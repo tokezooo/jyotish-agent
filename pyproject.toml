@@ -1,0 +1,60 @@
+[project]
+name = "jyotish-agent"
+version = "0.1.0"
+description = "Agentic Jyotish assistant: deterministic PyJHora calculations behind typed tools for a Pi agent harness."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+license = { text = "AGPL-3.0-only" }
+authors = [{ name = "Vlad Dryamov", email = "vd@shftd.ai" }]
+
+# NOTE: PyJHora is AGPL-3.0. MVP posture is LOCAL-ONLY (no distribution).
+# Do not publish, deploy publicly, or ship a wheel until the AGPL obligation
+# is deliberately handled. See PLAN.md "Risks" and TODOS.md P1.
+dependencies = [
+    "fastapi>=0.115,<0.116",
+    "uvicorn[standard]>=0.34,<0.35",
+    "pydantic>=2.9,<3",
+    "PyJHora==4.8.6",
+    # PyJHora's wheel declares no runtime deps; pin the headless calculation set
+    # explicitly. GUI/plotting deps (PyQt6, matplotlib) are intentionally omitted;
+    # see scripts/check_pyjhora_data.py and the headless import smoke test.
+    # Upper bounds on the numeric stack: PyJHora is older code and numpy/pandas
+    # major bumps routinely break it. uv.lock pins exact versions; these caps stop
+    # an unlocked install from floating into an incompatible major.
+    "pyswisseph>=2.10,<3",
+    "numpy>=1.26,<3",
+    "scipy>=1.11,<2",
+    "geopy>=2.4,<3",
+    "geocoder>=1.38,<2",  # required: jhora.utils imports geocoder at module load
+    "timezonefinder>=6.5,<9",
+    "pandas>=2.1,<3",
+    "pytz>=2024.1",
+    "python-dateutil>=2.9,<3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3,<9",
+    "httpx>=0.28,<0.29",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jyotish_agent"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+# Third-party import-time noise (geocoder ships invalid escape sequences); our own
+# code must not rely on this to hide real warnings.
+filterwarnings = [
+    "ignore::SyntaxWarning",
+    "ignore::DeprecationWarning",
+]
+
+[tool.uv]
+# Local-only project; no publish target configured by design.
+package = true
