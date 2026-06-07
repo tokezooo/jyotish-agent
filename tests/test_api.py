@@ -43,6 +43,8 @@ _EXPECTED_TOP_KEYS = {
 _EXPECTED_FACT_KEYS = {
     "ascendant",
     "houses",
+    "lagnas",
+    "bhava",
     "aspects",
     "d1",
     "d9",
@@ -304,6 +306,13 @@ def test_unknown_chart_returns_422():
     r = client.post("/charts/compute", json=_compute_body(charts=["D99"]))
     assert r.status_code == 422
     assert r.headers["content-type"].startswith("application/problem+json")
+
+
+@requires_engine
+def test_unknown_node_aspects_returns_422():
+    r = client.post("/charts/compute", json=_compute_body(node_aspects="nope"))
+    assert r.status_code == 422
+    assert "node_aspects" in r.json()["problem"]
 
 
 @requires_engine

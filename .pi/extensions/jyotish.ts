@@ -76,6 +76,7 @@ const ConfigSchema = Type.Object(
       Type.String({ description: "Default LAHIRI. Must be Moshier-safe without .se1." }),
     ),
     rahu_ketu: Type.Optional(StringEnum(["true_nodes", "mean_nodes"] as const)),
+    node_aspects: Type.Optional(StringEnum(["standard", "jupiter_like"] as const)),
     reference_date: Type.Optional(
       Type.String({
         description: "YYYY-MM-DD for the running dasha; defaults to today",

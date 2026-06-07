@@ -198,7 +198,48 @@ def test_aspect_offsets_rules():
     assert names.aspect_offsets(2) == frozenset({3, 6, 7})  # Mars
     assert names.aspect_offsets(4) == frozenset({4, 6, 8})  # Jupiter
     assert names.aspect_offsets(6) == frozenset({2, 6, 9})  # Saturn
-    assert names.aspect_offsets(7) == frozenset({6})  # Rahu: 7th only (MVP)
+    assert names.aspect_offsets(7) == frozenset({6})  # Rahu: 7th only (standard)
+    # jupiter_like gives the nodes 5th/7th/9th; non-nodes are unaffected.
+    assert names.aspect_offsets(7, "jupiter_like") == frozenset({4, 6, 8})
+    assert names.aspect_offsets(0, "jupiter_like") == frozenset({6})
+
+
+def test_varga_lagnas_and_bhava():
+    out = compute_chart(
+        _PROFILE, reference_date=_REFERENCE, config=CalculationConfig(charts=("D9",))
+    )
+    facts = out["facts"]
+    # Per-chart lagnas (lowercase keys); d1 lagna aliases the top-level ascendant.
+    assert facts["lagnas"]["d1"]["sign"] == facts["ascendant"]["sign"]
+    assert "d9" in facts["lagnas"] and facts["lagnas"]["d9"]["sign"] is not None
+    # Per-varga bhava tables; bhava.d1 aliases houses, and d9 uses the D9 lagna so its
+    # table differs from D1's.
+    assert facts["bhava"]["d1"] == facts["houses"]
+    assert len(facts["bhava"]["d9"]) == 12
+    assert facts["bhava"]["d9"] != facts["bhava"]["d1"]
+    atoms = iter_fact_atoms(facts)
+    assert atoms["lagnas.d9.sign"] == facts["lagnas"]["d9"]["sign"]
+    assert atoms["bhava.d9.1.sign"] == facts["bhava"]["d9"][0]["sign"]
+    assert "bhava.d9.10.lord" in atoms
+
+
+def test_node_jupiter_like_aspects_enable_rahu_drishti():
+    standard = compute_chart(_PROFILE, reference_date=_REFERENCE)["facts"]["aspects"]
+    jlike = compute_chart(
+        _PROFILE, reference_date=_REFERENCE, config=CalculationConfig(node_aspects="jupiter_like")
+    )["facts"]["aspects"]
+    # Standard: nodes aspect the 7th only (1 sign). jupiter_like: 5th/7th/9th (3 signs).
+    assert len(standard["Rahu"]["aspected_signs"]) == 1
+    assert len(jlike["Rahu"]["aspected_signs"]) == 3
+
+
+def test_unknown_node_aspects_rejected():
+    from jyotish_agent.config import ConfigError
+
+    with pytest.raises(ConfigError, match="unknown node_aspects"):
+        compute_chart(
+            _PROFILE, reference_date=_REFERENCE, config=CalculationConfig(node_aspects="nope")
+        )
 
 
 def test_house_base_case_planet_in_lagna_is_first_house():

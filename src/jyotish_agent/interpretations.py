@@ -28,6 +28,11 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
         ascendant.sign            -> "Pisces"
         d1.Sun.sign               -> "Sagittarius"
         d1.Sun.degrees            -> "16.886946"
+        d1.Sun.house              -> "10"
+        houses.10.lord            -> "Jupiter"
+        bhava.d9.10.lord          -> "..."   (per-varga bhava table)
+        lagnas.d9.sign            -> "..."   (per-varga lagna)
+        aspects.Saturn.Moon       -> "true"
         panchanga.nakshatra       -> "Shatabhisha"
         panchanga.nakshatra.pada  -> "1"
         vimshottari.mahadasha.lord-> "Saturn"
@@ -59,14 +64,30 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
             if placement.get("house") is not None:
                 atoms[f"{chart_key}.{planet}.house"] = str(placement["house"])
 
-    for house in facts.get("houses") or []:
-        n = house.get("house")
-        if n is None:
-            continue
-        if house.get("sign") is not None:
-            atoms[f"houses.{n}.sign"] = str(house["sign"])
-        if house.get("lord") is not None:
-            atoms[f"houses.{n}.lord"] = str(house["lord"])
+    def _emit_house_table(prefix: str, table) -> None:
+        for house in table or []:
+            n = house.get("house")
+            if n is None:
+                continue
+            if house.get("sign") is not None:
+                atoms[f"{prefix}.{n}.sign"] = str(house["sign"])
+            if house.get("lord") is not None:
+                atoms[f"{prefix}.{n}.lord"] = str(house["lord"])
+
+    _emit_house_table("houses", facts.get("houses"))  # D1 alias
+
+    # Per-varga bhava tables: bhava.<Chart>.<N>.sign / .lord
+    bhava = facts.get("bhava")
+    if isinstance(bhava, dict):
+        for chart_name, table in bhava.items():
+            _emit_house_table(f"bhava.{chart_name}", table)
+
+    # Varga lagnas: lagnas.<Chart>.sign
+    lagnas = facts.get("lagnas")
+    if isinstance(lagnas, dict):
+        for chart_name, lag in lagnas.items():
+            if isinstance(lag, dict) and lag.get("sign") is not None:
+                atoms[f"lagnas.{chart_name}.sign"] = str(lag["sign"])
 
     # Planet-to-planet aspects: aspects.<From>.<To> = "true" if From aspects To.
     aspects = facts.get("aspects")

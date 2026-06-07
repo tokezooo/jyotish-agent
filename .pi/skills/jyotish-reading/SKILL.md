@@ -59,7 +59,13 @@ on you to ensure every factual claim in `summary` is backed by an entry in
   `houses.10.lord` is the 10th-house (career) lord.
 - `aspects.<From>.<To>` (value `true`) for D1 graha drishti, e.g. `aspects.Saturn.Moon`
   means Saturn aspects the Moon. Every planet aspects the 7th; Mars also 4th/8th,
-  Jupiter 5th/9th, Saturn 3rd/10th.
+  Jupiter 5th/9th, Saturn 3rd/10th. Rahu/Ketu aspect the 7th only unless
+  `config.node_aspects="jupiter_like"` (then 5th/7th/9th).
+- `lagnas.<chart>.sign` for each computed chart's own lagna (e.g. `lagnas.d9.sign` is
+  the navamsa lagna; chart keys are lowercase like `d1`/`d9`). `ascendant` is the d1
+  alias.
+- `bhava.<chart>.<N>.sign`, `bhava.<chart>.<N>.lord` for each chart's 12-house bhava
+  table (N = 1..12), e.g. `bhava.d9.10.lord`. `houses.<N>` is the d1 alias.
 - `panchanga.tithi`, `panchanga.nakshatra` (+ `panchanga.nakshatra.pada`),
   `panchanga.yoga`, `panchanga.karana`, `panchanga.weekday`
 - `vimshottari.mahadasha.lord` / `.start` / `.end` (and `bhukti`, `antara`)

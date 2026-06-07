@@ -77,6 +77,8 @@ class CalculationConfigRequest(BaseModel):
 
     ayanamsa: str = "LAHIRI"
     rahu_ketu: str = "true_nodes"
+    # Rahu/Ketu drishti: "standard" (7th only) or "jupiter_like" (5/7/9).
+    node_aspects: str = "standard"
     # Divisional charts to compute. Unknown names are rejected by the engine (422);
     # D1 is always added. Defaults to D1+D9.
     charts: list[str] = Field(default_factory=lambda: list(DEFAULT_CHARTS))
@@ -84,10 +86,12 @@ class CalculationConfigRequest(BaseModel):
     reference_date: _dt.date | None = None
 
     def to_calculation_config(self) -> CalculationConfig:
-        # ayanamsa / rahu_ketu / charts validity is enforced by the engine (single source).
+        # Field validity (ayanamsa / rahu_ketu / node_aspects / charts) is enforced by
+        # the engine (single source of truth).
         return CalculationConfig(
             ayanamsa=self.ayanamsa,
             rahu_ketu=self.rahu_ketu,
+            node_aspects=self.node_aspects,
             charts=tuple(self.charts),
         )
 

@@ -199,8 +199,17 @@ ASPECT_OFFSETS: dict[int, frozenset[int]] = {
 }
 
 
-def aspect_offsets(planet_index: int) -> frozenset[int]:
-    """Forward sign offsets a planet aspects (7th for most; specials for Ma/Ju/Sa)."""
+_NODE_INDICES = (7, 8)  # Rahu, Ketu
+_JUPITER_LIKE = frozenset({4, 6, 8})  # 5th/7th/9th
+
+
+def aspect_offsets(planet_index: int, node_aspects: str = "standard") -> frozenset[int]:
+    """Forward sign offsets a planet aspects (7th for most; specials for Ma/Ju/Sa).
+
+    Rahu/Ketu get the 7th only by default; with ``node_aspects="jupiter_like"`` they
+    aspect the 5th/7th/9th (school-dependent)."""
+    if planet_index in _NODE_INDICES and node_aspects == "jupiter_like":
+        return _JUPITER_LIKE
     return ASPECT_OFFSETS.get(planet_index, _DEFAULT_ASPECT_OFFSETS)
 
 

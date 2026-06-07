@@ -83,6 +83,9 @@ class CalculationConfig:
     rahu_ketu: str = "true_nodes"  # vs "mean_nodes"; applied via const.set_node_mode
     # Divisional charts to compute. D1 is always included (carries the ascendant).
     charts: tuple[str, ...] = DEFAULT_CHARTS
+    # Rahu/Ketu drishti: "standard" = 7th only; "jupiter_like" = 5th/7th/9th (some
+    # schools). Affects only the nodes' aspects.
+    node_aspects: str = "standard"
 
     def resolved_charts(self) -> dict[str, int]:
         """Validated {chart_name: factor}, always including D1, order-stable.
@@ -127,6 +130,12 @@ def apply_config(config: CalculationConfig | None = None) -> CalculationConfig:
         raise ConfigError(
             f"unknown rahu_ketu {config.rahu_ketu!r}; expected "
             f"'true_nodes' or 'mean_nodes'"
+        )
+
+    if config.node_aspects not in ("standard", "jupiter_like"):
+        raise ConfigError(
+            f"unknown node_aspects {config.node_aspects!r}; expected "
+            f"'standard' or 'jupiter_like'"
         )
 
     drik.set_ayanamsa_mode(mode)

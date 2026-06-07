@@ -69,9 +69,12 @@ Interpretive surface (all citation-enforced): D1/D2/D3/D7/D9/D10/D12 + per-plane
 - Golden fixtures keyed by mode: `golden_chennai_1990_{moshier,swiss}.json`. CI without `.se1` runs the Moshier baseline; both paths verified (83 pass, 2 mode-specific skips each).
 - Parity: Swiss vs Moshier agree to within 0.1° (same sign) — confirms the fallback was a faithful approximation (LAHIRI Sun differed by ~5e-6°). True external-reference parity (vs astro.com/JHora published values) still needs trusted source data — future.
 
+### Phase 8: per-varga bhava + varga lagnas + node aspects (DONE)
+- `facts["lagnas"]` (each chart's own lagna; `d1` aliases `ascendant`) and `facts["bhava"]` (each chart's 12-house table; `d1` aliases `houses`). Chart keys lowercased (`d1`/`d9`). Citation paths `lagnas.<chart>.sign`, `bhava.<chart>.<N>.sign/.lord`.
+- `config.node_aspects` ("standard" 7th-only | "jupiter_like" 5/7/9) tunes Rahu/Ketu drishti; bad value -> 422.
+
 ### Candidate future milestones (not started)
 - Trust-boundary hardening: prose-citation enforcement, harness-forced check/screen gates, multilingual safety screen.
-- Per-varga bhava tables + varga lagnas; node special aspects.
 
 ### Resolved in Phase-3 review (feat/phase-3-api, pre-merge)
 

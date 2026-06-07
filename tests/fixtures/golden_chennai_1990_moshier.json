@@ -5,6 +5,7 @@
       "D1",
       "D9"
     ],
+    "node_aspects": "standard",
     "rahu_ketu": "true_nodes",
     "reference_date": [
       2026,
@@ -167,6 +168,180 @@
           "Ketu"
         ]
       }
+    },
+    "bhava": {
+      "d1": [
+        {
+          "house": 1,
+          "lord": "Jupiter",
+          "lord_index": 4,
+          "sign": "Pisces",
+          "sign_index": 11
+        },
+        {
+          "house": 2,
+          "lord": "Mars",
+          "lord_index": 2,
+          "sign": "Aries",
+          "sign_index": 0
+        },
+        {
+          "house": 3,
+          "lord": "Venus",
+          "lord_index": 5,
+          "sign": "Taurus",
+          "sign_index": 1
+        },
+        {
+          "house": 4,
+          "lord": "Mercury",
+          "lord_index": 3,
+          "sign": "Gemini",
+          "sign_index": 2
+        },
+        {
+          "house": 5,
+          "lord": "Moon",
+          "lord_index": 1,
+          "sign": "Cancer",
+          "sign_index": 3
+        },
+        {
+          "house": 6,
+          "lord": "Sun",
+          "lord_index": 0,
+          "sign": "Leo",
+          "sign_index": 4
+        },
+        {
+          "house": 7,
+          "lord": "Mercury",
+          "lord_index": 3,
+          "sign": "Virgo",
+          "sign_index": 5
+        },
+        {
+          "house": 8,
+          "lord": "Venus",
+          "lord_index": 5,
+          "sign": "Libra",
+          "sign_index": 6
+        },
+        {
+          "house": 9,
+          "lord": "Mars",
+          "lord_index": 2,
+          "sign": "Scorpio",
+          "sign_index": 7
+        },
+        {
+          "house": 10,
+          "lord": "Jupiter",
+          "lord_index": 4,
+          "sign": "Sagittarius",
+          "sign_index": 8
+        },
+        {
+          "house": 11,
+          "lord": "Saturn",
+          "lord_index": 6,
+          "sign": "Capricorn",
+          "sign_index": 9
+        },
+        {
+          "house": 12,
+          "lord": "Saturn",
+          "lord_index": 6,
+          "sign": "Aquarius",
+          "sign_index": 10
+        }
+      ],
+      "d9": [
+        {
+          "house": 1,
+          "lord": "Saturn",
+          "lord_index": 6,
+          "sign": "Aquarius",
+          "sign_index": 10
+        },
+        {
+          "house": 2,
+          "lord": "Jupiter",
+          "lord_index": 4,
+          "sign": "Pisces",
+          "sign_index": 11
+        },
+        {
+          "house": 3,
+          "lord": "Mars",
+          "lord_index": 2,
+          "sign": "Aries",
+          "sign_index": 0
+        },
+        {
+          "house": 4,
+          "lord": "Venus",
+          "lord_index": 5,
+          "sign": "Taurus",
+          "sign_index": 1
+        },
+        {
+          "house": 5,
+          "lord": "Mercury",
+          "lord_index": 3,
+          "sign": "Gemini",
+          "sign_index": 2
+        },
+        {
+          "house": 6,
+          "lord": "Moon",
+          "lord_index": 1,
+          "sign": "Cancer",
+          "sign_index": 3
+        },
+        {
+          "house": 7,
+          "lord": "Sun",
+          "lord_index": 0,
+          "sign": "Leo",
+          "sign_index": 4
+        },
+        {
+          "house": 8,
+          "lord": "Mercury",
+          "lord_index": 3,
+          "sign": "Virgo",
+          "sign_index": 5
+        },
+        {
+          "house": 9,
+          "lord": "Venus",
+          "lord_index": 5,
+          "sign": "Libra",
+          "sign_index": 6
+        },
+        {
+          "house": 10,
+          "lord": "Mars",
+          "lord_index": 2,
+          "sign": "Scorpio",
+          "sign_index": 7
+        },
+        {
+          "house": 11,
+          "lord": "Jupiter",
+          "lord_index": 4,
+          "sign": "Sagittarius",
+          "sign_index": 8
+        },
+        {
+          "house": 12,
+          "lord": "Saturn",
+          "lord_index": 6,
+          "sign": "Capricorn",
+          "sign_index": 9
+        }
+      ]
     },
     "d1": [
       {
@@ -402,6 +577,18 @@
         "sign_index": 10
       }
     ],
+    "lagnas": {
+      "d1": {
+        "degrees": 25.460176,
+        "sign": "Pisces",
+        "sign_index": 11
+      },
+      "d9": {
+        "degrees": 19.141581,
+        "sign": "Aquarius",
+        "sign_index": 10
+      }
+    },
     "panchanga": {
       "karana": {
         "index": 9,

@@ -100,7 +100,7 @@ def _ascendant(chart) -> dict:
     }
 
 
-def _aspects(chart) -> dict:
+def _aspects(chart, node_aspects: str = "standard") -> dict:
     """Graha drishti for a chart: which signs/houses/planets each planet aspects.
 
     Whole-sign graha drishti. Conjunctions (same sign) are not aspects. Houses are
@@ -110,7 +110,7 @@ def _aspects(chart) -> dict:
     planet_signs = {int(body): int(pos[0]) for body, pos in chart if body != "L"}
     result: dict[str, dict] = {}
     for pidx, sign in planet_signs.items():
-        aspected = sorted({(sign + off) % 12 for off in names.aspect_offsets(pidx)})
+        aspected = sorted({(sign + off) % 12 for off in names.aspect_offsets(pidx, node_aspects)})
         aspected_set = set(aspected)
         hit_planets = sorted(
             names.planet_name(other)
@@ -269,11 +269,13 @@ def compute_chart(
     # ascendant is taken from D1, which resolved_charts guarantees is present.
     divisional_facts = {name.lower(): _placements(chart) for name, chart in raw_charts.items()}
     ascendant = _ascendant(raw_charts["D1"])
-    # Bhava table is D1-only by design; per-varga house tables are out of MVP scope
-    # (each chart's planets still carry their own whole-sign `house` field).
+    # D1 ascendant/houses are retained as top-level aliases for back-compat; the
+    # general per-chart forms are `lagnas` and `bhava` (which include D1). Keys are
+    # lowercased (d1, d9, ...) to match the divisional placement key convention.
     houses = _houses(raw_charts["D1"])
-    # Aspects (graha drishti) are D1-only in the MVP, like the bhava table.
-    aspects = _aspects(raw_charts["D1"])
+    lagnas = {name.lower(): _ascendant(chart) for name, chart in raw_charts.items()}
+    bhava = {name.lower(): _houses(chart) for name, chart in raw_charts.items()}
+    aspects = _aspects(raw_charts["D1"], applied.node_aspects)
 
     return {
         "normalized_input": {
@@ -288,6 +290,7 @@ def compute_chart(
         "calculation_config": {
             "ayanamsa": applied.ayanamsa,
             "rahu_ketu": applied.rahu_ketu,
+            "node_aspects": applied.node_aspects,
             "charts": list(resolved),
             # reference_date drives the running Vimshottari period; surfaced here so a
             # quoted/cached result is fully reproducible from calculation_config alone.
@@ -296,6 +299,8 @@ def compute_chart(
         "facts": {
             "ascendant": ascendant,
             "houses": houses,
+            "lagnas": lagnas,
+            "bhava": bhava,
             "aspects": aspects,
             **divisional_facts,
             "panchanga": panchanga,
