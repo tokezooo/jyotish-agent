@@ -46,6 +46,7 @@ _EXPECTED_FACT_KEYS = {
     "lagnas",
     "bhava",
     "aspects",
+    "yogas",
     "d1",
     "d9",
     "panchanga",
@@ -313,6 +314,26 @@ def test_aspect_fact_roundtrips_through_validation():
             "answer": {
                 "summary": "Saturn aspect.",
                 "facts_used": [{"path": f"aspects.Saturn.{target}", "value": "true"}],
+            },
+            "facts": c["facts"],
+            "facts_token": c["facts_token"],
+        },
+    )
+    assert v.json() == {"valid": True, "violations": []}
+
+
+@requires_engine
+def test_yoga_fact_roundtrips_through_validation():
+    c = client.post("/charts/compute", json=_compute_body()).json()
+    val = c["facts"]["yogas"]["Gajakesari"]["present"]
+    v = client.post(
+        "/answers/validate",
+        json={
+            "answer": {
+                "summary": "Gajakesari status.",
+                "facts_used": [
+                    {"path": "yogas.Gajakesari.present", "value": "true" if val else "false"}
+                ],
             },
             "facts": c["facts"],
             "facts_token": c["facts_token"],

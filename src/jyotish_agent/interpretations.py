@@ -110,6 +110,13 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
             for to_planet in info.get("aspects_planets") or []:
                 atoms[f"aspects.{from_planet}.{to_planet}"] = "true"
 
+    # Yogas: yogas.<Name>.present = "true"/"false"
+    yogas = facts.get("yogas")
+    if isinstance(yogas, dict):
+        for name, info in yogas.items():
+            if isinstance(info, dict) and "present" in info:
+                atoms[f"yogas.{name}.present"] = "true" if info["present"] else "false"
+
     panchanga = facts.get("panchanga") or {}
     for key, entry in panchanga.items():
         if not isinstance(entry, dict):

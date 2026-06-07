@@ -233,6 +233,14 @@ def test_node_jupiter_like_aspects_enable_rahu_drishti():
     assert len(jlike["Rahu"]["aspected_signs"]) == 3
 
 
+def test_yogas_in_facts_and_citable():
+    facts = _compute()["facts"]
+    assert "yogas" in facts and "Gajakesari" in facts["yogas"]
+    atoms = iter_fact_atoms(facts)
+    assert atoms["yogas.Gajakesari.present"] in ("true", "false")
+    assert atoms["yogas.Budha-Aditya.present"] in ("true", "false")
+
+
 def test_unknown_node_aspects_rejected():
     from jyotish_agent.config import ConfigError
 

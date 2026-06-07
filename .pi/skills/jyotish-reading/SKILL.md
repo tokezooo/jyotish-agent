@@ -68,6 +68,12 @@ stands: back every factual claim in `summary` with an entry in `facts_used`.
   alias.
 - `bhava.<chart>.<N>.sign`, `bhava.<chart>.<N>.lord` for each chart's 12-house bhava
   table (N = 1..12), e.g. `bhava.d9.10.lord`. `houses.<N>` is the d1 alias.
+- `yogas.<Name>.present` (`true`/`false`) for the supported geometric yogas
+  (Gajakesari, Chandra-Mangala, Budha-Aditya). Each yoga in `facts.yogas` also carries
+  the exact `definition` used and the `basis` geometry — cite the definition, and only
+  claim a yoga when `present` is `true`. This is a deliberately NARROW geometric set
+  (not full yoga coverage) with no strength/combustion/cancellation analysis; do not
+  imply completeness or claim a yoga's effect as deterministic.
 - `panchanga.tithi`, `panchanga.nakshatra` (+ `panchanga.nakshatra.pada`),
   `panchanga.yoga`, `panchanga.karana`, `panchanga.weekday`
 - `vimshottari.mahadasha.lord` / `.start` / `.end` (and `bhukti`, `antara`)

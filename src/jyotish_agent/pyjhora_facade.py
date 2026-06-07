@@ -17,6 +17,7 @@ from datetime import datetime, timedelta
 
 from . import ENGINE_VERSION, names
 from .config import ENGINE_LOCK, CalculationConfig, apply_config, ephemeris_mode
+from .yogas import detect_yogas
 
 
 class EngineOutputError(ValueError):
@@ -269,6 +270,7 @@ def compute_chart(
     # ascendant is taken from D1, which resolved_charts guarantees is present.
     divisional_facts = {name.lower(): _placements(chart) for name, chart in raw_charts.items()}
     ascendant = _ascendant(raw_charts["D1"])
+    yogas = detect_yogas(divisional_facts["d1"])  # narrow geometric set, D1 only
     # D1 ascendant/houses are retained as top-level aliases for back-compat; the
     # general per-chart forms are `lagnas` and `bhava` (which include D1). Keys are
     # lowercased (d1, d9, ...) to match the divisional placement key convention.
@@ -302,6 +304,7 @@ def compute_chart(
             "lagnas": lagnas,
             "bhava": bhava,
             "aspects": aspects,
+            "yogas": yogas,
             **divisional_facts,
             "panchanga": panchanga,
             "vimshottari": vimshottari,

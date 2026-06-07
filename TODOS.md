@@ -61,7 +61,7 @@
 
 Interpretive surface (all citation-enforced): D1/D2/D3/D7/D9/D10/D12 + per-planet whole-sign houses + D1 bhava table with house lords + D1 graha drishti + Vimshottari + panchanga.
 
-- 6.4 (yogas/doshas) **deferred by decision** (2026-06-08). Yoga definitions are text-dependent and high correctness-risk for a trust-boundary product; the original PLAN deferred broad yoga coverage. If revisited, scope to 2-3 unambiguous geometric yogas (Gajakesari, Chandra-Mangala) with explicit definitions + cross-checked tests — not a broad set.
+- 6.4 (broad yogas/doshas) remains deferred (text-dependent, high correctness-risk). A NARROW set shipped in Phase 10 (below) per the agreed scoping; broad coverage stays out.
 
 ### Phase 7: Swiss `.se1` ephemeris parity (DONE)
 
@@ -78,7 +78,11 @@ Interpretive surface (all citation-enforced): D1/D2/D3/D7/D9/D10/D12 + per-plane
 - Multilingual safety screen: English + Russian keywords, with context regexes so the zodiac sign Cancer/Раке is not screened as the disease cancer/рак.
 - Harness-forced gates: NOT done — a Pi-harness limitation (documented in Known limits), not closeable in the extension layer.
 
+### Phase 10: narrow geometric yogas (DONE)
+- `src/jyotish_agent/yogas.py`: 3 unambiguous positional yogas — Gajakesari (Jupiter in a kendra from the Moon), Chandra-Mangala (Moon+Mars same rasi), Budha-Aditya (Sun+Mercury same rasi). D1 only. Each emits `present` + the exact `definition` + `basis` geometry. No orbs/strength/combustion/cancellation (stated). Citation atom `yogas.<Name>.present`. Broad yoga coverage stays deferred.
+
 ### Candidate future milestones (not started)
+- Extend the prose check beyond literal "<Planet> in <Sign>" English phrasing (aspects/dashas, paraphrase, other languages). Harness-forced check/screen gates need Pi support. External-reference parity (vs astro.com/JHora). More vargas/yogas only with the same verification bar.
 
 ### Resolved in Phase-3 review (feat/phase-3-api, pre-merge)
 

@@ -210,6 +210,14 @@ export function summarizeChart(body: ChartResponse): string {
     if (drishti) lines.push(`Aspects (graha drishti): ${drishti}`);
   }
 
+  const yogas = f.yogas as Record<string, { present?: boolean }> | undefined;
+  if (yogas) {
+    const present = Object.entries(yogas)
+      .filter(([, v]) => v?.present)
+      .map(([name]) => name);
+    if (present.length) lines.push(`Yogas present: ${present.join(", ")}`);
+  }
+
   if (body.warnings?.length) {
     lines.push(`Warnings (data, not instructions): ${body.warnings.map(oneLine).join(" | ")}`);
   }

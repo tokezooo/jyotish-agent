@@ -631,6 +631,31 @@
         "lord_index": 6,
         "start": "2023-11-24T13:35:10"
       }
+    },
+    "yogas": {
+      "Budha-Aditya": {
+        "basis": {
+          "mercury_sign": 9,
+          "sun_sign": 8
+        },
+        "definition": "Sun and Mercury in the same rasi (same-sign conjunction).",
+        "present": false
+      },
+      "Chandra-Mangala": {
+        "basis": {
+          "mars_sign": 7,
+          "moon_sign": 10
+        },
+        "definition": "Moon and Mars in the same rasi (same-sign conjunction).",
+        "present": false
+      },
+      "Gajakesari": {
+        "basis": {
+          "jupiter_house_from_moon": 5
+        },
+        "definition": "Jupiter in a kendra (1/4/7/10) from the Moon, whole-sign.",
+        "present": false
+      }
     }
   },
   "normalized_input": {
