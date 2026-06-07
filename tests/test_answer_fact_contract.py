@@ -109,17 +109,86 @@ def test_multiple_violations_reported():
 @pytest.mark.parametrize(
     "question,expected",
     [
-        ("Will I get cancer?", SafetyCategory.medical),
+        ("Will I get cancer?", SafetyCategory.medical),  # "get cancer" context
+        ("Is my cancer treatment timing good?", SafetyCategory.medical),
         ("When will I die?", SafetyCategory.deterministic_harm),
         ("Should I invest in this stock?", SafetyCategory.financial),
         ("I want to die, what does my chart say?", SafetyCategory.self_harm),
         ("Should I file a lawsuit?", SafetyCategory.legal),
         ("What are my strongest career signals?", None),
         ("Tell me about my Saturn placement.", None),
+        # The zodiac sign Cancer must NOT trip the medical screen.
+        ("Tell me about my Moon in Cancer.", None),
+        ("What does a Cancer ascendant mean?", None),
+        # Russian (studio is Russian-primary)
+        ("Когда я умру?", SafetyCategory.deterministic_harm),
+        ("У меня рак груди?", SafetyCategory.medical),  # contextual рак
+        ("Не хочу жить, что говорит карта?", SafetyCategory.self_harm),
+        ("Что значит Луна в Раке?", None),  # zodiac Cancer, not medical
+        ("Какие у меня сигналы по карьере?", None),
     ],
 )
 def test_screen_question(question, expected):
     assert screen_question(question) == expected
+
+
+@pytest.mark.parametrize(
+    "benign",
+    [
+        "Что моя карта говорит о судьбе?",  # судьба (fate) must not trip "суд"
+        "Расскажи про мой характер.",  # характер must not trip "рак"
+        "Какие у меня увлечения по карте?",  # увлечение must not trip "лечени"
+        "Какая моя реакция на стресс по карте?",  # реакция must not trip "акци"
+    ],
+)
+def test_russian_astrology_terms_not_falsely_screened(benign):
+    assert screen_question(benign) is None
+
+
+def test_prose_contradiction_detected():
+    # Summary claims Sun in Leo, but the fixture places Sun in Sagittarius.
+    v = validate_answer(
+        [{"path": "d1.Sun.sign", "value": "Sagittarius"}],
+        _FACTS,
+        summary="The native has Sun in Leo, giving strong leadership.",
+    )
+    assert any("Sun in Leo" in m and "Sagittarius" in m for m in v)
+
+
+def test_prose_true_placement_passes():
+    # A correct placement in prose is not flagged.
+    v = validate_answer(
+        [{"path": "d1.Sun.sign", "value": "Sagittarius"}],
+        _FACTS,
+        summary="With Sun in Sagittarius, the native is principled.",
+    )
+    assert v == []
+
+
+def test_prose_check_skipped_without_summary():
+    # Backward-compatible: no summary -> only facts_used checked.
+    assert validate_answer([{"path": "d1.Sun.sign", "value": "Sagittarius"}], _FACTS) == []
+
+
+def test_prose_negation_not_flagged():
+    # A counterfactual contrast must not be flagged as a contradiction.
+    v = validate_answer(
+        [{"path": "d1.Sun.sign", "value": "Sagittarius"}],
+        _FACTS,
+        summary="Unlike a Sun in Leo native, this person is reserved.",
+    )
+    assert v == []
+
+
+def test_prose_cross_chart_union_is_a_known_false_negative():
+    # Documented limit: a claim true in ANY computed chart is not flagged, even if
+    # stated about a different chart. This pins the known false-negative.
+    facts = {
+        "d1": [{"planet": "Sun", "sign": "Sagittarius", "degrees": 16.0}],
+        "d9": [{"planet": "Sun", "sign": "Virgo", "degrees": 1.0}],
+    }
+    # "Sun in Virgo" is true in D9, so it is NOT flagged even if meant about D1.
+    assert validate_answer([], facts, summary="The D1 Sun in Virgo is key.") == []
 
 
 def test_self_harm_takes_priority():

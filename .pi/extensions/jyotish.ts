@@ -344,9 +344,11 @@ export default function (pi: ExtensionAPI) {
     label: "Check answer citations",
     description:
       "Verify that a drafted interpretive answer cites only computed facts. Pass the " +
-      "answer's facts_used and the `facts` block from jyotish_compute_chart. Returns " +
-      "violations for any cited fact that is invented or has the wrong value. Call this " +
-      "before giving the user the final answer; if it returns violations, fix them.",
+      "answer's facts_used, summary, and the `facts` + `facts_token` from " +
+      "jyotish_compute_chart. Returns violations for any cited fact that is invented or " +
+      "has the wrong value, AND for '<Planet> in <Sign>' claims in the summary that " +
+      "contradict the charts. Call before giving the final answer; if it returns " +
+      "violations, fix them.",
     promptGuidelines: [
       "Always call jyotish_check_answer before finalizing a chart interpretation.",
       "If it returns violations, correct facts_used and the prose, then re-check.",

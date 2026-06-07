@@ -64,11 +64,13 @@ uv run uvicorn jyotish_agent.api:app --reload   # http://127.0.0.1:8000 (docs at
   `config.charts` selects divisional charts from D1, D2, D3, D7, D9, D10 (career),
   D12 — D1 is always included; defaults to D1+D9.
 - `POST /answers/validate` — enforce the fact-citation contract: checks an answer's
-  `facts_used` against the computed facts. The `facts_token` (from `/charts/compute`)
-  binds validation to real output, so an answer can't self-certify against forged
-  facts. It verifies the cited facts are real, not that the prose omits no claim.
+  `facts_used` against the computed facts, and additionally scans the `summary` for
+  "<Planet> in <Sign>" claims that contradict the charts (best-effort, common English
+  phrasing only — not a full prose check). The `facts_token` (from `/charts/compute`)
+  binds validation to real output, so an answer can't self-certify against forged facts.
 - `POST /questions/screen` — best-effort keyword screen (medical/legal/financial/
-  self-harm/deterministic-harm) with a suggested redirect. Advisory.
+  self-harm/deterministic-harm), English + Russian, with a suggested redirect.
+  Advisory; the agent's own judgement is the primary safeguard.
 - `GET /health` — liveness.
 
 Errors are RFC 7807 `application/problem+json` with `problem` / `cause` / `fix`

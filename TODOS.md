@@ -34,12 +34,12 @@
 - README/skill updated; gate documented as skill-enforced (best-effort), not harness-forced.
 - Tests: token integrity (valid/forged), empty facts_used rejected, antara/bhukti/pada/start-end atoms, case-sensitivity, non-finite, screen endpoint.
 
-## Known limits (MVP, post-Phase-5)
+## Known limits (post-Phase-9)
 
-- The citation check cannot read `summary` prose, so an *uncited* invented claim isn't caught by the validator — only by the skill rule. True enforcement would need answer-prose parsing or a constrained generation step.
-- `jyotish_check_answer` / `jyotish_screen_question` are not harness-forced; a non-compliant agent could skip them.
-- Safety screen is English keyword-based (studio is Russian-primary) — broaden or replace with model-judgement for production.
-- Golden values are Moshier-fallback specific; install `.se1` for Swiss parity.
+- Prose-citation check is PARTIAL (Phase 9): it flags "<Planet> in <Sign>" claims that contradict the charts (common English phrasing only). It does NOT catch paraphrases ("occupies", "exalted in"), other phrasings/languages, or non-placement claims (aspects/dashas). Cross-chart claims are validated at planet-level union (a claim true in any computed chart passes). The skill rule (cite everything) remains primary.
+- `jyotish_check_answer` / `jyotish_screen_question` are NOT harness-forced — a non-compliant agent could skip them. True enforcement needs Pi-harness support (a required-tool / pre-response hook) that the extension layer cannot provide; documented as best-effort. **Not closeable in our code.**
+- Safety screen is best-effort keyword-based, now English + Russian (Phase 9), with context regexes for collision-prone terms (cancer/рак vs the sign Cancer/Раке). Still misses paraphrases/other languages.
+- Golden values are Moshier-fallback specific; install `.se1` for Swiss parity (Phase 7).
 
 ### Resolved in Phase-4 review (feat/phase-4-pi, pre-merge)
 
@@ -73,8 +73,12 @@ Interpretive surface (all citation-enforced): D1/D2/D3/D7/D9/D10/D12 + per-plane
 - `facts["lagnas"]` (each chart's own lagna; `d1` aliases `ascendant`) and `facts["bhava"]` (each chart's 12-house table; `d1` aliases `houses`). Chart keys lowercased (`d1`/`d9`). Citation paths `lagnas.<chart>.sign`, `bhava.<chart>.<N>.sign/.lord`.
 - `config.node_aspects` ("standard" 7th-only | "jupiter_like" 5/7/9) tunes Rahu/Ketu drishti; bad value -> 422.
 
+### Phase 9: trust-boundary hardening (DONE, partial)
+- Prose-contradiction detection wired into `/answers/validate` (flags "<Planet> in <Sign>" claims that contradict the charts; best-effort English phrasing, negation-aware, planet-level union). See Known limits.
+- Multilingual safety screen: English + Russian keywords, with context regexes so the zodiac sign Cancer/Раке is not screened as the disease cancer/рак.
+- Harness-forced gates: NOT done — a Pi-harness limitation (documented in Known limits), not closeable in the extension layer.
+
 ### Candidate future milestones (not started)
-- Trust-boundary hardening: prose-citation enforcement, harness-forced check/screen gates, multilingual safety screen.
 
 ### Resolved in Phase-3 review (feat/phase-3-api, pre-merge)
 

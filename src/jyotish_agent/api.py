@@ -117,7 +117,9 @@ async def validate_answer_endpoint(req: ValidateAnswerRequest) -> ValidateAnswer
         )
     # Then the fact-citation contract: every cited fact must exist with a matching value.
     facts_used = [ref.model_dump() for ref in req.answer.facts_used]
-    violations = validate_answer(facts_used, req.facts)
+    # Pass the summary so prose placement claims that contradict the facts are caught,
+    # not just the explicitly-cited facts_used.
+    violations = validate_answer(facts_used, req.facts, summary=req.answer.summary)
     return ValidateAnswerResponse(valid=not violations, violations=violations)
 
 

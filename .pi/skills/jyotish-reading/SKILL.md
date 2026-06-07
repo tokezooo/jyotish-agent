@@ -28,9 +28,11 @@ product's whole value is the visible boundary between **computed facts** and
    re-check. Do not give the user an answer that hasn't passed this check.
 
 This check verifies that the facts you *chose to cite* are real and unmodified (the
-`facts_token` binds them to the computed chart). It cannot read your prose, so it is
-on you to ensure every factual claim in `summary` is backed by an entry in
-`facts_used` — that is the rule, and the check only enforces the part it can see.
+`facts_token` binds them to the computed chart). It also scans your `summary` for
+"<Planet> in <Sign>" claims and rejects any that contradict the computed charts — so
+a wrong placement in prose is caught even if you forgot to cite it. It still cannot
+verify every kind of prose claim (aspects, dashas, nuanced statements), so the rule
+stands: back every factual claim in `summary` with an entry in `facts_used`.
 
 ## Answer contract
 

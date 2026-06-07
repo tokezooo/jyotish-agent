@@ -170,6 +170,26 @@ def test_validate_answer_rejects_invented_citation():
     assert len(body["violations"]) == 1
 
 
+def test_validate_answer_rejects_prose_contradiction():
+    # facts_used is honest (or empty of the bad claim), but the prose contradicts facts.
+    facts = {"d1": [{"planet": "Sun", "sign": "Sagittarius", "degrees": 16.0}]}
+    r = client.post(
+        "/answers/validate",
+        json={
+            "answer": {
+                "summary": "Sun in Leo dominates the chart.",
+                "facts_used": [{"path": "d1.Sun.sign", "value": "Sagittarius"}],
+            },
+            "facts": facts,
+            "facts_token": _signed(facts),
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["valid"] is False
+    assert any("Sun in Leo" in v for v in body["violations"])
+
+
 def test_validate_answer_rejects_forged_facts():
     # Agent forges a facts block (Sun in Leo) and cites it; without a valid token for
     # THOSE facts, the integrity check fails. This is the core anti-self-certification.

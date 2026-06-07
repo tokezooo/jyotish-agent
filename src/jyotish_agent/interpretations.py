@@ -17,7 +17,19 @@ import math
 import re
 from enum import Enum
 
+from .names import PLANETS, SIGNS
+
 _DIVISIONAL_KEY = re.compile(r"^d\d+$")
+
+# Matches "<Planet> [is|sits|placed] in <Sign>" claims in answer prose, so a stated
+# placement can be checked against the computed charts even if the author forgot to
+# add it to facts_used. Best-effort English-phrasing detector, not a parser.
+_PLACEMENT_CLAIM = re.compile(
+    r"\b(" + "|".join(PLANETS) + r")\b"
+    r"(?:\s+is|\s+sits|\s+is\s+placed|\s+placed)?\s+in\s+"
+    r"\b(" + "|".join(SIGNS) + r")\b",
+    re.IGNORECASE,
+)
 
 
 def iter_fact_atoms(facts: dict) -> dict[str, str]:
@@ -135,12 +147,69 @@ def _values_match(cited: str, computed: str) -> bool:
         return c == k
 
 
-def validate_answer(facts_used: list[dict], facts: dict) -> list[str]:
+def _planet_signs(facts: dict) -> dict[str, set[str]]:
+    """Map planet name -> set of signs it occupies across all computed charts."""
+    out: dict[str, set[str]] = {}
+    for key, value in facts.items():
+        if not _DIVISIONAL_KEY.match(key) or not isinstance(value, list):
+            continue
+        for placement in value:
+            planet, sign = placement.get("planet"), placement.get("sign")
+            if planet and sign:
+                out.setdefault(planet, set()).add(sign)
+    return out
+
+
+_NEGATION = re.compile(r"\b(not|never|no|isn't|aren't|unlike|n't|без|не)\b", re.IGNORECASE)
+
+
+def find_prose_contradictions(summary: str, facts: dict) -> list[str]:
+    """Detect '<Planet> in <Sign>' claims in the prose that CONTRADICT the computed
+    charts. Catches the MOST COMMON LITERAL English phrasing only — it is a
+    floor-raiser for accidental contradictions, NOT a security control. It is trivially
+    bypassed by paraphrase ("occupies", "exalted in", a comma), reversed word order, or
+    another language, so the model's own discipline (cite everything) remains primary.
+
+    Limitations (deliberate, documented):
+    - Negated/counterfactual mentions ("unlike a Sun in Leo native") are skipped to
+      avoid flagging correct answers.
+    - A placement is considered true if it holds in ANY computed chart (planet-level
+      union), so a claim about a specific varga that is only true in another varga is
+      NOT flagged. Per-chart prose validation is out of scope.
+    """
+    signs_by_planet = _planet_signs(facts)
+    canon_planet = {p.lower(): p for p in PLANETS}
+    canon_sign = {s.lower(): s for s in SIGNS}
+    violations: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for m in _PLACEMENT_CLAIM.finditer(summary or ""):
+        # Skip negated/counterfactual phrasings: a negation in the ~30 chars before the
+        # claim means the answer is contrasting, not asserting, the placement.
+        if _NEGATION.search(summary[max(0, m.start() - 30) : m.start()]):
+            continue
+        planet = canon_planet[m.group(1).lower()]
+        sign = canon_sign[m.group(2).lower()]
+        if (planet, sign) in seen:
+            continue
+        seen.add((planet, sign))
+        actual = signs_by_planet.get(planet, set())
+        if actual and sign not in actual:
+            violations.append(
+                f"summary claims '{planet} in {sign}' but the computed charts place "
+                f"{planet} in {sorted(actual)}"
+            )
+    return violations
+
+
+def validate_answer(
+    facts_used: list[dict], facts: dict, summary: str | None = None
+) -> list[str]:
     """Return a list of citation violations (empty == the answer is fact-grounded).
 
-    Each ``facts_used`` item is ``{"path": str, "value": str|number}``. A violation
-    is raised when the path is not a computed fact, or its value disagrees with the
-    computed value."""
+    Each ``facts_used`` item is ``{"path": str, "value": str|number}``. A violation is
+    raised when the path is not a computed fact, or its value disagrees with the
+    computed value. If ``summary`` is given, prose placement claims that contradict the
+    computed charts are also flagged (see find_prose_contradictions)."""
     atoms = iter_fact_atoms(facts)
     violations: list[str] = []
     for ref in facts_used:
@@ -154,6 +223,8 @@ def validate_answer(facts_used: list[dict], facts: dict) -> list[str]:
             violations.append(
                 f"fact '{path}' cited as '{value}' but the computed value is '{atoms[path]}'"
             )
+    if summary:
+        violations.extend(find_prose_contradictions(summary, facts))
     return violations
 
 
@@ -165,29 +236,50 @@ class SafetyCategory(str, Enum):
     deterministic_harm = "deterministic_harm"
 
 
-# Keyword screens. BEST-EFFORT, English-only, substring-based: a coarse pre-filter,
-# NOT a sufficient safety control. It is intentionally broad (false positives just add
-# a caveat, the safe direction) and will miss paraphrases/other languages — the model's
-# own judgement via the skill remains the primary safeguard.
+# Keyword screens. BEST-EFFORT, substring-based: a coarse pre-filter, NOT a sufficient
+# safety control. English + Russian (the studio is Russian-primary) for the highest-risk
+# categories; intentionally broad (false positives just add a caveat, the safe
+# direction). It will still miss paraphrases and other languages — the model's own
+# judgement via the skill remains the primary safeguard.
 _SCREENS: dict[SafetyCategory, tuple[str, ...]] = {
+    # Russian terms are chosen to avoid substring collisions with common astrology
+    # vocabulary (судьба=fate, характер=character, увлечение=hobby, реакция=reaction),
+    # so they are unambiguous phrases rather than short stems.
     SafetyCategory.self_harm: (
+        # English
         "suicide", "kill myself", "end my life", "end it all", "self harm", "self-harm",
         "self injury", "self-injury", "harm myself", "hurt myself", "want to die",
         "don't want to be here", "overdose",
+        # Russian
+        "суицид", "убить себя", "покончить с собой", "не хочу жить",
+        "причинить себе вред", "наложить на себя руки", "свести счёты с жизнью",
     ),
     SafetyCategory.medical: (
-        "diagnos", "disease", "cancer", "tumor", "tumour", "terminal", "fatal",
+        # English. "cancer" is NOT a bare term here: it collides with the zodiac sign
+        # Cancer (Moon in Cancer). The cancer-as-disease sense is matched contextually
+        # in _REGEX_SCREENS instead.
+        "diagnos", "disease", "tumor", "tumour", "terminal", "fatal",
         "medication", "treatment", "cure", "symptom", "pregnan", "mental illness",
         "depression",
+        # Russian (рак=cancer is likewise contextual in _REGEX_SCREENS; bare рак
+        # collides with Раке=the sign Cancer).
+        "диагноз", "болезн", "онколог", "опухол", "симптом", "беремен", "депресси",
+        "вылечить", "лекарств", "заболевани",
     ),
-    SafetyCategory.legal: ("lawsuit", "legal advice", "sue ", "court case", "custody"),
+    SafetyCategory.legal: (
+        "lawsuit", "legal advice", "sue ", "court case", "custody",
+        "судебн", "подать иск", "юридическ", "адвокат",
+    ),
     SafetyCategory.financial: (
-        "should i invest", "stock", "buy bitcoin", "guaranteed return", "financial advice",
+        # "stock" is contextual in _REGEX_SCREENS (collides with stockpile, etc.).
+        "should i invest", "buy bitcoin", "guaranteed return", "financial advice",
         "put money into",
+        "инвестир", "купить биткоин", "вложить деньги", "купить акци", "фондовый рынок",
     ),
     SafetyCategory.deterministic_harm: (
         "when will i die", "when do i die", "when's my death", "date of death",
         "how will i die", "will i die", "predict my death", "day i die",
+        "когда я умру", "когда умру", "дата смерти", "как я умру", "как умру",
     ),
 }
 
@@ -216,10 +308,24 @@ _REDIRECTS: dict[SafetyCategory, str] = {
 }
 
 
+# Context-required regexes for terms whose bare substring collides with common
+# (often astrology) vocabulary: "cancer"/"рак" the disease vs Cancer/Раке the sign,
+# "stock" vs stockpile. These require a disease/finance context to fire, so legitimate
+# zodiac-Cancer and "stockpile" questions are not screened.
+_REGEX_SCREENS: dict[SafetyCategory, tuple[re.Pattern[str], ...]] = {
+    SafetyCategory.medical: (
+        re.compile(r"\b(have|has|had|get|getting|got|risk of|diagnosed with)\s+cancer\b", re.I),
+        re.compile(r"\bcancer\s+(treatment|diagnos\w*|patient|screening|risk)\b", re.I),
+        re.compile(r"рак груди|больн\w*\s+раком|диагноз[:\s]+рак|рак\s+(желудка|лёгких|легких|кожи|крови)", re.I),
+    ),
+    SafetyCategory.financial: (re.compile(r"\bstocks?\b", re.I),),
+}
+
+
 def screen_question(text: str) -> SafetyCategory | None:
     """Return the first matched unsafe category, or None. Self-harm takes priority.
     Best-effort keyword filter only — see the note on ``_SCREENS``."""
-    lowered = text.lower()
+    lowered = str(text).lower()
     for category in (
         SafetyCategory.self_harm,
         SafetyCategory.deterministic_harm,
@@ -228,6 +334,8 @@ def screen_question(text: str) -> SafetyCategory | None:
         SafetyCategory.financial,
     ):
         if any(kw in lowered for kw in _SCREENS[category]):
+            return category
+        if any(rx.search(lowered) for rx in _REGEX_SCREENS.get(category, ())):
             return category
     return None
 
