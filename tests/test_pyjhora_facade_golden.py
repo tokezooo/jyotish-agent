@@ -3,9 +3,11 @@
 Phase 2 exit criteria: one known birth profile produces a stable fact set, and
 repeated runs are byte-identical (no wall-clock timestamps in the output).
 
-Note: the golden values are computed under the Moshier fallback (no .se1 files).
-If Swiss ephemeris files are installed, placements shift slightly, so the exact
-comparison is skipped and only the structural/determinism invariants run.
+Note: golden fixtures are keyed by ephemeris mode. The Moshier baseline
+(``golden_chennai_1990_moshier.json``) is committed and is what CI checks. The Swiss
+fixture is generated locally (not committed) and the Swiss path is also covered by a
+tolerance-based parity test (Swiss vs Moshier). The exact-match test skips when no
+fixture exists for the active mode.
 """
 
 from __future__ import annotations
@@ -25,7 +27,10 @@ from jyotish_agent.pyjhora_facade import (  # noqa: E402
     compute_chart,
 )
 
-_GOLDEN = Path(__file__).parent / "fixtures" / "golden_chennai_1990.json"
+_FIXTURES = Path(__file__).parent / "fixtures"
+# Values differ between Swiss and Moshier ephemerides, so the golden fixture is keyed
+# by the active mode. CI without .se1 files runs the Moshier baseline.
+_GOLDEN = _FIXTURES / f"golden_chennai_1990_{ephemeris_mode()}.json"
 
 _PROFILE = BirthProfile(
     name="Chennai Test",
@@ -43,11 +48,39 @@ def _compute() -> dict:
 
 
 def test_golden_fixture_matches():
-    if ephemeris_mode() != "moshier":
-        pytest.skip("golden values are Moshier-fallback specific; .se1 present")
+    if not _GOLDEN.exists():
+        pytest.skip(f"no golden fixture for {ephemeris_mode()} mode ({_GOLDEN.name})")
     expected = json.loads(_GOLDEN.read_text())
     # Compare serialized form: immune to float-repr drift and dict ordering.
     assert json.dumps(_compute(), sort_keys=True) == json.dumps(expected, sort_keys=True)
+
+
+def test_swiss_enables_star_based_ayanamsa():
+    # TRUE_CITRA crashes under Moshier; with Swiss .se1 files it must compute.
+    if ephemeris_mode() != "swiss":
+        pytest.skip("Swiss ephemeris not installed (Moshier fallback)")
+    out = compute_chart(
+        _PROFILE, reference_date=_REFERENCE, config=CalculationConfig(ayanamsa="TRUE_CITRA")
+    )
+    assert out["calculation_config"]["ayanamsa"] == "TRUE_CITRA"
+    assert out["facts"]["ascendant"]["sign"] is not None
+
+
+def test_swiss_moshier_consistency():
+    # Parity check: Swiss output agrees with the Moshier baseline to within a small
+    # tolerance (same sign, sub-0.1deg), confirming the fallback was a faithful
+    # approximation and the Swiss path is wired correctly.
+    if ephemeris_mode() != "swiss":
+        pytest.skip("Swiss ephemeris not installed")
+    moshier = json.loads((_FIXTURES / "golden_chennai_1990_moshier.json").read_text())
+    swiss = _compute()
+    m_by_planet = {p["planet"]: p for p in moshier["facts"]["d1"]}
+    for p in swiss["facts"]["d1"]:
+        mm = m_by_planet[p["planet"]]
+        assert p["sign"] == mm["sign"], f"{p['planet']} sign differs"
+        # Real Swiss-vs-Moshier drift is sub-0.002deg here; 0.01deg is tight enough to
+        # catch a wiring bug (e.g. a planet ~half a degree off) yet pass true drift.
+        assert abs(p["degrees"] - mm["degrees"]) < 0.01, f"{p['planet']} degrees drift"
 
 
 def test_known_values_independent_of_ephemeris():

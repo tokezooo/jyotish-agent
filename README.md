@@ -32,10 +32,22 @@ uv run python scripts/check_pyjhora_data.py   # verify PyJHora + ephemeris data
 uv run pytest                             # run the test suite
 ```
 
-Note: PyJHora wheels ship no Swiss ephemeris (`.se1`) files, so calculations run
-through the pyswisseph **Moshier fallback** (repeatable, slightly lower precision).
-For full Swiss-ephemeris parity, copy `se*.se1` into the installed
-`jhora/data/ephe` directory.
+### Ephemeris (optional)
+
+PyJHora wheels ship no Swiss ephemeris (`.se1`) files, so by default calculations run
+through the pyswisseph **Moshier fallback** — repeatable and sub-arcsecond accurate
+for modern dates, but star-based ayanamsas (TRUE_CITRA / TRUE_REVATI / TRUE_PUSHYA)
+crash under it. To switch to full Swiss precision and enable those ayanamsas:
+
+```bash
+uv run python scripts/install_ephemeris.py          # downloads se1 into jhora/data/ephe
+uv run python scripts/check_pyjhora_data.py --strict  # verifies Swiss mode
+```
+
+The `.se1` files are not committed (licensed separately; re-run after a fresh
+`uv sync`). Golden test fixtures are keyed by mode
+(`golden_chennai_1990_{moshier,swiss}.json`); CI without `.se1` runs the Moshier
+baseline, and Swiss vs Moshier agree to within 0.1° (verified by a parity test).
 
 ## API
 

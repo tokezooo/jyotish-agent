@@ -19,8 +19,10 @@ from jyotish_agent.interpretations import (
     validate_answer,
 )
 
+# Contract logic is ephemeris-independent; the Moshier baseline fixture is always
+# present (committed) and sufficient for citation-path tests.
 _FACTS = json.loads(
-    (Path(__file__).parent / "fixtures" / "golden_chennai_1990.json").read_text()
+    (Path(__file__).parent / "fixtures" / "golden_chennai_1990_moshier.json").read_text()
 )["facts"]
 
 

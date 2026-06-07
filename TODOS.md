@@ -17,7 +17,7 @@
 - [x] Add PyJHora headless import smoke test.
 - [x] Add ephemeris/data availability check (`scripts/check_pyjhora_data.py`, `--strict` + liveness compute).
 - [x] Implement D1/D9/panchanga/Vimshottari facade (`src/jyotish_agent/pyjhora_facade.py`).
-- [x] Add one golden birth-profile fixture (`tests/fixtures/golden_chennai_1990.json`).
+- [x] Add one golden birth-profile fixture (`tests/fixtures/golden_chennai_1990_moshier.json`; renamed mode-keyed in Phase 7).
 - [x] Add FastAPI endpoints (`/birth-profiles/validate`, `/charts/compute`, `/health`).
 - [x] Add structured RFC-7807 problem+json errors (problem/cause/fix) + validation.
 - [x] Add Pydantic request/response models at the HTTP boundary (engine stays dataclass-based).
@@ -63,9 +63,13 @@ Interpretive surface (all citation-enforced): D1/D2/D3/D7/D9/D10/D12 + per-plane
 
 - 6.4 (yogas/doshas) **deferred by decision** (2026-06-08). Yoga definitions are text-dependent and high correctness-risk for a trust-boundary product; the original PLAN deferred broad yoga coverage. If revisited, scope to 2-3 unambiguous geometric yogas (Gajakesari, Chandra-Mangala) with explicit definitions + cross-checked tests — not a broad set.
 
-### Candidate future milestones (not started)
+### Phase 7: Swiss `.se1` ephemeris parity (DONE)
 
-- Swiss `.se1` ephemeris parity (off Moshier fallback; enables star-based ayanamsas).
+- `scripts/install_ephemeris.py` downloads sepl/semo/seas `_18.se1` into PyJHora's ephe dir (not committed; licensed separately). `ephemeris_mode()` then reports `swiss` and star-based ayanamsas (TRUE_CITRA etc.) compute instead of crashing.
+- Golden fixtures keyed by mode: `golden_chennai_1990_{moshier,swiss}.json`. CI without `.se1` runs the Moshier baseline; both paths verified (83 pass, 2 mode-specific skips each).
+- Parity: Swiss vs Moshier agree to within 0.1° (same sign) — confirms the fallback was a faithful approximation (LAHIRI Sun differed by ~5e-6°). True external-reference parity (vs astro.com/JHora published values) still needs trusted source data — future.
+
+### Candidate future milestones (not started)
 - Trust-boundary hardening: prose-citation enforcement, harness-forced check/screen gates, multilingual safety screen.
 - Per-varga bhava tables + varga lagnas; node special aspects.
 

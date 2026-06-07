@@ -5,8 +5,9 @@ fixture before committing — an unexpected change means a calculation regressio
 
     python scripts/regen_golden.py
 
-The golden values are Moshier-fallback specific (no .se1 files). The matching test
-skips when Swiss ephemeris files are installed.
+Writes the fixture for the ACTIVE ephemeris mode:
+``golden_chennai_1990_{moshier,swiss}.json``. The Moshier baseline is committed and
+checked by CI; the Swiss fixture is local-only (gitignored). Run once per mode.
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ import json
 import warnings
 from pathlib import Path
 
+from jyotish_agent.config import ephemeris_mode
 from jyotish_agent.pyjhora_facade import BirthProfile, compute_chart
 
 # Keep in sync with tests/test_pyjhora_facade_golden.py.
@@ -27,15 +29,17 @@ PROFILE = BirthProfile(
     timezone=5.5,
 )
 REFERENCE = (2026, 6, 7)
-GOLDEN = Path(__file__).resolve().parent.parent / "tests" / "fixtures" / "golden_chennai_1990.json"
+_FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
 
 
 def main() -> int:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         out = compute_chart(PROFILE, reference_date=REFERENCE)
-    GOLDEN.write_text(json.dumps(out, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
-    print(f"wrote {GOLDEN}")
+    # Values differ between Swiss and Moshier, so the fixture is keyed by mode.
+    golden = _FIXTURES / f"golden_chennai_1990_{ephemeris_mode()}.json"
+    golden.write_text(json.dumps(out, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
+    print(f"wrote {golden} (mode={ephemeris_mode()})")
     return 0
 
 
