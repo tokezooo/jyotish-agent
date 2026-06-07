@@ -231,6 +231,38 @@ def test_compute_default_reference_date():
 
 
 @requires_engine
+def test_compute_extra_chart_and_token_roundtrips():
+    r = client.post("/charts/compute", json=_compute_body(charts=["D9", "D10"]))
+    assert r.status_code == 200
+    cc = r.json()
+    assert "d10" in cc["facts"] and len(cc["facts"]["d10"]) == 9
+    assert cc["calculation_config"]["charts"] == ["D1", "D9", "D10"]
+    # The signed facts_token round-trips for the multi-chart facts, and a D10 fact
+    # is citable end-to-end through /answers/validate.
+    v = client.post(
+        "/answers/validate",
+        json={
+            "answer": {
+                "summary": "D10 Sun placement.",
+                "facts_used": [
+                    {"path": "d10.Sun.sign", "value": cc["facts"]["d10"][0]["sign"]}
+                ],
+            },
+            "facts": cc["facts"],
+            "facts_token": cc["facts_token"],
+        },
+    )
+    assert v.json() == {"valid": True, "violations": []}
+
+
+@requires_engine
+def test_unknown_chart_returns_422():
+    r = client.post("/charts/compute", json=_compute_body(charts=["D99"]))
+    assert r.status_code == 422
+    assert r.headers["content-type"].startswith("application/problem+json")
+
+
+@requires_engine
 def test_low_precision_time_warns_but_succeeds():
     body = _compute_body()
     body["birth_profile"] = {**_VALID_PROFILE, "birth_time_confidence": "approximate"}

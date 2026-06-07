@@ -44,6 +44,21 @@ PYJHORA_DEFAULT_AYANAMSA = "TRUE_PUSHYA"
 # Moshier because we have not verified it is safe. Add a mode here only with a test.
 MOSHIER_SAFE_AYANAMSAS = frozenset({"LAHIRI", "RAMAN", "KP", "FAGAN"})
 
+# Supported divisional (varga) charts -> PyJHora divisional_chart_factor. D1 is always
+# computed (it carries the ascendant); the rest are opt-in via CalculationConfig.charts.
+# This is the common, high-signal subset of the classical 16 vargas, chosen for the
+# MVP; the domain note is what an interpreter typically reads each chart for.
+DIVISIONAL_FACTORS: dict[str, int] = {
+    "D1": 1,    # Rasi — overall life, body, self
+    "D2": 2,    # Hora — wealth
+    "D3": 3,    # Drekkana — siblings, courage
+    "D7": 7,    # Saptamsa — children, progeny
+    "D9": 9,    # Navamsa — marriage, dharma, planetary strength
+    "D10": 10,  # Dasamsa — career, profession, status
+    "D12": 12,  # Dvadasamsa — parents
+}
+DEFAULT_CHARTS: tuple[str, ...] = ("D1", "D9")
+
 # Held by the facade across apply_config()+compute to serialize PyJHora global state.
 # apply_config does NOT acquire it (callers compose apply+compute under one hold).
 ENGINE_LOCK = threading.Lock()
@@ -66,6 +81,21 @@ class CalculationConfig:
 
     ayanamsa: str = DEFAULT_AYANAMSA
     rahu_ketu: str = "true_nodes"  # vs "mean_nodes"; applied via const.set_node_mode
+    # Divisional charts to compute. D1 is always included (carries the ascendant).
+    charts: tuple[str, ...] = DEFAULT_CHARTS
+
+    def resolved_charts(self) -> dict[str, int]:
+        """Validated {chart_name: factor}, always including D1, order-stable.
+        Raises ConfigError on an unknown chart."""
+        names = ["D1", *[c.upper() for c in self.charts]]
+        resolved: dict[str, int] = {}
+        for name in names:
+            if name not in DIVISIONAL_FACTORS:
+                raise ConfigError(
+                    f"unknown chart {name!r}; supported: {sorted(DIVISIONAL_FACTORS)}"
+                )
+            resolved[name] = DIVISIONAL_FACTORS[name]
+        return resolved
 
 
 def apply_config(config: CalculationConfig | None = None) -> CalculationConfig:

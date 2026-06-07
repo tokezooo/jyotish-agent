@@ -52,6 +52,10 @@ def _placements(chart) -> list[dict]:
     PyJHora returns ``[['L', (sign, deg)], [planet_idx, (sign, deg)], ...]`` where the
     position is sometimes a tuple and sometimes a list. Lagna ('L') is excluded here
     and surfaced separately as the ascendant.
+
+    NOTE: each divisional chart has its own lagna (varga lagna), but the MVP surfaces
+    only the D1 ascendant and drops per-chart lagnas. Revisit if varga-lagna analysis
+    is needed.
     """
     out: list[dict] = []
     for body, pos in chart:
@@ -189,15 +193,23 @@ def compute_chart(
         from jhora.panchanga import drik
 
         applied = apply_config(config)
+        resolved = applied.resolved_charts()  # {name: factor}, always includes D1
         place = drik.Place(profile.name, profile.latitude, profile.longitude, profile.timezone)
         jd = utils.julian_day_number(profile.date, profile.time)
         # Anchor the reference at local noon to avoid date-boundary ambiguity.
         ref_jd = utils.julian_day_number(reference_date, (12, 0, 0))
 
-        d1 = charts.divisional_chart(jd, place, divisional_chart_factor=1)
-        d9 = charts.divisional_chart(jd, place, divisional_chart_factor=9)
+        raw_charts = {
+            name: charts.divisional_chart(jd, place, divisional_chart_factor=factor)
+            for name, factor in resolved.items()
+        }
         panchanga = _panchanga(jd, place)
         vimshottari = _vimshottari_current(ref_jd, jd, place)
+
+    # Each divisional chart becomes a lowercase fact key (d1, d9, d10, ...). The
+    # ascendant is taken from D1, which resolved_charts guarantees is present.
+    divisional_facts = {name.lower(): _placements(chart) for name, chart in raw_charts.items()}
+    ascendant = _ascendant(raw_charts["D1"])
 
     return {
         "normalized_input": {
@@ -212,14 +224,14 @@ def compute_chart(
         "calculation_config": {
             "ayanamsa": applied.ayanamsa,
             "rahu_ketu": applied.rahu_ketu,
+            "charts": list(resolved),
             # reference_date drives the running Vimshottari period; surfaced here so a
             # quoted/cached result is fully reproducible from calculation_config alone.
             "reference_date": list(reference_date),
         },
         "facts": {
-            "ascendant": _ascendant(d1),
-            "d1": _placements(d1),
-            "d9": _placements(d9),
+            "ascendant": ascendant,
+            **divisional_facts,
             "panchanga": panchanga,
             "vimshottari": vimshottari,
         },

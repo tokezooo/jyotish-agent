@@ -17,7 +17,8 @@ import pytest
 
 pytest.importorskip("jhora", reason="PyJHora not installed; run `uv sync`")
 
-from jyotish_agent.config import ephemeris_mode  # noqa: E402
+from jyotish_agent.config import CalculationConfig, ephemeris_mode  # noqa: E402
+from jyotish_agent.interpretations import iter_fact_atoms  # noqa: E402
 from jyotish_agent.pyjhora_facade import (  # noqa: E402
     BirthProfile,
     _fmt_dt,
@@ -96,6 +97,23 @@ def test_pre_birth_reference_date_degrades_gracefully():
     out = compute_chart(_PROFILE, reference_date=(1980, 1, 1))
     levels = out["facts"]["vimshottari"]
     assert set(levels) == {"mahadasha", "bhukti", "antara"}  # keys always present
+
+
+def test_requesting_extra_divisional_chart():
+    out = compute_chart(
+        _PROFILE, reference_date=_REFERENCE, config=CalculationConfig(charts=("D9", "D10"))
+    )
+    facts = out["facts"]
+    assert "d10" in facts and len(facts["d10"]) == 9
+    assert "d1" in facts and "d9" in facts  # D1 always, D9 requested
+    assert out["calculation_config"]["charts"] == ["D1", "D9", "D10"]
+    # New divisional is citable through the contract.
+    assert "d10.Sun.sign" in iter_fact_atoms(facts)
+
+
+def test_default_charts_unchanged():
+    facts = _compute()["facts"]
+    assert set(k for k in facts if k.startswith("d")) == {"d1", "d9"}
 
 
 def test_fmt_dt_rolls_over_midnight():

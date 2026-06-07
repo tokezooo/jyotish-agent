@@ -61,6 +61,18 @@ describe("summarizeChart", () => {
     expect(summarizeChart({})).toBe("");
   });
 
+  test("renders extra divisional charts (e.g. D10) ordered by factor", () => {
+    const out = summarizeChart({
+      facts: {
+        d10: [{ planet: "Sun", sign: "Taurus", degrees: 18.87 }],
+        d1: [{ planet: "Sun", sign: "Sagittarius", degrees: 16.89 }],
+      },
+    });
+    // d1 before d10 despite input order; D10 surfaced (not dropped).
+    expect(out.indexOf("D1:")).toBeLessThan(out.indexOf("D10:"));
+    expect(out).toContain("D10: Sun Taurus 18.87°");
+  });
+
   test("skips leaves that are missing or NaN instead of rendering 'undefined'", () => {
     const out = summarizeChart({
       facts: {

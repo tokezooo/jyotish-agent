@@ -3,17 +3,13 @@
 Hard validation (types, ranges, required fields) is enforced by the Pydantic models
 and surfaces as 422. This module produces the *normalized* view of valid input plus
 soft warnings: things that don't block a computation but should temper trust in the
-result, such as a non-exact birth time or an unsupported requested chart.
+result, such as a non-exact or on-the-hour birth time. (Unknown divisional charts are
+a hard error from the engine, not a soft warning.)
 """
 
 from __future__ import annotations
 
-from .models import (
-    SUPPORTED_CHARTS,
-    BirthProfileRequest,
-    BirthTimeConfidence,
-    CalculationConfigRequest,
-)
+from .models import BirthProfileRequest, BirthTimeConfidence
 
 
 def normalized_profile(req: BirthProfileRequest) -> dict:
@@ -50,16 +46,5 @@ def profile_warnings(req: BirthProfileRequest) -> list[str]:
         warnings.append(
             "Birth time is on the hour (HH:00:00); confirm this is the exact time, "
             "not a rounded estimate."
-        )
-    return warnings
-
-
-def config_warnings(config: CalculationConfigRequest) -> list[str]:
-    warnings: list[str] = []
-    unsupported = [c for c in config.charts if c.upper() not in SUPPORTED_CHARTS]
-    if unsupported:
-        warnings.append(
-            f"Requested charts {unsupported} are not supported in this MVP; only "
-            f"{list(SUPPORTED_CHARTS)} are computed."
         )
     return warnings

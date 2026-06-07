@@ -14,7 +14,10 @@ legal, financial, self-harm, deterministic death/harm claims).
 from __future__ import annotations
 
 import math
+import re
 from enum import Enum
+
+_DIVISIONAL_KEY = re.compile(r"^d\d+$")
 
 
 def iter_fact_atoms(facts: dict) -> dict[str, str]:
@@ -41,8 +44,11 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
     if asc.get("degrees") is not None:
         atoms["ascendant.degrees"] = str(asc["degrees"])
 
-    for chart_key in ("d1", "d9"):
-        for placement in facts.get(chart_key) or []:
+    # Any divisional chart key (d1, d9, d10, ...) present in the facts is citable.
+    for chart_key, value in facts.items():
+        if not _DIVISIONAL_KEY.match(chart_key) or not isinstance(value, list):
+            continue
+        for placement in value:
             planet = placement.get("planet")
             if not planet:
                 continue

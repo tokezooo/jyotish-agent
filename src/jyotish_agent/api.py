@@ -32,7 +32,7 @@ from .models import (
 )
 from .pyjhora_facade import compute_chart
 from .signing import sign_facts, verify_facts
-from .validation import config_warnings, normalized_profile, profile_warnings
+from .validation import normalized_profile, profile_warnings
 
 logger = logging.getLogger("jyotish_agent.api")
 
@@ -92,7 +92,7 @@ async def compute(req: ChartComputeRequest) -> ChartComputeResponse:
         # catch-all 500 handler, which never echoes internal/birth-derived detail.
         raise CalculationError(str(exc)) from exc
 
-    warnings = profile_warnings(req.birth_profile) + config_warnings(req.config)
+    warnings = profile_warnings(req.birth_profile)
     return ChartComputeResponse(
         normalized_input=result["normalized_input"],
         calculation_config=result["calculation_config"],

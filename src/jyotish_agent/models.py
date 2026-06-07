@@ -20,11 +20,8 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .config import CalculationConfig
+from .config import DEFAULT_CHARTS, CalculationConfig
 from .pyjhora_facade import BirthProfile
-
-# MVP supports only these divisional charts; requests naming others get a warning.
-SUPPORTED_CHARTS = ("D1", "D9")
 
 # Birth years PyJHora/pyswisseph compute reliably; outside this we'd risk a 500.
 _MIN_YEAR = 1800
@@ -80,16 +77,19 @@ class CalculationConfigRequest(BaseModel):
 
     ayanamsa: str = "LAHIRI"
     rahu_ketu: str = "true_nodes"
-    # Advisory only: unknown values are tolerated (forward-compat) and reported as a
-    # warning; the MVP always computes SUPPORTED_CHARTS regardless. Consumed by the
-    # route for warnings, NOT passed to the engine config.
-    charts: list[str] = Field(default_factory=lambda: list(SUPPORTED_CHARTS))
+    # Divisional charts to compute. Unknown names are rejected by the engine (422);
+    # D1 is always added. Defaults to D1+D9.
+    charts: list[str] = Field(default_factory=lambda: list(DEFAULT_CHARTS))
     # Consumed by the route (defaults to today there), NOT by the engine config.
     reference_date: _dt.date | None = None
 
     def to_calculation_config(self) -> CalculationConfig:
-        # ayanamsa / rahu_ketu validity is enforced by apply_config (single source).
-        return CalculationConfig(ayanamsa=self.ayanamsa, rahu_ketu=self.rahu_ketu)
+        # ayanamsa / rahu_ketu / charts validity is enforced by the engine (single source).
+        return CalculationConfig(
+            ayanamsa=self.ayanamsa,
+            rahu_ketu=self.rahu_ketu,
+            charts=tuple(self.charts),
+        )
 
 
 class ValidateRequest(BirthProfileRequest):

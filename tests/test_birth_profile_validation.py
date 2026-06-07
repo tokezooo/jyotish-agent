@@ -12,14 +12,9 @@ from pydantic import ValidationError
 from jyotish_agent.models import (
     BirthProfileRequest,
     BirthTimeConfidence,
-    CalculationConfigRequest,
     Place,
 )
-from jyotish_agent.validation import (
-    config_warnings,
-    normalized_profile,
-    profile_warnings,
-)
+from jyotish_agent.validation import normalized_profile, profile_warnings
 
 
 def _profile(**over) -> BirthProfileRequest:
@@ -66,6 +61,18 @@ def test_extra_fields_forbidden():
         _profile(unexpected="x")
 
 
+def test_resolved_charts_always_includes_d1_and_validates():
+    from jyotish_agent.config import CalculationConfig, ConfigError
+
+    resolved = CalculationConfig(charts=("D9", "D10")).resolved_charts()
+    assert list(resolved) == ["D1", "D9", "D10"]  # D1 prepended
+    assert resolved["D10"] == 10
+    import pytest as _pytest
+
+    with _pytest.raises(ConfigError, match="unknown chart"):
+        CalculationConfig(charts=("D99",)).resolved_charts()
+
+
 def test_non_exact_birth_time_warns():
     w = profile_warnings(_profile(birth_time_confidence=BirthTimeConfidence.approximate))
     assert any("confidence" in m for m in w)
@@ -99,10 +106,3 @@ def test_name_too_long_rejected():
         _profile(name="x" * 5000)
 
 
-def test_unsupported_chart_warns():
-    w = config_warnings(CalculationConfigRequest(charts=["D1", "D9", "D10"]))
-    assert any("D10" in m for m in w)
-
-
-def test_supported_charts_no_warning():
-    assert config_warnings(CalculationConfigRequest(charts=["D1", "D9"])) == []

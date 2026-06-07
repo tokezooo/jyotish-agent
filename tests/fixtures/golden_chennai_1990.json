@@ -1,6 +1,10 @@
 {
   "calculation_config": {
     "ayanamsa": "LAHIRI",
+    "charts": [
+      "D1",
+      "D9"
+    ],
     "rahu_ketu": "true_nodes",
     "reference_date": [
       2026,

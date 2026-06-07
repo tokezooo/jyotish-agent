@@ -53,7 +53,7 @@
 ## Phase 4 notes
 
 - Repo is two toolchains: `src/jyotish_agent/` (Python service) + `.pi/` (Pi harness). `package.json`/`bun.lockb` sit beside `pyproject.toml`/`uv.lock`.
-- typebox `charts` field intentionally omitted (MVP always computes D1+D9).
+- (Phase 6.1) `charts` is now a first-class StringEnum array (D1/D2/D3/D7/D9/D10/D12); D1 always computed, unknown charts are a hard 422. Per-chart (varga) lagna is still dropped — only the D1 ascendant is surfaced.
 
 ### Resolved in Phase-3 review (feat/phase-3-api, pre-merge)
 
