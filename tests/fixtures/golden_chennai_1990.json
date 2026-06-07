@@ -142,11 +142,11 @@
     "panchanga": {
       "karana": {
         "index": 9,
-        "name": "Naga"
+        "name": "Bava"
       },
       "nakshatra": {
         "index": 24,
-        "name": "Purva Bhadrapada",
+        "name": "Shatabhisha",
         "pada": 1
       },
       "tithi": {
@@ -159,7 +159,7 @@
       },
       "yoga": {
         "index": 16,
-        "name": "Vyatipata"
+        "name": "Siddhi"
       }
     },
     "vimshottari": {

@@ -13,9 +13,14 @@ That is what makes the golden-fixture test meaningful.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 from . import ENGINE_VERSION, names
 from .config import ENGINE_LOCK, CalculationConfig, apply_config, ephemeris_mode
+
+
+class EngineOutputError(ValueError):
+    """PyJHora returned a shape the facade did not expect (degenerate/changed output)."""
 
 # Degrees are rounded to this many places everywhere, so float noise across
 # libm/BLAS builds can't break byte-stability or the golden fixture.
@@ -74,25 +79,23 @@ def _ascendant(chart) -> dict:
                 "sign": names.sign_name(sign),
                 "degrees": _round_deg(pos[1]),
             }
-    raise ValueError("no Lagna ('L') in chart output")
+    raise EngineOutputError("no Lagna ('L') in chart output")
 
 
 def _fmt_dt(dt) -> str:
-    """Format a PyJHora date tuple (y, m, d, hour_float) as 'YYYY-MM-DDTHH:MM:SS'."""
+    """Format a PyJHora date tuple (y, m, d, hour_float) as 'YYYY-MM-DDTHH:MM:SS'.
+
+    Uses datetime+timedelta so an hour fraction near midnight (e.g. 23:59:59.6)
+    rolls correctly into the next day/month/year instead of emitting an invalid
+    'T24:00:00'. hour_float may be >24 or slightly negative in some PyJHora paths;
+    timedelta handles both.
+    """
     y, m, d = int(dt[0]), int(dt[1]), int(dt[2])
     hour_float = float(dt[3]) if len(dt) > 3 else 0.0
-    hh = int(hour_float)
-    minute_float = (hour_float - hh) * 60
-    mm = int(minute_float)
-    ss = int(round((minute_float - mm) * 60))
-    # Carry rounding overflow (e.g. 59.6s -> next minute) without a datetime dep.
-    if ss == 60:
-        ss = 0
-        mm += 1
-    if mm == 60:
-        mm = 0
-        hh += 1
-    return f"{y:04d}-{m:02d}-{d:02d}T{hh:02d}:{mm:02d}:{ss:02d}"
+    base = datetime(y, m, d)
+    # Round to whole seconds before adding, so output matches _DEG-style stability.
+    moment = base + timedelta(seconds=round(hour_float * 3600))
+    return moment.strftime("%Y-%m-%dT%H:%M:%S")
 
 
 def _panchanga(jd, place) -> dict:
@@ -102,7 +105,10 @@ def _panchanga(jd, place) -> dict:
     nak = drik.nakshatra(jd, place)
     yoga = drik.yogam(jd, place)
     karana = drik.karana(jd, place)
-    vaara = drik.vaara(jd, place)
+    # Civil weekday so it always matches the calendar date in normalized_input.
+    # PyJHora's default vaara is the Vedic (sunrise-to-sunrise) day, which can be
+    # the previous weekday for a pre-sunrise birth — a silent mismatch we avoid.
+    vaara = drik.vaara(jd, place, show_vedic_day=False)
 
     tithi_idx = int(tithi[0])
     nak_idx = int(nak[0])
@@ -124,11 +130,10 @@ def _panchanga(jd, place) -> dict:
     }
 
 
-def _period_entry(lords_tuple, start, end, depth: int) -> dict | None:
-    """Build one Vimshottari period level from a running-ladder entry."""
-    if len(lords_tuple) < depth:
-        return None
-    lord = int(lords_tuple[depth - 1])
+def _period_entry(lords_tuple, start, end) -> dict:
+    """Build one Vimshottari period level from a running-ladder entry. The lord of a
+    level is the last entry in its lords tuple (maha -> (m,), bhukti -> (m, b), ...)."""
+    lord = int(lords_tuple[-1])
     return {
         "lord_index": lord,
         "lord": names.planet_name(lord),
@@ -137,26 +142,30 @@ def _period_entry(lords_tuple, start, end, depth: int) -> dict | None:
     }
 
 
+# Running-ladder depth (1=maha, 2=bhukti, 3=antara) -> output key.
+_DASHA_LEVELS = {1: "mahadasha", 2: "bhukti", 3: "antara"}
+
+
 def _vimshottari_current(ref_jd, jd, place) -> dict:
     from jhora.horoscope.dhasa.graha import vimsottari
 
-    ladder = vimsottari.get_running_dhasa_for_given_date(ref_jd, jd, place)
-    # ladder = [[(maha,), start, end], [(maha,bhukti), start, end],
-    #           [(maha,bhukti,antara), start, end]]
-    levels: dict[str, dict | None] = {
-        "mahadasha": None,
-        "bhukti": None,
-        "antara": None,
-    }
+    levels: dict[str, dict | None] = {k: None for k in _DASHA_LEVELS.values()}
+    # Request only the 3 levels we surface; PyJHora defaults to 6 (down to deha).
+    # A reference date before the dasha span (e.g. before birth) makes PyJHora raise;
+    # that is a legitimate "no running period", so degrade to empty levels.
+    try:
+        ladder = vimsottari.get_running_dhasa_for_given_date(
+            ref_jd, jd, place, dhasa_level_index=3
+        )
+    except ValueError:
+        return levels
+    if not ladder:
+        return levels
     for entry in ladder:
         lords, start, end = entry[0], entry[1], entry[2]
-        depth = len(lords)
-        if depth == 1:
-            levels["mahadasha"] = _period_entry(lords, start, end, 1)
-        elif depth == 2:
-            levels["bhukti"] = _period_entry(lords, start, end, 2)
-        elif depth == 3:
-            levels["antara"] = _period_entry(lords, start, end, 3)
+        key = _DASHA_LEVELS.get(len(lords))
+        if key is not None:
+            levels[key] = _period_entry(lords, start, end)
     return levels
 
 
@@ -182,6 +191,7 @@ def compute_chart(
         applied = apply_config(config)
         place = drik.Place(profile.name, profile.latitude, profile.longitude, profile.timezone)
         jd = utils.julian_day_number(profile.date, profile.time)
+        # Anchor the reference at local noon to avoid date-boundary ambiguity.
         ref_jd = utils.julian_day_number(reference_date, (12, 0, 0))
 
         d1 = charts.divisional_chart(jd, place, divisional_chart_factor=1)

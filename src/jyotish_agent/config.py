@@ -58,9 +58,7 @@ class CalculationConfig:
     """
 
     ayanamsa: str = DEFAULT_AYANAMSA
-    # TODO(Phase 2): rahu_ketu is captured for provenance but apply_config does NOT
-    # yet wire it to PyJHora. The facade must apply node mode when it lands.
-    rahu_ketu: str = "true_nodes"  # vs "mean_nodes"
+    rahu_ketu: str = "true_nodes"  # vs "mean_nodes"; applied via const.set_node_mode
 
 
 def apply_config(config: CalculationConfig | None = None) -> CalculationConfig:
@@ -87,7 +85,16 @@ def apply_config(config: CalculationConfig | None = None) -> CalculationConfig:
             f"(Moshier fallback active). Star-based modes crash and others are "
             f"unverified. Use a safe mode (e.g. LAHIRI) or install ephemeris files."
         )
+
+    if config.rahu_ketu not in ("true_nodes", "mean_nodes"):
+        raise ValueError(
+            f"unknown rahu_ketu {config.rahu_ketu!r}; expected "
+            f"'true_nodes' or 'mean_nodes'"
+        )
+
     drik.set_ayanamsa_mode(mode)
+    # Wire node mode so provenance never claims a setting that wasn't applied.
+    const.set_node_mode(config.rahu_ketu == "true_nodes")
     return config
 
 

@@ -27,7 +27,14 @@
 ## Carried Phase-2 Notes
 
 - Facade emits no wall-clock timestamp, so output is byte-stable; golden test relies on this.
-- Golden values are Moshier-fallback specific; the golden test skips if `.se1` files are installed.
+- Golden values are Moshier-fallback specific; the golden test skips if `.se1` files are installed. (Weekday is calendar-derived and asserted unconditionally.)
 - `ENGINE_LOCK` is held across apply+compute in the facade. True multi-request parallelism still needs a process/subprocess pool (Phase 3 concern when FastAPI lands).
-- `karana` index→name mapping assumed 0-based; raw index always preserved if the name table is off.
-- `rahu_ketu` node mode is captured for provenance but not yet wired to PyJHora (Phase 2 TODO in `config.py`).
+- Regenerate the golden fixture with `python scripts/regen_golden.py` after intentional output changes; review the diff.
+
+### Resolved in Phase-2 review (fix/phase-2-review)
+
+- Off-by-one mislabels fixed: nakshatra/yoga are 1-based [1..27], karana is 1-based [1..60] (real 60-entry table). Guarded by `tests/test_names.py`.
+- `rahu_ketu` node mode now wired via `const.set_node_mode` in `apply_config` (provenance no longer claims an unapplied setting).
+- `_fmt_dt` uses `datetime`+`timedelta` (rolls past midnight correctly).
+- `weekday` is the civil weekday, matching the calendar date in `normalized_input`.
+- Pre-birth / out-of-span reference dates degrade to empty Vimshottari levels instead of crashing.

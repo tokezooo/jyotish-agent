@@ -33,8 +33,10 @@ def _restore_pyjhora_ayanamsa():
         yield
         return
 
-    saved = const._DEFAULT_AYANAMSA_MODE
+    saved_ayanamsa = const._DEFAULT_AYANAMSA_MODE
+    saved_true_nodes = const._use_true_nodes_for_rahu_ketu
     try:
         yield
     finally:
-        drik.set_ayanamsa_mode(saved)
+        drik.set_ayanamsa_mode(saved_ayanamsa)
+        const.set_node_mode(saved_true_nodes)

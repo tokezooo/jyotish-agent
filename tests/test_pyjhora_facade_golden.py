@@ -18,7 +18,11 @@ import pytest
 pytest.importorskip("jhora", reason="PyJHora not installed; run `uv sync`")
 
 from jyotish_agent.config import ephemeris_mode  # noqa: E402
-from jyotish_agent.pyjhora_facade import BirthProfile, compute_chart  # noqa: E402
+from jyotish_agent.pyjhora_facade import (  # noqa: E402
+    BirthProfile,
+    _fmt_dt,
+    compute_chart,
+)
 
 _GOLDEN = Path(__file__).parent / "fixtures" / "golden_chennai_1990.json"
 
@@ -41,7 +45,17 @@ def test_golden_fixture_matches():
     if ephemeris_mode() != "moshier":
         pytest.skip("golden values are Moshier-fallback specific; .se1 present")
     expected = json.loads(_GOLDEN.read_text())
-    assert _compute() == expected
+    # Compare serialized form: immune to float-repr drift and dict ordering.
+    assert json.dumps(_compute(), sort_keys=True) == json.dumps(expected, sort_keys=True)
+
+
+def test_known_values_independent_of_ephemeris():
+    # Weekday is derived from the civil calendar date, not the ephemeris, so it must
+    # always hold regardless of Moshier vs Swiss. 1990-01-01 was a Monday. This keeps
+    # at least one exact-value assertion alive even when the golden test skips.
+    out = _compute()
+    assert out["facts"]["panchanga"]["weekday"]["name"] == "Monday"
+    assert out["facts"]["ascendant"]["sign"] is not None
 
 
 def test_output_is_byte_stable():
@@ -75,3 +89,19 @@ def test_reference_date_changes_running_dasha():
         early["facts"]["vimshottari"]["mahadasha"]["lord"]
         != late["facts"]["vimshottari"]["mahadasha"]["lord"]
     )
+
+
+def test_pre_birth_reference_date_degrades_gracefully():
+    # A reference before birth has no running dasha. Must not crash; structure holds.
+    out = compute_chart(_PROFILE, reference_date=(1980, 1, 1))
+    levels = out["facts"]["vimshottari"]
+    assert set(levels) == {"mahadasha", "bhukti", "antara"}  # keys always present
+
+
+def test_fmt_dt_rolls_over_midnight():
+    # 23:59:59.6 must roll into the next day, never emit 'T24:00:00'.
+    assert _fmt_dt((2026, 1, 1, 23 + 59 / 60 + 59.6 / 3600)) == "2026-01-02T00:00:00"
+    assert _fmt_dt((2026, 1, 1, 0)) == "2026-01-01T00:00:00"
+    assert _fmt_dt((2026, 12, 31, 23.9999)) == "2027-01-01T00:00:00"
+    # Exact half-day.
+    assert _fmt_dt((2026, 6, 7, 12.5)) == "2026-06-07T12:30:00"

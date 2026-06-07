@@ -137,8 +137,11 @@ YOGAS = (
     "Vaidhriti",
 )
 
-# Karana: 11 distinct types (7 movable repeat + 4 fixed).
-KARANAS = (
+# Karana. PyJHora returns a 1-based index in [1..60] (drik.karana docstring:
+# "1 = Kimstugna, 2 = Bava, ..., 60 = Naga"), NOT an 11-type index. The cycle is:
+# position 1 = Kimstughna (fixed), positions 2..57 = the 7 movable karanas repeating,
+# positions 58/59/60 = Shakuni/Chatushpada/Naga (fixed).
+_MOVABLE_KARANAS = (
     "Bava",
     "Balava",
     "Kaulava",
@@ -146,10 +149,11 @@ KARANAS = (
     "Gara",
     "Vanija",
     "Vishti",
-    "Shakuni",
-    "Chatushpada",
-    "Naga",
-    "Kimstughna",
+)
+KARANAS_60 = (
+    ("Kimstughna",)
+    + tuple(_MOVABLE_KARANAS[(pos - 2) % 7] for pos in range(2, 58))
+    + ("Shakuni", "Chatushpada", "Naga")
 )
 
 
@@ -166,24 +170,32 @@ def sign_name(i: int) -> str | None:
     return _lookup(SIGNS, i)
 
 
-def nakshatra_name(i: int) -> str | None:
-    return _lookup(NAKSHATRAS, i)
-
-
 def weekday_name(i: int) -> str | None:
+    """Vaara is 0-based in PyJHora (0=Sunday..6=Saturday)."""
     return _lookup(WEEKDAYS, i)
 
 
+def _lookup_1based(table: tuple[str, ...], i: int) -> str | None:
+    """PyJHora returns nakshatra/yoga/karana/tithi as 1-based indices. Map to the
+    0-based table; return None if out of [1..len]. Never raises."""
+    return table[i - 1] if isinstance(i, int) and 1 <= i <= len(table) else None
+
+
+def nakshatra_name(i: int) -> str | None:
+    """Nakshatra is 1-based in PyJHora (1=Ashwini..27=Revati)."""
+    return _lookup_1based(NAKSHATRAS, i)
+
+
 def yoga_name(i: int) -> str | None:
-    return _lookup(YOGAS, i)
+    """Yoga is 1-based in PyJHora (1=Vishkambha..27=Vaidhriti)."""
+    return _lookup_1based(YOGAS, i)
 
 
 def karana_name(i: int) -> str | None:
-    return _lookup(KARANAS, i)
+    """Karana is 1-based in PyJHora (1=Kimstughna..60=Naga)."""
+    return _lookup_1based(KARANAS_60, i)
 
 
 def tithi_name(i: int) -> str | None:
-    """Tithi tables are 1-based in PyJHora (1..30); convert to 0-based index."""
-    if isinstance(i, int) and 1 <= i <= len(TITHIS):
-        return TITHIS[i - 1]
-    return None
+    """Tithi is 1-based in PyJHora (1..30)."""
+    return _lookup_1based(TITHIS, i)
