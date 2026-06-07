@@ -12,9 +12,11 @@ The first milestone is deliberately narrow:
 
 ## Current State
 
-Phase 1 (repo baseline) is in place: Python 3.12 project, headless PyJHora
-calculation deps pinned, ephemeris/data check, and an import smoke test. The
-facade, API, and Pi tooling (Phases 2–4) are not implemented yet. See:
+Phases 1–2 are in place: Python 3.12 project, headless PyJHora deps pinned,
+ephemeris/data check, and the calculation facade. `compute_chart()` returns a
+deterministic fact set (ascendant, D1, D9, panchanga basics, current Vimshottari
+period) with a passing golden fixture. The API (Phase 3) and Pi tooling
+(Phases 4–5) are not implemented yet. See:
 
 - [PRD.md](PRD.md)
 - [PLAN.md](PLAN.md)

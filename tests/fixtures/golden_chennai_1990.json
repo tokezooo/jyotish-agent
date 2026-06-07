@@ -1,0 +1,212 @@
+{
+  "calculation_config": {
+    "ayanamsa": "LAHIRI",
+    "rahu_ketu": "true_nodes"
+  },
+  "facts": {
+    "ascendant": {
+      "degrees": 25.460176,
+      "sign": "Pisces",
+      "sign_index": 11
+    },
+    "d1": [
+      {
+        "degrees": 16.886946,
+        "planet": "Sun",
+        "planet_index": 0,
+        "sign": "Sagittarius",
+        "sign_index": 8
+      },
+      {
+        "degrees": 6.745215,
+        "planet": "Moon",
+        "planet_index": 1,
+        "sign": "Aquarius",
+        "sign_index": 10
+      },
+      {
+        "degrees": 16.14216,
+        "planet": "Mars",
+        "planet_index": 2,
+        "sign": "Scorpio",
+        "sign_index": 7
+      },
+      {
+        "degrees": 2.00804,
+        "planet": "Mercury",
+        "planet_index": 3,
+        "sign": "Capricorn",
+        "sign_index": 9
+      },
+      {
+        "degrees": 11.452804,
+        "planet": "Jupiter",
+        "planet_index": 4,
+        "sign": "Gemini",
+        "sign_index": 2
+      },
+      {
+        "degrees": 12.527142,
+        "planet": "Venus",
+        "planet_index": 5,
+        "sign": "Capricorn",
+        "sign_index": 9
+      },
+      {
+        "degrees": 21.919669,
+        "planet": "Saturn",
+        "planet_index": 6,
+        "sign": "Sagittarius",
+        "sign_index": 8
+      },
+      {
+        "degrees": 23.143389,
+        "planet": "Rahu",
+        "planet_index": 7,
+        "sign": "Capricorn",
+        "sign_index": 9
+      },
+      {
+        "degrees": 23.143389,
+        "planet": "Ketu",
+        "planet_index": 8,
+        "sign": "Cancer",
+        "sign_index": 3
+      }
+    ],
+    "d9": [
+      {
+        "degrees": 1.982518,
+        "planet": "Sun",
+        "planet_index": 0,
+        "sign": "Virgo",
+        "sign_index": 5
+      },
+      {
+        "degrees": 0.706933,
+        "planet": "Moon",
+        "planet_index": 1,
+        "sign": "Sagittarius",
+        "sign_index": 8
+      },
+      {
+        "degrees": 25.279439,
+        "planet": "Mars",
+        "planet_index": 2,
+        "sign": "Scorpio",
+        "sign_index": 7
+      },
+      {
+        "degrees": 18.07236,
+        "planet": "Mercury",
+        "planet_index": 3,
+        "sign": "Capricorn",
+        "sign_index": 9
+      },
+      {
+        "degrees": 13.075239,
+        "planet": "Jupiter",
+        "planet_index": 4,
+        "sign": "Capricorn",
+        "sign_index": 9
+      },
+      {
+        "degrees": 22.744281,
+        "planet": "Venus",
+        "planet_index": 5,
+        "sign": "Aries",
+        "sign_index": 0
+      },
+      {
+        "degrees": 17.277017,
+        "planet": "Saturn",
+        "planet_index": 6,
+        "sign": "Libra",
+        "sign_index": 6
+      },
+      {
+        "degrees": 28.290497,
+        "planet": "Rahu",
+        "planet_index": 7,
+        "sign": "Cancer",
+        "sign_index": 3
+      },
+      {
+        "degrees": 28.290497,
+        "planet": "Ketu",
+        "planet_index": 8,
+        "sign": "Capricorn",
+        "sign_index": 9
+      }
+    ],
+    "panchanga": {
+      "karana": {
+        "index": 9,
+        "name": "Naga"
+      },
+      "nakshatra": {
+        "index": 24,
+        "name": "Purva Bhadrapada",
+        "pada": 1
+      },
+      "tithi": {
+        "index": 5,
+        "name": "Shukla Panchami"
+      },
+      "weekday": {
+        "index": 1,
+        "name": "Monday"
+      },
+      "yoga": {
+        "index": 16,
+        "name": "Vyatipata"
+      }
+    },
+    "vimshottari": {
+      "antara": {
+        "end": "2026-07-03T21:00:23",
+        "lord": "Rahu",
+        "lord_index": 7,
+        "start": "2026-01-20T01:15:38"
+      },
+      "bhukti": {
+        "end": "2026-11-27T09:13:29",
+        "lord": "Saturn",
+        "lord_index": 6,
+        "start": "2023-11-24T13:35:10"
+      },
+      "mahadasha": {
+        "end": "2042-11-24T11:18:15",
+        "lord": "Saturn",
+        "lord_index": 6,
+        "start": "2023-11-24T13:35:10"
+      }
+    }
+  },
+  "normalized_input": {
+    "date": [
+      1990,
+      1,
+      1
+    ],
+    "latitude": 13.0827,
+    "longitude": 80.2707,
+    "name": "Chennai Test",
+    "reference_date": [
+      2026,
+      6,
+      7
+    ],
+    "time": [
+      12,
+      30,
+      0
+    ],
+    "timezone": 5.5
+  },
+  "provenance": {
+    "engine": "PyJHora",
+    "engine_version": "4.8.6",
+    "ephemeris_mode": "moshier"
+  }
+}
