@@ -12,12 +12,11 @@ The first milestone is deliberately narrow:
 
 ## Current State
 
-Phases 1–4 are in place: Python 3.12 project, headless PyJHora deps pinned,
+All five MVP phases are in place: Python 3.12 project, headless PyJHora deps pinned,
 ephemeris/data check, the calculation facade (`compute_chart()` → deterministic
 ascendant, D1, D9, panchanga basics, current Vimshottari period, golden-tested),
-a FastAPI service exposing validation and chart computation, and a Pi extension
-exposing those as agent tools. The interpretation contract (Phase 5) is not
-implemented yet. See:
+a FastAPI service, a Pi extension exposing the tools, and the fact-citation answer
+contract that makes the trust boundary enforceable. See:
 
 - [PRD.md](PRD.md)
 - [PLAN.md](PLAN.md)
@@ -46,11 +45,21 @@ uv run uvicorn jyotish_agent.api:app --reload   # http://127.0.0.1:8000 (docs at
 
 - `POST /birth-profiles/validate` — normalize a birth profile, return soft warnings.
 - `POST /charts/compute` — deterministic fact set (ascendant, D1, D9, panchanga,
-  current Vimshottari period) plus warnings and provenance.
+  current Vimshottari period) plus warnings, provenance, and a `facts_token`.
+- `POST /answers/validate` — enforce the fact-citation contract: checks an answer's
+  `facts_used` against the computed facts. The `facts_token` (from `/charts/compute`)
+  binds validation to real output, so an answer can't self-certify against forged
+  facts. It verifies the cited facts are real, not that the prose omits no claim.
+- `POST /questions/screen` — best-effort keyword screen (medical/legal/financial/
+  self-harm/deterministic-harm) with a suggested redirect. Advisory.
 - `GET /health` — liveness.
 
 Errors are RFC 7807 `application/problem+json` with `problem` / `cause` / `fix`
 fields. Birth data is never logged or echoed into error bodies.
+
+Set `JYOTISH_SIGNING_KEY` to a fixed secret in any multi-process or multi-restart
+deployment so `facts_token`s verify across workers (a random per-process key is used
+if unset).
 
 Regenerate the golden test fixture after intentional output changes:
 
@@ -73,10 +82,14 @@ uv run uvicorn jyotish_agent.api:app          # terminal 1: the service
 pi --extension .pi/extensions/jyotish.ts      # terminal 2: a Pi session with the tools
 ```
 
-Tools registered: `jyotish_validate_birth_data`, `jyotish_compute_chart`. Set
-`JYOTISH_API_URL` to point at a non-default service (loopback HTTP by default; a
-non-loopback non-HTTPS URL triggers a plaintext-PII warning). The `jyotish-reading`
-skill (`.pi/skills/`) tells the agent to cite only computed facts.
+Tools registered: `jyotish_screen_question`, `jyotish_validate_birth_data`,
+`jyotish_compute_chart`, `jyotish_check_answer`. Set `JYOTISH_API_URL` to point at a
+non-default service (loopback HTTP by default; a non-loopback non-HTTPS URL triggers
+a plaintext-PII warning). The `jyotish-reading` skill (`.pi/skills/`) drives the
+flow: screen → compute → draft answer (summary / facts_used / uncertainty /
+followups) → `jyotish_check_answer` → answer. Nothing in the harness *forces* the
+check tool to run; the gate is enforced by the skill, so it is best-effort by
+construction.
 
 Note: the `pi.registerTool` wiring needs a live Pi session and is not covered by the
 bun tests (which cover the pure helpers, the typebox schema as a Python-model drift

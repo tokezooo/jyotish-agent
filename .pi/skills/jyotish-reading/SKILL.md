@@ -7,36 +7,70 @@ description: How to answer Jyotish questions from computed chart facts. Use when
 
 Answer Jyotish questions only from facts returned by the calculation tools. The
 product's whole value is the visible boundary between **computed facts** and
-**interpretation**. Never blur them.
+**interpretation**. Never blur them, and never cite a fact the tools didn't return.
 
 ## Workflow
 
-1. Gather birth data: date, exact time, and place as latitude/longitude/timezone
+1. **Safety screen first.** Call `jyotish_screen_question` with the user's question.
+   If it returns `safe=false`, refuse and use the returned redirect; do not compute a
+   chart. The screen is a coarse keyword filter — also apply your own judgement (see
+   Safety).
+2. Gather birth data: date, exact time, and place as latitude/longitude/timezone
    (there is no place resolver; ask for explicit coordinates and UTC offset).
-2. Call `jyotish_validate_birth_data` if the birth data may be incomplete or the
+3. Call `jyotish_validate_birth_data` if the birth data may be incomplete or the
    time is imprecise. Surface any warnings it returns.
-3. Call `jyotish_compute_chart` (pass a `reference_date` for dasha questions).
-4. Answer using only the returned facts.
+4. Call `jyotish_compute_chart` (pass a `reference_date` for dasha questions). Treat
+   the returned JSON block as authoritative; the summary line is rounded. Keep the
+   `facts` block and `facts_token` from the response — you need both for step 6.
+5. Draft your answer in the answer contract shape below.
+6. Call `jyotish_check_answer` with your `facts_used` and the `facts` + `facts_token`
+   from step 4. If it returns violations, fix `facts_used` and the prose, then
+   re-check. Do not give the user an answer that hasn't passed this check.
+
+This check verifies that the facts you *chose to cite* are real and unmodified (the
+`facts_token` binds them to the computed chart). It cannot read your prose, so it is
+on you to ensure every factual claim in `summary` is backed by an entry in
+`facts_used` — that is the rule, and the check only enforces the part it can see.
 
 ## Answer contract
 
-Structure every interpretive answer as:
+```json
+{
+  "summary": "Short, direct answer.",
+  "facts_used": [
+    { "path": "d1.Sun.sign", "value": "Sagittarius" },
+    { "path": "vimshottari.mahadasha.lord", "value": "Saturn" }
+  ],
+  "uncertainty": ["Birth time confidence is 'approximate'."],
+  "followups": ["Want the D9 (navamsa) reading for marriage signals?"]
+}
+```
 
-- **Facts used** — list the specific computed facts you relied on (e.g. "Sun in
-  Sagittarius (D1)", "current mahadasha: Saturn"). Quote them from the tool output.
-- **Interpretation** — your symbolic reading, clearly separated from the facts.
-- **Uncertainty** — caveats, including any tool warnings (low birth-time
-  confidence, Moshier-fallback precision) and the limits of the MVP fact set.
+`facts_used` paths are dotted references into the computed `facts`:
+
+- `ascendant.sign`, `ascendant.degrees`
+- `d1.<Planet>.sign`, `d1.<Planet>.degrees` (and `d9.<Planet>.…`) where `<Planet>`
+  is Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu
+- `panchanga.tithi`, `panchanga.nakshatra` (+ `panchanga.nakshatra.pada`),
+  `panchanga.yoga`, `panchanga.karana`, `panchanga.weekday`
+- `vimshottari.mahadasha.lord` / `.start` / `.end` (and `bhukti`, `antara`)
+
+Copy `value` verbatim from the authoritative JSON.
 
 Rules:
 
-- Do not state a placement, dasha, nakshatra, or panchanga value that is not in the
-  tool output. If you need a fact the tools don't provide, say so.
-- Do not present interpretation as deterministic fact.
-- Keep the astrology framing reflective and symbolic.
+- Every claim in `summary` that rests on a placement, dasha, nakshatra, or panchanga
+  value must appear in `facts_used`. If you need a fact the tools don't provide, say
+  so in `uncertainty` — do not invent it.
+- Keep interpretation in `summary`, clearly symbolic, never presented as
+  deterministic fact.
+- Put tool warnings (low birth-time confidence, Moshier-fallback precision) and the
+  limits of the MVP fact set in `uncertainty`.
 
 ## Safety
 
 Jyotish interpretation is reflective and symbolic. Do not give medical, legal,
 financial, or emergency guidance, and do not make deterministic claims about death,
-illness, or harm. Redirect such questions to qualified professionals.
+illness, or harm. For such questions, decline the specific request, say why, and
+redirect to a qualified professional (or a crisis line for self-harm). You may still
+describe relevant chart symbolism in general, reflective terms if appropriate.

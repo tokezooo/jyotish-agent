@@ -19,13 +19,19 @@ from fastapi import FastAPI, Request
 from . import ENGINE_VERSION
 from .config import ConfigError
 from .errors import CalculationError, register_error_handlers
+from .interpretations import redirect_message, screen_question, validate_answer
 from .models import (
     ChartComputeRequest,
     ChartComputeResponse,
+    ScreenRequest,
+    ScreenResponse,
+    ValidateAnswerRequest,
+    ValidateAnswerResponse,
     ValidateRequest,
     ValidateResponse,
 )
 from .pyjhora_facade import compute_chart
+from .signing import sign_facts, verify_facts
 from .validation import config_warnings, normalized_profile, profile_warnings
 
 logger = logging.getLogger("jyotish_agent.api")
@@ -93,4 +99,35 @@ async def compute(req: ChartComputeRequest) -> ChartComputeResponse:
         facts=result["facts"],
         provenance=result["provenance"],
         warnings=warnings,
+        facts_token=sign_facts(result["facts"]),
+    )
+
+
+@app.post("/answers/validate", response_model=ValidateAnswerResponse)
+async def validate_answer_endpoint(req: ValidateAnswerRequest) -> ValidateAnswerResponse:
+    # Integrity first: the facts must be the ones THIS service computed (token binds
+    # validation to real output, so the agent can't self-certify against forged facts).
+    if not verify_facts(req.facts, req.facts_token):
+        return ValidateAnswerResponse(
+            valid=False,
+            violations=[
+                "facts failed integrity check: not produced by this service or modified "
+                "after computation. Recompute the chart and use its facts + facts_token."
+            ],
+        )
+    # Then the fact-citation contract: every cited fact must exist with a matching value.
+    facts_used = [ref.model_dump() for ref in req.answer.facts_used]
+    violations = validate_answer(facts_used, req.facts)
+    return ValidateAnswerResponse(valid=not violations, violations=violations)
+
+
+@app.post("/questions/screen", response_model=ScreenResponse)
+async def screen(req: ScreenRequest) -> ScreenResponse:
+    # Best-effort keyword screen (English, substring) for domains the agent must
+    # refuse/redirect. Advisory: the agent's own judgement via the skill is primary.
+    category = screen_question(req.question)
+    return ScreenResponse(
+        safe=category is None,
+        category=category.value if category else None,
+        redirect=redirect_message(category) if category else None,
     )

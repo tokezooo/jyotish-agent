@@ -108,6 +108,59 @@ class ValidateResponse(BaseModel):
     warnings: list[str]
 
 
+class FactRef(BaseModel):
+    """A citation to one computed fact, by its dotted path and the value claimed.
+    See interpretations.iter_fact_atoms for valid paths."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(min_length=1, description="e.g. 'd1.Sun.sign', 'vimshottari.mahadasha.lord'")
+    value: str | float | int
+
+
+class AnswerContract(BaseModel):
+    """The interpretive-answer shape. `facts_used` is validated against the computed
+    facts so an answer can never cite a placement/dasha/panchanga it wasn't given."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str = Field(min_length=1)
+    # Non-empty: an interpretive chart answer must cite at least one computed fact.
+    # NOTE: this validates the facts the answer CHOSE to cite, not the prose — it
+    # cannot detect a claim made in `summary` that was left out of facts_used.
+    facts_used: list[FactRef] = Field(min_length=1)
+    uncertainty: list[str] = Field(default_factory=list)
+    followups: list[str] = Field(default_factory=list)
+
+
+class ValidateAnswerRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    answer: AnswerContract
+    # The `facts` block AND `facts_token` from a prior /charts/compute response. The
+    # token binds validation to real compute output (see signing.py); a forged or
+    # modified facts block fails the integrity check.
+    facts: dict
+    facts_token: str
+
+
+class ValidateAnswerResponse(BaseModel):
+    valid: bool
+    violations: list[str]
+
+
+class ScreenRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    question: str = Field(min_length=1)
+
+
+class ScreenResponse(BaseModel):
+    safe: bool
+    category: str | None
+    redirect: str | None
+
+
 class ChartComputeResponse(BaseModel):
     """Typed response contract for /charts/compute (what Phase 4 Pi consumes).
 
@@ -119,3 +172,5 @@ class ChartComputeResponse(BaseModel):
     facts: dict
     provenance: dict
     warnings: list[str]
+    # HMAC over `facts`; pass back to /answers/validate to prove the facts are real.
+    facts_token: str

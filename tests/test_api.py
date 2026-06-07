@@ -38,6 +38,7 @@ _EXPECTED_TOP_KEYS = {
     "facts",
     "provenance",
     "warnings",
+    "facts_token",
 }
 _EXPECTED_FACT_KEYS = {"ascendant", "d1", "d9", "panchanga", "vimshottari"}
 
@@ -114,6 +115,94 @@ def test_internal_value_error_is_500_not_422(monkeypatch):
     assert r.status_code == 500
     assert r.headers["content-type"].startswith("application/problem+json")
     assert "INTERNAL_SECRET" not in r.text
+
+
+_FACTS = {"ascendant": {"sign": "Pisces", "degrees": 25.46}}
+
+
+def _signed(facts: dict) -> str:
+    from jyotish_agent.signing import sign_facts
+
+    return sign_facts(facts)
+
+
+def test_validate_answer_accepts_grounded_citation():
+    r = client.post(
+        "/answers/validate",
+        json={
+            "answer": {
+                "summary": "Pisces rising.",
+                "facts_used": [{"path": "ascendant.sign", "value": "Pisces"}],
+            },
+            "facts": _FACTS,
+            "facts_token": _signed(_FACTS),
+        },
+    )
+    assert r.status_code == 200
+    assert r.json() == {"valid": True, "violations": []}
+
+
+def test_validate_answer_rejects_invented_citation():
+    r = client.post(
+        "/answers/validate",
+        json={
+            "answer": {
+                "summary": "Leo rising.",
+                "facts_used": [{"path": "ascendant.sign", "value": "Leo"}],
+            },
+            "facts": _FACTS,
+            "facts_token": _signed(_FACTS),
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["valid"] is False
+    assert len(body["violations"]) == 1
+
+
+def test_validate_answer_rejects_forged_facts():
+    # Agent forges a facts block (Sun in Leo) and cites it; without a valid token for
+    # THOSE facts, the integrity check fails. This is the core anti-self-certification.
+    forged = {"d1": [{"planet": "Sun", "sign": "Leo", "degrees": 1.0}]}
+    r = client.post(
+        "/answers/validate",
+        json={
+            "answer": {
+                "summary": "Sun in Leo.",
+                "facts_used": [{"path": "d1.Sun.sign", "value": "Leo"}],
+            },
+            "facts": forged,
+            "facts_token": _signed(_FACTS),  # token for different facts
+        },
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["valid"] is False
+    assert "integrity" in body["violations"][0]
+
+
+def test_validate_answer_requires_nonempty_citations():
+    r = client.post(
+        "/answers/validate",
+        json={
+            "answer": {"summary": "A reading.", "facts_used": []},
+            "facts": _FACTS,
+            "facts_token": _signed(_FACTS),
+        },
+    )
+    assert r.status_code == 422  # min_length=1 on facts_used
+
+
+def test_screen_endpoint_flags_unsafe_and_allows_safe():
+    bad = client.post("/questions/screen", json={"question": "When will I die?"})
+    assert bad.status_code == 200
+    body = bad.json()
+    assert body["safe"] is False
+    assert body["category"] == "deterministic_harm"
+    assert body["redirect"]
+
+    ok = client.post("/questions/screen", json={"question": "My career signals?"})
+    assert ok.json() == {"safe": True, "category": None, "redirect": None}
 
 
 # --- engine-backed: real chart computation ---

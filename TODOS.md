@@ -23,7 +23,23 @@
 - [x] Add Pydantic request/response models at the HTTP boundary (engine stays dataclass-based).
 - [x] Add Pi extension tool registrations (`.pi/extensions/jyotish.ts`: validate + compute).
 - [x] Add Jyotish reading skill with fact-citation rules (`.pi/skills/jyotish-reading/SKILL.md`).
-- [ ] Phase 5: interpretation answer contract (summary/facts_used/uncertainty/followups) + answer-fact tests.
+- [x] Phase 5: interpretation answer contract (summary/facts_used/uncertainty/followups) + answer-fact tests.
+
+### Resolved in Phase-5 review (feat/phase-5-answer-contract, pre-merge)
+
+- HMAC `facts_token`: `/charts/compute` signs facts; `/answers/validate` verifies, so the agent can't self-certify against forged facts (closes the client-supplied-facts hole). Set `JYOTISH_SIGNING_KEY` for multi-process.
+- `facts_used` required non-empty; documented honestly that the check validates cited facts, not uncited prose claims.
+- Non-finite (nan/inf) citations never match.
+- Safety screen wired: `/questions/screen` endpoint + `jyotish_screen_question` tool (was dead code); documented as best-effort English keyword filter with redirect messages.
+- README/skill updated; gate documented as skill-enforced (best-effort), not harness-forced.
+- Tests: token integrity (valid/forged), empty facts_used rejected, antara/bhukti/pada/start-end atoms, case-sensitivity, non-finite, screen endpoint.
+
+## Known limits (MVP, post-Phase-5)
+
+- The citation check cannot read `summary` prose, so an *uncited* invented claim isn't caught by the validator — only by the skill rule. True enforcement would need answer-prose parsing or a constrained generation step.
+- `jyotish_check_answer` / `jyotish_screen_question` are not harness-forced; a non-compliant agent could skip them.
+- Safety screen is English keyword-based (studio is Russian-primary) — broaden or replace with model-judgement for production.
+- Golden values are Moshier-fallback specific; install `.se1` for Swiss parity.
 
 ### Resolved in Phase-4 review (feat/phase-4-pi, pre-merge)
 

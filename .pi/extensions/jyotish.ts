@@ -308,4 +308,81 @@ export default function (pi: ExtensionAPI) {
       };
     },
   });
+
+  pi.registerTool({
+    name: "jyotish_check_answer",
+    label: "Check answer citations",
+    description:
+      "Verify that a drafted interpretive answer cites only computed facts. Pass the " +
+      "answer's facts_used and the `facts` block from jyotish_compute_chart. Returns " +
+      "violations for any cited fact that is invented or has the wrong value. Call this " +
+      "before giving the user the final answer; if it returns violations, fix them.",
+    promptGuidelines: [
+      "Always call jyotish_check_answer before finalizing a chart interpretation.",
+      "If it returns violations, correct facts_used and the prose, then re-check.",
+    ],
+    parameters: Type.Object(
+      {
+        answer: Type.Object(
+          {
+            summary: Type.String(),
+            facts_used: Type.Array(
+              Type.Object(
+                {
+                  path: Type.String({ description: "e.g. 'd1.Sun.sign'" }),
+                  value: Type.Union([Type.String(), Type.Number()]),
+                },
+                NO_EXTRA,
+              ),
+              { minItems: 1 },
+            ),
+            uncertainty: Type.Optional(Type.Array(Type.String())),
+            followups: Type.Optional(Type.Array(Type.String())),
+          },
+          NO_EXTRA,
+        ),
+        // Pass BOTH `facts` and `facts_token` exactly as returned by
+        // jyotish_compute_chart; the token proves the facts are real.
+        facts: Type.Record(Type.String(), Type.Unknown()),
+        facts_token: Type.String(),
+      },
+      NO_EXTRA,
+    ),
+    async execute(_toolCallId, params, signal) {
+      const { ok, status, body } = await postJson("/answers/validate", params, signal);
+      if (!ok) {
+        return { content: [{ type: "text", text: formatProblem(status, body) }], details: {} };
+      }
+      const result = body as { valid?: boolean; violations?: string[] };
+      const text = result.valid
+        ? "OK: all cited facts are grounded in the computed chart."
+        : "VIOLATIONS (fix before answering):\n- " + (result.violations ?? []).join("\n- ");
+      return { content: [{ type: "text", text }], details: result as Record<string, unknown> };
+    },
+  });
+
+  pi.registerTool({
+    name: "jyotish_screen_question",
+    label: "Screen question safety",
+    description:
+      "Best-effort check whether a question asks for medical, legal, or financial " +
+      "advice, self-harm, or deterministic death/harm claims. Call FIRST; if not safe, " +
+      "refuse and use the returned redirect instead of computing a chart. Advisory: " +
+      "your own judgement still applies.",
+    promptGuidelines: [
+      "Call jyotish_screen_question before anything else; if safe=false, refuse with the redirect.",
+    ],
+    parameters: Type.Object({ question: Type.String() }, NO_EXTRA),
+    async execute(_toolCallId, params, signal) {
+      const { ok, status, body } = await postJson("/questions/screen", params, signal);
+      if (!ok) {
+        return { content: [{ type: "text", text: formatProblem(status, body) }], details: {} };
+      }
+      const r = body as { safe?: boolean; category?: string | null; redirect?: string | null };
+      const text = r.safe
+        ? "OK: no unsafe domain detected (advisory)."
+        : `UNSAFE (${r.category}): refuse and redirect.\n${r.redirect ?? ""}`;
+      return { content: [{ type: "text", text }], details: r as Record<string, unknown> };
+    },
+  });
 }
