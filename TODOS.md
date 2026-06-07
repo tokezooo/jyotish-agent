@@ -57,6 +57,18 @@
 - (Phase 6.2) Whole-sign houses: every planet carries a `house` (from its chart's own lagna), and `facts["houses"]` is a 12-entry D1 bhava table (sign + classical lord). Citation paths `d<N>.<Planet>.house`, `houses.<N>.sign/.lord`. Per-varga bhava tables (sign+lord for D9 etc.) are out of MVP scope; classical single-lord rulerships only.
 - (Phase 6.3) Graha drishti (D1 aspects): all planets aspect 7th; Mars 4/7/8, Jupiter 5/7/9, Saturn 3/7/10. `facts["aspects"]` per planet (aspected signs/houses/planets). Citation path `aspects.<From>.<To>`=`true`. Scope: D1-only, conjunctions not treated as aspects, Rahu/Ketu 7th-only (node special aspects are school-dependent — revisit).
 
+## Feature-breadth milestone: CLOSED at 6.3
+
+Interpretive surface (all citation-enforced): D1/D2/D3/D7/D9/D10/D12 + per-planet whole-sign houses + D1 bhava table with house lords + D1 graha drishti + Vimshottari + panchanga.
+
+- 6.4 (yogas/doshas) **deferred by decision** (2026-06-08). Yoga definitions are text-dependent and high correctness-risk for a trust-boundary product; the original PLAN deferred broad yoga coverage. If revisited, scope to 2-3 unambiguous geometric yogas (Gajakesari, Chandra-Mangala) with explicit definitions + cross-checked tests — not a broad set.
+
+### Candidate future milestones (not started)
+
+- Swiss `.se1` ephemeris parity (off Moshier fallback; enables star-based ayanamsas).
+- Trust-boundary hardening: prose-citation enforcement, harness-forced check/screen gates, multilingual safety screen.
+- Per-varga bhava tables + varga lagnas; node special aspects.
+
 ### Resolved in Phase-3 review (feat/phase-3-api, pre-merge)
 
 - Privacy/correctness: `/charts/compute` maps only `ConfigError` to 422; any other exception hits a catch-all 500 problem+json that never echoes internal/birth-derived detail. (Was a broad `except ValueError` leaking messages + mislabeling bugs.)
