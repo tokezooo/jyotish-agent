@@ -56,6 +56,17 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
                 atoms[f"{chart_key}.{planet}.sign"] = str(placement["sign"])
             if placement.get("degrees") is not None:
                 atoms[f"{chart_key}.{planet}.degrees"] = str(placement["degrees"])
+            if placement.get("house") is not None:
+                atoms[f"{chart_key}.{planet}.house"] = str(placement["house"])
+
+    for house in facts.get("houses") or []:
+        n = house.get("house")
+        if n is None:
+            continue
+        if house.get("sign") is not None:
+            atoms[f"houses.{n}.sign"] = str(house["sign"])
+        if house.get("lord") is not None:
+            atoms[f"houses.{n}.lord"] = str(house["lord"])
 
     panchanga = facts.get("panchanga") or {}
     for key, entry in panchanga.items():

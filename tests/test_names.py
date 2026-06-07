@@ -61,3 +61,13 @@ def test_weekday_0based():
     assert names.weekday_name(1) == "Monday"
     assert names.weekday_name(6) == "Saturday"
     assert names.weekday_name(7) is None
+
+
+def test_sign_lords():
+    # Aries->Mars, Leo->Sun, Sagittarius->Jupiter, Capricorn->Saturn.
+    assert names.planet_name(names.sign_lord_index(0)) == "Mars"
+    assert names.planet_name(names.sign_lord_index(4)) == "Sun"
+    assert names.planet_name(names.sign_lord_index(8)) == "Jupiter"
+    assert names.planet_name(names.sign_lord_index(9)) == "Saturn"
+    assert names.sign_lord_index(12) is None
+    assert len(names.SIGN_LORDS) == 12

@@ -40,7 +40,7 @@ _EXPECTED_TOP_KEYS = {
     "warnings",
     "facts_token",
 }
-_EXPECTED_FACT_KEYS = {"ascendant", "d1", "d9", "panchanga", "vimshottari"}
+_EXPECTED_FACT_KEYS = {"ascendant", "houses", "d1", "d9", "panchanga", "vimshottari"}
 
 
 def _compute_body(**config_over) -> dict:
@@ -250,6 +250,24 @@ def test_compute_extra_chart_and_token_roundtrips():
             },
             "facts": cc["facts"],
             "facts_token": cc["facts_token"],
+        },
+    )
+    assert v.json() == {"valid": True, "violations": []}
+
+
+@requires_engine
+def test_house_fact_roundtrips_through_validation():
+    c = client.post("/charts/compute", json=_compute_body()).json()
+    lord = c["facts"]["houses"][9]["lord"]  # 10th-house lord
+    v = client.post(
+        "/answers/validate",
+        json={
+            "answer": {
+                "summary": "Career lord.",
+                "facts_used": [{"path": "houses.10.lord", "value": lord}],
+            },
+            "facts": c["facts"],
+            "facts_token": c["facts_token"],
         },
     )
     assert v.json() == {"valid": True, "violations": []}

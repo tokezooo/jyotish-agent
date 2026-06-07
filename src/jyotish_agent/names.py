@@ -157,9 +157,34 @@ KARANAS_60 = (
 )
 
 
+# Classical rasi (sign) lords, by sign index -> planet index. Used for house lords.
+# MVP uses classical single-lord rulerships only — no exaltation, and no Rahu/Ketu
+# co-lordship of Aquarius/Scorpio.
+SIGN_LORDS: tuple[int, ...] = (
+    2,  # Aries -> Mars
+    5,  # Taurus -> Venus
+    3,  # Gemini -> Mercury
+    1,  # Cancer -> Moon
+    0,  # Leo -> Sun
+    3,  # Virgo -> Mercury
+    5,  # Libra -> Venus
+    2,  # Scorpio -> Mars
+    4,  # Sagittarius -> Jupiter
+    6,  # Capricorn -> Saturn
+    6,  # Aquarius -> Saturn
+    4,  # Pisces -> Jupiter
+)
+assert len(SIGN_LORDS) == 12, "SIGN_LORDS must cover all 12 signs"
+
+
 def _lookup(table: tuple[str, ...], index: int) -> str | None:
     """Return table[index] or None if out of range. Never raises."""
     return table[index] if isinstance(index, int) and 0 <= index < len(table) else None
+
+
+def sign_lord_index(sign_index: int) -> int | None:
+    """Planet index that rules the given sign, or None if out of range."""
+    return SIGN_LORDS[sign_index] if 0 <= sign_index < len(SIGN_LORDS) else None
 
 
 def planet_name(i: int) -> str | None:

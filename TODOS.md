@@ -54,6 +54,7 @@
 
 - Repo is two toolchains: `src/jyotish_agent/` (Python service) + `.pi/` (Pi harness). `package.json`/`bun.lockb` sit beside `pyproject.toml`/`uv.lock`.
 - (Phase 6.1) `charts` is now a first-class StringEnum array (D1/D2/D3/D7/D9/D10/D12); D1 always computed, unknown charts are a hard 422. Per-chart (varga) lagna is still dropped — only the D1 ascendant is surfaced.
+- (Phase 6.2) Whole-sign houses: every planet carries a `house` (from its chart's own lagna), and `facts["houses"]` is a 12-entry D1 bhava table (sign + classical lord). Citation paths `d<N>.<Planet>.house`, `houses.<N>.sign/.lord`. Per-varga bhava tables (sign+lord for D9 etc.) are out of MVP scope; classical single-lord rulerships only.
 
 ### Resolved in Phase-3 review (feat/phase-3-api, pre-merge)
 

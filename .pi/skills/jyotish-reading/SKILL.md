@@ -49,11 +49,14 @@ on you to ensure every factual claim in `summary` is backed by an entry in
 `facts_used` paths are dotted references into the computed `facts`:
 
 - `ascendant.sign`, `ascendant.degrees`
-- `d<N>.<Planet>.sign`, `d<N>.<Planet>.degrees` for each computed divisional chart
-  (`d1`, `d9`, and any others requested via `config.charts` such as `d10` for career),
-  where `<Planet>` is Sun, Moon, Mars, Mercury, Jupiter, Venus, Saturn, Rahu, Ketu.
-  Request the charts you need (e.g. D10 for career, D7 for children) in
+- `d<N>.<Planet>.sign`, `d<N>.<Planet>.degrees`, `d<N>.<Planet>.house` for each
+  computed divisional chart (`d1`, `d9`, and any others requested via `config.charts`
+  such as `d10` for career), where `<Planet>` is Sun, Moon, Mars, Mercury, Jupiter,
+  Venus, Saturn, Rahu, Ketu. `house` is whole-sign, counted from that chart's own
+  lagna. Request the charts you need (e.g. D10 for career, D7 for children) in
   `jyotish_compute_chart`'s `config.charts`.
+- `houses.<N>.sign`, `houses.<N>.lord` for the D1 bhava table (N = 1..12), e.g.
+  `houses.10.lord` is the 10th-house (career) lord.
 - `panchanga.tithi`, `panchanga.nakshatra` (+ `panchanga.nakshatra.pada`),
   `panchanga.yoga`, `panchanga.karana`, `panchanga.weekday`
 - `vimshottari.mahadasha.lord` / `.start` / `.end` (and `bhukti`, `antara`)

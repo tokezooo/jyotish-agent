@@ -116,6 +116,40 @@ def test_default_charts_unchanged():
     assert set(k for k in facts if k.startswith("d")) == {"d1", "d9"}
 
 
+def test_houses_and_planet_house():
+    facts = _compute()["facts"]
+    # Pisces lagna: Sun in Sagittarius is the 10th house.
+    sun = next(p for p in facts["d1"] if p["planet"] == "Sun")
+    assert sun["house"] == 10
+    houses = facts["houses"]
+    assert len(houses) == 12
+    assert houses[0] == {
+        "house": 1,
+        "sign_index": 11,
+        "sign": "Pisces",
+        "lord_index": 4,
+        "lord": "Jupiter",
+    }
+    h10 = houses[9]
+    assert h10["house"] == 10 and h10["sign"] == "Sagittarius" and h10["lord"] == "Jupiter"
+    atoms = iter_fact_atoms(facts)
+    assert atoms["d1.Sun.house"] == "10"
+    assert atoms["houses.10.lord"] == "Jupiter"
+    assert atoms["houses.1.sign"] == "Pisces"
+    # Non-D1 charts carry their own (varga-lagna) houses, and they're citable.
+    assert any(k.startswith("d9.") and k.endswith(".house") for k in atoms)
+
+
+def test_house_base_case_planet_in_lagna_is_first_house():
+    from jyotish_agent.pyjhora_facade import _placements
+
+    # Synthetic chart: lagna and a planet both in sign 5 -> house 1; sign 4 -> house 12.
+    chart = [["L", (5, 0.0)], [0, (5, 10.0)], [1, (4, 2.0)]]
+    placements = {p["planet_index"]: p["house"] for p in _placements(chart)}
+    assert placements[0] == 1  # same sign as lagna
+    assert placements[1] == 12  # one sign before lagna
+
+
 def test_fmt_dt_rolls_over_midnight():
     # 23:59:59.6 must roll into the next day, never emit 'T24:00:00'.
     assert _fmt_dt((2026, 1, 1, 23 + 59 / 60 + 59.6 / 3600)) == "2026-01-02T00:00:00"

@@ -53,10 +53,12 @@ def _placements(chart) -> list[dict]:
     position is sometimes a tuple and sometimes a list. Lagna ('L') is excluded here
     and surfaced separately as the ascendant.
 
-    NOTE: each divisional chart has its own lagna (varga lagna), but the MVP surfaces
-    only the D1 ascendant and drops per-chart lagnas. Revisit if varga-lagna analysis
-    is needed.
+    NOTE: each divisional chart has its own lagna (varga lagna); ``house`` below is
+    whole-sign and computed relative to THAT chart's own lagna, so D9 houses are from
+    the navamsa lagna, etc. The MVP surfaces the D1 ascendant as the top-level
+    ascendant but drops the other charts' lagna sign/degree.
     """
+    lagna_sign = _lagna_sign(chart)
     out: list[dict] = []
     for body, pos in chart:
         if body == "L":
@@ -69,21 +71,52 @@ def _placements(chart) -> list[dict]:
                 "sign_index": sign,
                 "sign": names.sign_name(sign),
                 "degrees": _round_deg(pos[1]),
+                # Whole-sign house: 1 = lagna sign, counted forward.
+                "house": ((sign - lagna_sign) % 12) + 1,
             }
         )
     return out
 
 
-def _ascendant(chart) -> dict:
+def _lagna_pos(chart):
+    """Return the lagna (sign, degrees) position tuple, or raise."""
     for body, pos in chart:
         if body == "L":
-            sign = int(pos[0])
-            return {
+            return pos
+    raise EngineOutputError("no Lagna ('L') in chart output")
+
+
+def _lagna_sign(chart) -> int:
+    return int(_lagna_pos(chart)[0])
+
+
+def _ascendant(chart) -> dict:
+    pos = _lagna_pos(chart)
+    sign = int(pos[0])
+    return {
+        "sign_index": sign,
+        "sign": names.sign_name(sign),
+        "degrees": _round_deg(pos[1]),
+    }
+
+
+def _houses(chart) -> list[dict]:
+    """Whole-sign bhava table for a chart: 12 houses from the lagna with sign + lord."""
+    lagna_sign = _lagna_sign(chart)
+    table: list[dict] = []
+    for house in range(1, 13):
+        sign = (lagna_sign + house - 1) % 12
+        lord = names.sign_lord_index(sign)
+        table.append(
+            {
+                "house": house,
                 "sign_index": sign,
                 "sign": names.sign_name(sign),
-                "degrees": _round_deg(pos[1]),
+                "lord_index": lord,
+                "lord": names.planet_name(lord) if lord is not None else None,
             }
-    raise EngineOutputError("no Lagna ('L') in chart output")
+        )
+    return table
 
 
 def _fmt_dt(dt) -> str:
@@ -210,6 +243,9 @@ def compute_chart(
     # ascendant is taken from D1, which resolved_charts guarantees is present.
     divisional_facts = {name.lower(): _placements(chart) for name, chart in raw_charts.items()}
     ascendant = _ascendant(raw_charts["D1"])
+    # Bhava table is D1-only by design; per-varga house tables are out of MVP scope
+    # (each chart's planets still carry their own whole-sign `house` field).
+    houses = _houses(raw_charts["D1"])
 
     return {
         "normalized_input": {
@@ -231,6 +267,7 @@ def compute_chart(
         },
         "facts": {
             "ascendant": ascendant,
+            "houses": houses,
             **divisional_facts,
             "panchanga": panchanga,
             "vimshottari": vimshottari,

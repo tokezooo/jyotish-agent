@@ -130,6 +130,7 @@ interface Placement {
   planet?: string;
   sign?: string;
   degrees?: number;
+  house?: number;
 }
 interface Ascendant {
   sign?: string;
@@ -155,7 +156,8 @@ function hasNum(n: number | undefined): n is number {
 
 function placementLine(p: Placement): string | null {
   if (!p.planet || !p.sign || !hasNum(p.degrees)) return null;
-  return `${p.planet} ${p.sign} ${p.degrees}°`;
+  const house = hasNum(p.house) ? ` H${p.house}` : "";
+  return `${p.planet} ${p.sign} ${p.degrees}°${house}`;
 }
 
 /**

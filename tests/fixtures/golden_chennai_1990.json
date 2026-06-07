@@ -21,6 +21,7 @@
     "d1": [
       {
         "degrees": 16.886946,
+        "house": 10,
         "planet": "Sun",
         "planet_index": 0,
         "sign": "Sagittarius",
@@ -28,6 +29,7 @@
       },
       {
         "degrees": 6.745215,
+        "house": 12,
         "planet": "Moon",
         "planet_index": 1,
         "sign": "Aquarius",
@@ -35,6 +37,7 @@
       },
       {
         "degrees": 16.14216,
+        "house": 9,
         "planet": "Mars",
         "planet_index": 2,
         "sign": "Scorpio",
@@ -42,6 +45,7 @@
       },
       {
         "degrees": 2.00804,
+        "house": 11,
         "planet": "Mercury",
         "planet_index": 3,
         "sign": "Capricorn",
@@ -49,6 +53,7 @@
       },
       {
         "degrees": 11.452804,
+        "house": 4,
         "planet": "Jupiter",
         "planet_index": 4,
         "sign": "Gemini",
@@ -56,6 +61,7 @@
       },
       {
         "degrees": 12.527142,
+        "house": 11,
         "planet": "Venus",
         "planet_index": 5,
         "sign": "Capricorn",
@@ -63,6 +69,7 @@
       },
       {
         "degrees": 21.919669,
+        "house": 10,
         "planet": "Saturn",
         "planet_index": 6,
         "sign": "Sagittarius",
@@ -70,6 +77,7 @@
       },
       {
         "degrees": 23.143389,
+        "house": 11,
         "planet": "Rahu",
         "planet_index": 7,
         "sign": "Capricorn",
@@ -77,6 +85,7 @@
       },
       {
         "degrees": 23.143389,
+        "house": 5,
         "planet": "Ketu",
         "planet_index": 8,
         "sign": "Cancer",
@@ -86,6 +95,7 @@
     "d9": [
       {
         "degrees": 1.982518,
+        "house": 8,
         "planet": "Sun",
         "planet_index": 0,
         "sign": "Virgo",
@@ -93,6 +103,7 @@
       },
       {
         "degrees": 0.706933,
+        "house": 11,
         "planet": "Moon",
         "planet_index": 1,
         "sign": "Sagittarius",
@@ -100,6 +111,7 @@
       },
       {
         "degrees": 25.279439,
+        "house": 10,
         "planet": "Mars",
         "planet_index": 2,
         "sign": "Scorpio",
@@ -107,6 +119,7 @@
       },
       {
         "degrees": 18.07236,
+        "house": 12,
         "planet": "Mercury",
         "planet_index": 3,
         "sign": "Capricorn",
@@ -114,6 +127,7 @@
       },
       {
         "degrees": 13.075239,
+        "house": 12,
         "planet": "Jupiter",
         "planet_index": 4,
         "sign": "Capricorn",
@@ -121,6 +135,7 @@
       },
       {
         "degrees": 22.744281,
+        "house": 3,
         "planet": "Venus",
         "planet_index": 5,
         "sign": "Aries",
@@ -128,6 +143,7 @@
       },
       {
         "degrees": 17.277017,
+        "house": 9,
         "planet": "Saturn",
         "planet_index": 6,
         "sign": "Libra",
@@ -135,6 +151,7 @@
       },
       {
         "degrees": 28.290497,
+        "house": 6,
         "planet": "Rahu",
         "planet_index": 7,
         "sign": "Cancer",
@@ -142,10 +159,97 @@
       },
       {
         "degrees": 28.290497,
+        "house": 12,
         "planet": "Ketu",
         "planet_index": 8,
         "sign": "Capricorn",
         "sign_index": 9
+      }
+    ],
+    "houses": [
+      {
+        "house": 1,
+        "lord": "Jupiter",
+        "lord_index": 4,
+        "sign": "Pisces",
+        "sign_index": 11
+      },
+      {
+        "house": 2,
+        "lord": "Mars",
+        "lord_index": 2,
+        "sign": "Aries",
+        "sign_index": 0
+      },
+      {
+        "house": 3,
+        "lord": "Venus",
+        "lord_index": 5,
+        "sign": "Taurus",
+        "sign_index": 1
+      },
+      {
+        "house": 4,
+        "lord": "Mercury",
+        "lord_index": 3,
+        "sign": "Gemini",
+        "sign_index": 2
+      },
+      {
+        "house": 5,
+        "lord": "Moon",
+        "lord_index": 1,
+        "sign": "Cancer",
+        "sign_index": 3
+      },
+      {
+        "house": 6,
+        "lord": "Sun",
+        "lord_index": 0,
+        "sign": "Leo",
+        "sign_index": 4
+      },
+      {
+        "house": 7,
+        "lord": "Mercury",
+        "lord_index": 3,
+        "sign": "Virgo",
+        "sign_index": 5
+      },
+      {
+        "house": 8,
+        "lord": "Venus",
+        "lord_index": 5,
+        "sign": "Libra",
+        "sign_index": 6
+      },
+      {
+        "house": 9,
+        "lord": "Mars",
+        "lord_index": 2,
+        "sign": "Scorpio",
+        "sign_index": 7
+      },
+      {
+        "house": 10,
+        "lord": "Jupiter",
+        "lord_index": 4,
+        "sign": "Sagittarius",
+        "sign_index": 8
+      },
+      {
+        "house": 11,
+        "lord": "Saturn",
+        "lord_index": 6,
+        "sign": "Capricorn",
+        "sign_index": 9
+      },
+      {
+        "house": 12,
+        "lord": "Saturn",
+        "lord_index": 6,
+        "sign": "Aquarius",
+        "sign_index": 10
       }
     ],
     "panchanga": {
