@@ -49,6 +49,13 @@ MOSHIER_SAFE_AYANAMSAS = frozenset({"LAHIRI", "RAMAN", "KP", "FAGAN"})
 ENGINE_LOCK = threading.Lock()
 
 
+class ConfigError(ValueError):
+    """A calculation parameter (ayanamsa / node mode) was rejected. Subclasses
+    ValueError for back-compat, but is distinct so callers (e.g. the API) can map
+    *only* these to a 4xx and never confuse them with internal ValueErrors whose
+    messages may carry user-derived data."""
+
+
 @dataclass(frozen=True)
 class CalculationConfig:
     """Explicit, serializable calculation settings.
@@ -75,11 +82,11 @@ def apply_config(config: CalculationConfig | None = None) -> CalculationConfig:
     mode = config.ayanamsa.upper()
     available = {m.upper() for m in const.available_ayanamsa_modes}
     if mode not in available:
-        raise ValueError(
+        raise ConfigError(
             f"unknown ayanamsa {config.ayanamsa!r}; available: {sorted(available)}"
         )
     if ephemeris_mode() == "moshier" and mode not in MOSHIER_SAFE_AYANAMSAS:
-        raise ValueError(
+        raise ConfigError(
             f"ayanamsa {mode!r} is not in the Moshier-verified safe set "
             f"{sorted(MOSHIER_SAFE_AYANAMSAS)}; no .se1 files are installed "
             f"(Moshier fallback active). Star-based modes crash and others are "
@@ -87,7 +94,7 @@ def apply_config(config: CalculationConfig | None = None) -> CalculationConfig:
         )
 
     if config.rahu_ketu not in ("true_nodes", "mean_nodes"):
-        raise ValueError(
+        raise ConfigError(
             f"unknown rahu_ketu {config.rahu_ketu!r}; expected "
             f"'true_nodes' or 'mean_nodes'"
         )

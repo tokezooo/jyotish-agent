@@ -18,11 +18,22 @@
 - [x] Add ephemeris/data availability check (`scripts/check_pyjhora_data.py`, `--strict` + liveness compute).
 - [x] Implement D1/D9/panchanga/Vimshottari facade (`src/jyotish_agent/pyjhora_facade.py`).
 - [x] Add one golden birth-profile fixture (`tests/fixtures/golden_chennai_1990.json`).
-- [ ] Add FastAPI endpoints (Phase 3).
-- [ ] Add structured RFC-7807-style errors + validation (Phase 3).
-- [ ] Add Pydantic request/response models (Phase 3, replacing facade dataclasses at the boundary).
+- [x] Add FastAPI endpoints (`/birth-profiles/validate`, `/charts/compute`, `/health`).
+- [x] Add structured RFC-7807 problem+json errors (problem/cause/fix) + validation.
+- [x] Add Pydantic request/response models at the HTTP boundary (engine stays dataclass-based).
 - [ ] Add Pi extension tool registrations (Phase 4).
 - [ ] Add Jyotish reading skill with fact-citation rules (Phase 5).
+
+### Resolved in Phase-3 review (feat/phase-3-api, pre-merge)
+
+- Privacy/correctness: `/charts/compute` maps only `ConfigError` to 422; any other exception hits a catch-all 500 problem+json that never echoes internal/birth-derived detail. (Was a broad `except ValueError` leaking messages + mislabeling bugs.)
+- Access-log middleware logs via `finally`, so 5xx/exception paths are no longer invisible.
+- Typed `ChartComputeResponse` + `response_model` so Phase 4 Pi has an OpenAPI contract.
+- `extra="forbid"` rejections report `(unexpected field)` instead of reflecting the client key.
+- `name` capped (`max_length=200`); birth year constrained to 1800–2200.
+- On-the-hour birth-time warning suppressed when confidence is `exact`.
+- `reference_date` surfaced in `calculation_config` for reproducibility.
+- Tests: validation/error/health run engine-free; added today()-default, 500-not-422, full-shape, ephemeris-gated star-mode coverage.
 
 ## Carried Phase-2 Notes
 

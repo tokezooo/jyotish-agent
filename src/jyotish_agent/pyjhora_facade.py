@@ -212,6 +212,9 @@ def compute_chart(
         "calculation_config": {
             "ayanamsa": applied.ayanamsa,
             "rahu_ketu": applied.rahu_ketu,
+            # reference_date drives the running Vimshottari period; surfaced here so a
+            # quoted/cached result is fully reproducible from calculation_config alone.
+            "reference_date": list(reference_date),
         },
         "facts": {
             "ascendant": _ascendant(d1),

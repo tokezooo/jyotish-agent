@@ -1,7 +1,12 @@
 {
   "calculation_config": {
     "ayanamsa": "LAHIRI",
-    "rahu_ketu": "true_nodes"
+    "rahu_ketu": "true_nodes",
+    "reference_date": [
+      2026,
+      6,
+      7
+    ]
   },
   "facts": {
     "ascendant": {

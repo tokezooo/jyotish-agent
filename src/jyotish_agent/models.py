@@ -1,0 +1,117 @@
+"""Pydantic request/response models — the HTTP boundary.
+
+These live at the API edge only. The engine layer (facade, config) stays on plain
+dataclasses with no FastAPI/Pydantic dependency; ``to_birth_profile`` /
+``to_calculation_config`` adapt across the boundary. Keeping the engine
+Pydantic-free means the calculation code imports and tests without a web stack.
+
+Date/time use ``datetime.date`` / ``datetime.time`` so Pydantic rejects impossible
+values (2025-02-30, 25:00) with a 422 before any calculation runs.
+"""
+
+from __future__ import annotations
+
+import datetime as _dt
+from enum import Enum
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from .config import CalculationConfig
+from .pyjhora_facade import BirthProfile
+
+# MVP supports only these divisional charts; requests naming others get a warning.
+SUPPORTED_CHARTS = ("D1", "D9")
+
+# Birth years PyJHora/pyswisseph compute reliably; outside this we'd risk a 500.
+_MIN_YEAR = 1800
+_MAX_YEAR = 2200
+_MAX_NAME = 200
+
+
+class BirthTimeConfidence(str, Enum):
+    exact = "exact"
+    approximate = "approximate"
+    unknown = "unknown"
+
+
+class Place(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=_MAX_NAME, description="Place label")
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    # Offset in hours from UTC, e.g. 5.5 for IST. Required: no place/tz resolver yet.
+    timezone: float = Field(ge=-12, le=14)
+
+
+class BirthProfileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=_MAX_NAME)
+    date: _dt.date
+    time: _dt.time
+    place: Place
+    birth_time_confidence: BirthTimeConfidence = BirthTimeConfidence.exact
+
+    @field_validator("date")
+    @classmethod
+    def _year_in_supported_range(cls, v: _dt.date) -> _dt.date:
+        if not (_MIN_YEAR <= v.year <= _MAX_YEAR):
+            raise ValueError(f"year must be between {_MIN_YEAR} and {_MAX_YEAR}")
+        return v
+
+    def to_birth_profile(self) -> BirthProfile:
+        return BirthProfile(
+            name=self.name,
+            date=(self.date.year, self.date.month, self.date.day),
+            time=(self.time.hour, self.time.minute, self.time.second),
+            latitude=self.place.latitude,
+            longitude=self.place.longitude,
+            timezone=self.place.timezone,
+        )
+
+
+class CalculationConfigRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    ayanamsa: str = "LAHIRI"
+    rahu_ketu: str = "true_nodes"
+    # Advisory only: unknown values are tolerated (forward-compat) and reported as a
+    # warning; the MVP always computes SUPPORTED_CHARTS regardless. Consumed by the
+    # route for warnings, NOT passed to the engine config.
+    charts: list[str] = Field(default_factory=lambda: list(SUPPORTED_CHARTS))
+    # Consumed by the route (defaults to today there), NOT by the engine config.
+    reference_date: _dt.date | None = None
+
+    def to_calculation_config(self) -> CalculationConfig:
+        # ayanamsa / rahu_ketu validity is enforced by apply_config (single source).
+        return CalculationConfig(ayanamsa=self.ayanamsa, rahu_ketu=self.rahu_ketu)
+
+
+class ValidateRequest(BirthProfileRequest):
+    """Distinct type so the validate endpoint gets its own OpenAPI schema name."""
+
+
+class ChartComputeRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    birth_profile: BirthProfileRequest
+    config: CalculationConfigRequest = Field(default_factory=CalculationConfigRequest)
+
+
+class ValidateResponse(BaseModel):
+    normalized_profile: dict
+    warnings: list[str]
+
+
+class ChartComputeResponse(BaseModel):
+    """Typed response contract for /charts/compute (what Phase 4 Pi consumes).
+
+    `facts`, `normalized_input`, and `provenance` stay as dicts: their shape is the
+    facade's deterministic output, kept in one place rather than duplicated here."""
+
+    normalized_input: dict
+    calculation_config: dict
+    facts: dict
+    provenance: dict
+    warnings: list[str]

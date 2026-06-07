@@ -12,11 +12,11 @@ The first milestone is deliberately narrow:
 
 ## Current State
 
-Phases 1–2 are in place: Python 3.12 project, headless PyJHora deps pinned,
-ephemeris/data check, and the calculation facade. `compute_chart()` returns a
-deterministic fact set (ascendant, D1, D9, panchanga basics, current Vimshottari
-period) with a passing golden fixture. The API (Phase 3) and Pi tooling
-(Phases 4–5) are not implemented yet. See:
+Phases 1–3 are in place: Python 3.12 project, headless PyJHora deps pinned,
+ephemeris/data check, the calculation facade (`compute_chart()` → deterministic
+ascendant, D1, D9, panchanga basics, current Vimshottari period, golden-tested),
+and a FastAPI service exposing validation and chart computation. The Pi tooling
+(Phases 4–5) is not implemented yet. See:
 
 - [PRD.md](PRD.md)
 - [PLAN.md](PLAN.md)
@@ -36,6 +36,26 @@ Note: PyJHora wheels ship no Swiss ephemeris (`.se1`) files, so calculations run
 through the pyswisseph **Moshier fallback** (repeatable, slightly lower precision).
 For full Swiss-ephemeris parity, copy `se*.se1` into the installed
 `jhora/data/ephe` directory.
+
+## API
+
+```bash
+uv run uvicorn jyotish_agent.api:app --reload   # http://127.0.0.1:8000 (docs at /docs)
+```
+
+- `POST /birth-profiles/validate` — normalize a birth profile, return soft warnings.
+- `POST /charts/compute` — deterministic fact set (ascendant, D1, D9, panchanga,
+  current Vimshottari period) plus warnings and provenance.
+- `GET /health` — liveness.
+
+Errors are RFC 7807 `application/problem+json` with `problem` / `cause` / `fix`
+fields. Birth data is never logged or echoed into error bodies.
+
+Regenerate the golden test fixture after intentional output changes:
+
+```bash
+uv run python scripts/regen_golden.py
+```
 
 ## Source References
 
