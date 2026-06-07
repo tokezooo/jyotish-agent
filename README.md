@@ -45,8 +45,9 @@ uv run uvicorn jyotish_agent.api:app --reload   # http://127.0.0.1:8000 (docs at
 
 - `POST /birth-profiles/validate` — normalize a birth profile, return soft warnings.
 - `POST /charts/compute` — deterministic fact set (ascendant, divisional charts with
-  whole-sign houses per planet, a D1 bhava/house table with house lords, panchanga,
-  current Vimshottari period) plus warnings, provenance, and a `facts_token`.
+  whole-sign houses per planet, a D1 bhava/house table with house lords, D1 graha
+  drishti aspects, panchanga, current Vimshottari period) plus warnings, provenance,
+  and a `facts_token`.
   `config.charts` selects divisional charts from D1, D2, D3, D7, D9, D10 (career),
   D12 — D1 is always included; defaults to D1+D9.
 - `POST /answers/validate` — enforce the fact-citation contract: checks an answer's

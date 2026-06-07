@@ -100,6 +100,32 @@ def _ascendant(chart) -> dict:
     }
 
 
+def _aspects(chart) -> dict:
+    """Graha drishti for a chart: which signs/houses/planets each planet aspects.
+
+    Whole-sign graha drishti. Conjunctions (same sign) are not aspects. Houses are
+    relative to the chart's own lagna. Keyed by planet name for stable, citable output
+    (atom path ``aspects.<From>.<To>``)."""
+    lagna = _lagna_sign(chart)
+    planet_signs = {int(body): int(pos[0]) for body, pos in chart if body != "L"}
+    result: dict[str, dict] = {}
+    for pidx, sign in planet_signs.items():
+        aspected = sorted({(sign + off) % 12 for off in names.aspect_offsets(pidx)})
+        aspected_set = set(aspected)
+        hit_planets = sorted(
+            names.planet_name(other)
+            for other, osign in planet_signs.items()
+            if other != pidx and osign in aspected_set
+        )
+        result[names.planet_name(pidx)] = {
+            "aspected_sign_indices": aspected,
+            "aspected_signs": [names.sign_name(s) for s in aspected],
+            "aspected_houses": [((s - lagna) % 12) + 1 for s in aspected],
+            "aspects_planets": hit_planets,
+        }
+    return result
+
+
 def _houses(chart) -> list[dict]:
     """Whole-sign bhava table for a chart: 12 houses from the lagna with sign + lord."""
     lagna_sign = _lagna_sign(chart)
@@ -246,6 +272,8 @@ def compute_chart(
     # Bhava table is D1-only by design; per-varga house tables are out of MVP scope
     # (each chart's planets still carry their own whole-sign `house` field).
     houses = _houses(raw_charts["D1"])
+    # Aspects (graha drishti) are D1-only in the MVP, like the bhava table.
+    aspects = _aspects(raw_charts["D1"])
 
     return {
         "normalized_input": {
@@ -268,6 +296,7 @@ def compute_chart(
         "facts": {
             "ascendant": ascendant,
             "houses": houses,
+            "aspects": aspects,
             **divisional_facts,
             "panchanga": panchanga,
             "vimshottari": vimshottari,

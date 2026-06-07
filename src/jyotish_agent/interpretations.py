@@ -68,6 +68,15 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
         if house.get("lord") is not None:
             atoms[f"houses.{n}.lord"] = str(house["lord"])
 
+    # Planet-to-planet aspects: aspects.<From>.<To> = "true" if From aspects To.
+    aspects = facts.get("aspects")
+    if isinstance(aspects, dict):
+        for from_planet, info in aspects.items():
+            if not isinstance(info, dict):
+                continue
+            for to_planet in info.get("aspects_planets") or []:
+                atoms[f"aspects.{from_planet}.{to_planet}"] = "true"
+
     panchanga = facts.get("panchanga") or {}
     for key, entry in panchanga.items():
         if not isinstance(entry, dict):

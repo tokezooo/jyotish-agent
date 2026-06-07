@@ -187,6 +187,23 @@ def sign_lord_index(sign_index: int) -> int | None:
     return SIGN_LORDS[sign_index] if 0 <= sign_index < len(SIGN_LORDS) else None
 
 
+# Graha drishti (planetary aspects) as forward sign offsets (Nth sign counting the
+# planet's own sign as 1, so the 7th aspect is offset 6). Every planet aspects the
+# 7th; Mars/Jupiter/Saturn have special aspects. MVP: Rahu/Ketu get the 7th only
+# (node special aspects are school-dependent and intentionally out of scope).
+_DEFAULT_ASPECT_OFFSETS = frozenset({6})  # 7th
+ASPECT_OFFSETS: dict[int, frozenset[int]] = {
+    2: frozenset({3, 6, 7}),  # Mars: 4th, 7th, 8th
+    4: frozenset({4, 6, 8}),  # Jupiter: 5th, 7th, 9th
+    6: frozenset({2, 6, 9}),  # Saturn: 3rd, 7th, 10th
+}
+
+
+def aspect_offsets(planet_index: int) -> frozenset[int]:
+    """Forward sign offsets a planet aspects (7th for most; specials for Ma/Ju/Sa)."""
+    return ASPECT_OFFSETS.get(planet_index, _DEFAULT_ASPECT_OFFSETS)
+
+
 def planet_name(i: int) -> str | None:
     return _lookup(PLANETS, i)
 

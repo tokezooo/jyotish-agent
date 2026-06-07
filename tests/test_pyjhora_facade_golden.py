@@ -140,6 +140,34 @@ def test_houses_and_planet_house():
     assert any(k.startswith("d9.") and k.endswith(".house") for k in atoms)
 
 
+def test_graha_drishti():
+    facts = _compute()["facts"]
+    atoms = iter_fact_atoms(facts)
+    # Saturn (Sagittarius, sign 8) special aspects offsets {2,6,9} -> signs
+    # Aquarius(10)=Moon, Gemini(2)=Jupiter, Virgo(5)=empty. So Saturn aspects Moon + Jupiter.
+    assert atoms.get("aspects.Saturn.Moon") == "true"
+    assert atoms.get("aspects.Saturn.Jupiter") == "true"
+    # 7th-aspect for a non-special planet: Sun (Sag, 8) aspects sign 2 (Gemini) -> Jupiter.
+    assert atoms.get("aspects.Sun.Jupiter") == "true"
+    # No self-aspect.
+    assert "aspects.Saturn.Saturn" not in atoms
+    # One planet aspecting several planets in one sign: Jupiter (Gemini, 2) 7th-aspects
+    # Sagittarius (Sun, Saturn) and special-aspects Aquarius (Moon) -> >= 3 targets.
+    assert len(facts["aspects"]["Jupiter"]["aspects_planets"]) >= 3
+    # aspected_houses is shipped as context; pin Saturn's (10th aspect lands somewhere).
+    assert len(facts["aspects"]["Saturn"]["aspected_houses"]) == 3
+
+
+def test_aspect_offsets_rules():
+    from jyotish_agent import names
+
+    assert names.aspect_offsets(0) == frozenset({6})  # Sun: 7th only
+    assert names.aspect_offsets(2) == frozenset({3, 6, 7})  # Mars
+    assert names.aspect_offsets(4) == frozenset({4, 6, 8})  # Jupiter
+    assert names.aspect_offsets(6) == frozenset({2, 6, 9})  # Saturn
+    assert names.aspect_offsets(7) == frozenset({6})  # Rahu: 7th only (MVP)
+
+
 def test_house_base_case_planet_in_lagna_is_first_house():
     from jyotish_agent.pyjhora_facade import _placements
 

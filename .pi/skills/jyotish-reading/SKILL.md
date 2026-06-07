@@ -57,6 +57,9 @@ on you to ensure every factual claim in `summary` is backed by an entry in
   `jyotish_compute_chart`'s `config.charts`.
 - `houses.<N>.sign`, `houses.<N>.lord` for the D1 bhava table (N = 1..12), e.g.
   `houses.10.lord` is the 10th-house (career) lord.
+- `aspects.<From>.<To>` (value `true`) for D1 graha drishti, e.g. `aspects.Saturn.Moon`
+  means Saturn aspects the Moon. Every planet aspects the 7th; Mars also 4th/8th,
+  Jupiter 5th/9th, Saturn 3rd/10th.
 - `panchanga.tithi`, `panchanga.nakshatra` (+ `panchanga.nakshatra.pada`),
   `panchanga.yoga`, `panchanga.karana`, `panchanga.weekday`
 - `vimshottari.mahadasha.lord` / `.start` / `.end` (and `bhukti`, `antara`)

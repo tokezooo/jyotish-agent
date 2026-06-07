@@ -61,6 +61,19 @@ describe("summarizeChart", () => {
     expect(summarizeChart({})).toBe("");
   });
 
+  test("renders graha drishti and suppresses planets that aspect no one", () => {
+    const out = summarizeChart({
+      facts: {
+        aspects: {
+          Saturn: { aspects_planets: ["Moon", "Jupiter"] },
+          Moon: { aspects_planets: [] },
+        },
+      },
+    });
+    expect(out).toContain("Aspects (graha drishti): Saturn->Moon/Jupiter");
+    expect(out).not.toContain("Moon->");
+  });
+
   test("renders extra divisional charts (e.g. D10) ordered by factor", () => {
     const out = summarizeChart({
       facts: {

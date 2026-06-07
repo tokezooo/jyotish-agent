@@ -18,6 +18,156 @@
       "sign": "Pisces",
       "sign_index": 11
     },
+    "aspects": {
+      "Jupiter": {
+        "aspected_houses": [
+          8,
+          10,
+          12
+        ],
+        "aspected_sign_indices": [
+          6,
+          8,
+          10
+        ],
+        "aspected_signs": [
+          "Libra",
+          "Sagittarius",
+          "Aquarius"
+        ],
+        "aspects_planets": [
+          "Moon",
+          "Saturn",
+          "Sun"
+        ]
+      },
+      "Ketu": {
+        "aspected_houses": [
+          11
+        ],
+        "aspected_sign_indices": [
+          9
+        ],
+        "aspected_signs": [
+          "Capricorn"
+        ],
+        "aspects_planets": [
+          "Mercury",
+          "Rahu",
+          "Venus"
+        ]
+      },
+      "Mars": {
+        "aspected_houses": [
+          3,
+          4,
+          12
+        ],
+        "aspected_sign_indices": [
+          1,
+          2,
+          10
+        ],
+        "aspected_signs": [
+          "Taurus",
+          "Gemini",
+          "Aquarius"
+        ],
+        "aspects_planets": [
+          "Jupiter",
+          "Moon"
+        ]
+      },
+      "Mercury": {
+        "aspected_houses": [
+          5
+        ],
+        "aspected_sign_indices": [
+          3
+        ],
+        "aspected_signs": [
+          "Cancer"
+        ],
+        "aspects_planets": [
+          "Ketu"
+        ]
+      },
+      "Moon": {
+        "aspected_houses": [
+          6
+        ],
+        "aspected_sign_indices": [
+          4
+        ],
+        "aspected_signs": [
+          "Leo"
+        ],
+        "aspects_planets": []
+      },
+      "Rahu": {
+        "aspected_houses": [
+          5
+        ],
+        "aspected_sign_indices": [
+          3
+        ],
+        "aspected_signs": [
+          "Cancer"
+        ],
+        "aspects_planets": [
+          "Ketu"
+        ]
+      },
+      "Saturn": {
+        "aspected_houses": [
+          4,
+          7,
+          12
+        ],
+        "aspected_sign_indices": [
+          2,
+          5,
+          10
+        ],
+        "aspected_signs": [
+          "Gemini",
+          "Virgo",
+          "Aquarius"
+        ],
+        "aspects_planets": [
+          "Jupiter",
+          "Moon"
+        ]
+      },
+      "Sun": {
+        "aspected_houses": [
+          4
+        ],
+        "aspected_sign_indices": [
+          2
+        ],
+        "aspected_signs": [
+          "Gemini"
+        ],
+        "aspects_planets": [
+          "Jupiter"
+        ]
+      },
+      "Venus": {
+        "aspected_houses": [
+          5
+        ],
+        "aspected_sign_indices": [
+          3
+        ],
+        "aspected_signs": [
+          "Cancer"
+        ],
+        "aspects_planets": [
+          "Ketu"
+        ]
+      }
+    },
     "d1": [
       {
         "degrees": 16.886946,
