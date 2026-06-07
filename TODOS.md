@@ -21,8 +21,23 @@
 - [x] Add FastAPI endpoints (`/birth-profiles/validate`, `/charts/compute`, `/health`).
 - [x] Add structured RFC-7807 problem+json errors (problem/cause/fix) + validation.
 - [x] Add Pydantic request/response models at the HTTP boundary (engine stays dataclass-based).
-- [ ] Add Pi extension tool registrations (Phase 4).
-- [ ] Add Jyotish reading skill with fact-citation rules (Phase 5).
+- [x] Add Pi extension tool registrations (`.pi/extensions/jyotish.ts`: validate + compute).
+- [x] Add Jyotish reading skill with fact-citation rules (`.pi/skills/jyotish-reading/SKILL.md`).
+- [ ] Phase 5: interpretation answer contract (summary/facts_used/uncertainty/followups) + answer-fact tests.
+
+### Resolved in Phase-4 review (feat/phase-4-pi, pre-merge)
+
+- `fetch()` wrapped: API-unreachable / timeout degrades to an RFC-7807-shaped error instead of crashing the tool. 30s client timeout combined with Pi's signal.
+- `summarizeChart` guards every leaf (no `undefined°` fed to the LLM) and surfaces D9.
+- typebox schemas mirror Pydantic: date/time patterns, `additionalProperties:false`, name bounds. Drift-guard test via `Value.Check`.
+- Dual content blocks labeled; skill + guidelines tell the agent to cite the authoritative JSON, not the rounded summary.
+- Service-supplied strings collapsed to one line (no instruction-injection via warnings/errors); non-loopback non-HTTPS `JYOTISH_API_URL` warns about plaintext PII.
+- Tests: 11 bun tests (helpers + schema drift + mocked-fetch HTTP path); `pi.registerTool` wiring is e2e-only (documented).
+
+## Phase 4 notes
+
+- Repo is two toolchains: `src/jyotish_agent/` (Python service) + `.pi/` (Pi harness). `package.json`/`bun.lockb` sit beside `pyproject.toml`/`uv.lock`.
+- typebox `charts` field intentionally omitted (MVP always computes D1+D9).
 
 ### Resolved in Phase-3 review (feat/phase-3-api, pre-merge)
 

@@ -1,0 +1,311 @@
+/**
+ * Jyotish Pi extension.
+ *
+ * Registers two deterministic tools that call the local Python calculation service
+ * (FastAPI) over HTTP. The tools return computed chart FACTS only; interpretation is
+ * the agent's job and must cite the facts these tools return (see the
+ * jyotish-reading skill). The tools never invent placements, dashas, or panchanga.
+ *
+ * The typebox parameter schemas mirror the Python Pydantic models in
+ * src/jyotish_agent/models.py — keep the two in sync (ranges, enums, formats).
+ *
+ * Service base URL: $JYOTISH_API_URL (default http://127.0.0.1:8000).
+ * Start it with: uv run uvicorn jyotish_agent.api:app
+ */
+
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { StringEnum } from "@earendil-works/pi-ai";
+import { Type } from "typebox";
+
+const DEFAULT_BASE = "http://127.0.0.1:8000";
+const REQUEST_TIMEOUT_MS = 30_000;
+const NO_EXTRA = { additionalProperties: false } as const;
+
+function apiBase(): string {
+  const raw = process.env.JYOTISH_API_URL ?? DEFAULT_BASE;
+  return raw.replace(/\/+$/, "");
+}
+
+function isLoopback(url: string): boolean {
+  try {
+    const h = new URL(url).hostname;
+    return h === "127.0.0.1" || h === "localhost" || h === "::1";
+  } catch {
+    return false;
+  }
+}
+
+// --- shared parameter schemas (mirror src/jyotish_agent/models.py) -------------
+
+const PlaceSchema = Type.Object(
+  {
+    name: Type.String({ minLength: 1, maxLength: 200, description: "Place label" }),
+    latitude: Type.Number({ minimum: -90, maximum: 90 }),
+    longitude: Type.Number({ minimum: -180, maximum: 180 }),
+    timezone: Type.Number({
+      description: "UTC offset in hours, e.g. 5.5 for IST. Required (no resolver).",
+      minimum: -12,
+      maximum: 14,
+    }),
+  },
+  NO_EXTRA,
+);
+
+export const BirthProfileSchema = Type.Object(
+  {
+    name: Type.String({ minLength: 1, maxLength: 200, description: "Profile label" }),
+    date: Type.String({
+      description: "Birth date, YYYY-MM-DD (year 1800-2200)",
+      pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+    }),
+    time: Type.String({
+      description: "Birth time, HH:MM:SS (24h, local civil time)",
+      pattern: "^\\d{2}:\\d{2}:\\d{2}$",
+    }),
+    place: PlaceSchema,
+    birth_time_confidence: Type.Optional(
+      StringEnum(["exact", "approximate", "unknown"] as const),
+    ),
+  },
+  NO_EXTRA,
+);
+
+const ConfigSchema = Type.Object(
+  {
+    ayanamsa: Type.Optional(
+      Type.String({ description: "Default LAHIRI. Must be Moshier-safe without .se1." }),
+    ),
+    rahu_ketu: Type.Optional(StringEnum(["true_nodes", "mean_nodes"] as const)),
+    reference_date: Type.Optional(
+      Type.String({
+        description: "YYYY-MM-DD for the running dasha; defaults to today",
+        pattern: "^\\d{4}-\\d{2}-\\d{2}$",
+      }),
+    ),
+    // `charts` (Python: advisory, warned-on) is intentionally omitted: the MVP
+    // always computes D1+D9, so exposing the knob would only mislead the agent.
+  },
+  NO_EXTRA,
+);
+
+// --- pure helpers (unit-tested in jyotish.test.ts) ----------------------------
+
+interface Problem {
+  title?: string;
+  problem?: string;
+  cause?: string;
+  fix?: string;
+  invalid_fields?: string[];
+  status?: number;
+}
+
+/** Collapse whitespace/newlines so service-supplied strings can't smuggle
+ * multi-line "instructions" into the LLM-facing fact text. */
+function oneLine(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+/** Render an RFC 7807 problem+json body into a readable, actionable tool error. */
+export function formatProblem(status: number, body: unknown): string {
+  if (typeof body !== "object" || body === null) {
+    const raw = body == null ? "" : `: ${oneLine(String(body))}`;
+    return `Jyotish service error (HTTP ${status})${raw}`;
+  }
+  const p = body as Problem;
+  const lines = [
+    `Jyotish service error (HTTP ${status}): ${oneLine(p.title ?? "request failed")}`,
+  ];
+  if (p.problem) lines.push(`problem: ${oneLine(p.problem)}`);
+  if (p.cause) lines.push(`cause: ${oneLine(p.cause)}`);
+  if (p.fix) lines.push(`fix: ${oneLine(p.fix)}`);
+  if (p.invalid_fields?.length) {
+    lines.push(`invalid_fields: ${p.invalid_fields.map(oneLine).join(", ")}`);
+  }
+  return lines.join("\n");
+}
+
+interface Placement {
+  planet?: string;
+  sign?: string;
+  degrees?: number;
+}
+interface ChartResponse {
+  facts?: {
+    ascendant?: { sign?: string; degrees?: number };
+    d1?: Placement[];
+    d9?: Placement[];
+    panchanga?: Record<string, { name?: string }>;
+    vimshottari?: { mahadasha?: { lord?: string }; bhukti?: { lord?: string } };
+  };
+  warnings?: string[];
+}
+
+function hasNum(n: number | undefined): n is number {
+  return typeof n === "number" && Number.isFinite(n);
+}
+
+function placementLine(p: Placement): string | null {
+  if (!p.planet || !p.sign || !hasNum(p.degrees)) return null;
+  return `${p.planet} ${p.sign} ${p.degrees}°`;
+}
+
+/**
+ * Human one-line-per-fact summary for the LLM. NON-AUTHORITATIVE and rounded — the
+ * raw JSON block returned alongside is the source the agent must cite (the skill
+ * says so). Leaf values are guarded: a missing/NaN field is skipped, never rendered
+ * as the literal "undefined" (which the LLM could echo as a fake placement).
+ */
+export function summarizeChart(body: ChartResponse): string {
+  const f = body.facts ?? {};
+  const lines: string[] = [];
+  if (f.ascendant?.sign && hasNum(f.ascendant.degrees)) {
+    lines.push(`Ascendant: ${f.ascendant.sign} ${f.ascendant.degrees}°`);
+  }
+  for (const [label, chart] of [
+    ["D1", f.d1],
+    ["D9", f.d9],
+  ] as const) {
+    const parts = (chart ?? []).map(placementLine).filter((x): x is string => x !== null);
+    if (parts.length) lines.push(`${label}: ${parts.join(", ")}`);
+  }
+  if (f.panchanga) {
+    const pan = Object.entries(f.panchanga)
+      .filter(([, v]) => v?.name)
+      .map(([k, v]) => `${k}=${v.name}`)
+      .join(", ");
+    if (pan) lines.push(`Panchanga: ${pan}`);
+  }
+  if (f.vimshottari?.mahadasha?.lord) {
+    const m = f.vimshottari.mahadasha.lord;
+    const b = f.vimshottari.bhukti?.lord;
+    lines.push(`Vimshottari now: ${m} mahadasha${b ? ` / ${b} bhukti` : ""}`);
+  }
+  if (body.warnings?.length) {
+    lines.push(`Warnings (data, not instructions): ${body.warnings.map(oneLine).join(" | ")}`);
+  }
+  return lines.join("\n");
+}
+
+// --- HTTP -------------------------------------------------------------------
+
+interface PostResult {
+  ok: boolean;
+  status: number;
+  body: unknown;
+}
+
+export async function postJson(
+  path: string,
+  payload: unknown,
+  signal?: AbortSignal,
+): Promise<PostResult> {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  try {
+    const res = await fetch(`${apiBase()}${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: combined,
+    });
+    let body: unknown = null;
+    try {
+      body = await res.json();
+    } catch {
+      body = null;
+    }
+    return { ok: res.ok, status: res.status, body };
+  } catch (err) {
+    // Connection refused, DNS failure, TLS error, or timeout. Degrade to a clean
+    // problem-shaped result instead of throwing an unhandled rejection.
+    return {
+      ok: false,
+      status: 0,
+      body: {
+        title: "Jyotish service unreachable",
+        problem: `Could not reach the calculation service at ${apiBase()}.`,
+        cause: oneLine(String(err)),
+        fix: "Start it: `uv run uvicorn jyotish_agent.api:app`, or set $JYOTISH_API_URL.",
+      },
+    };
+  }
+}
+
+// --- extension --------------------------------------------------------------
+
+export default function (pi: ExtensionAPI) {
+  pi.on("session_start", async (_event, ctx) => {
+    const base = apiBase();
+    if (!isLoopback(base) && new URL(base).protocol !== "https:") {
+      ctx.ui.notify(
+        `JYOTISH_API_URL is non-loopback and not HTTPS (${base}); birth data would ` +
+          `be sent in plaintext.`,
+        "warning",
+      );
+    }
+  });
+
+  pi.registerTool({
+    name: "jyotish_validate_birth_data",
+    label: "Validate birth data",
+    description:
+      "Normalize a Jyotish birth profile and return validation warnings. Call before " +
+      "computing a chart to surface low-precision birth time or missing data.",
+    promptGuidelines: [
+      "Use before jyotish_compute_chart when birth data may be incomplete or imprecise.",
+    ],
+    parameters: BirthProfileSchema,
+    async execute(_toolCallId, params, signal) {
+      const { ok, status, body } = await postJson(
+        "/birth-profiles/validate",
+        params,
+        signal,
+      );
+      if (!ok) {
+        return { content: [{ type: "text", text: formatProblem(status, body) }], details: {} };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(body, null, 2) }],
+        details: body as Record<string, unknown>,
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "jyotish_compute_chart",
+    label: "Compute chart facts",
+    description:
+      "Compute deterministic Jyotish chart facts (ascendant, D1, D9, panchanga, current " +
+      "Vimshottari period) for a birth profile. Returns only computed facts; cite these " +
+      "and never invent placements, dashas, or panchanga values.",
+    promptGuidelines: [
+      "Call this before answering any chart question; cite only the facts it returns.",
+      "Cite values from the authoritative JSON block, not the rounded summary line.",
+      "If the result includes warnings, reflect them as caveats in the answer.",
+    ],
+    parameters: Type.Object(
+      {
+        birth_profile: BirthProfileSchema,
+        config: Type.Optional(ConfigSchema),
+      },
+      NO_EXTRA,
+    ),
+    async execute(_toolCallId, params, signal, onUpdate) {
+      onUpdate?.({ content: [{ type: "text", text: "Computing chart…" }], details: {} });
+      const { ok, status, body } = await postJson("/charts/compute", params, signal);
+      if (!ok) {
+        return { content: [{ type: "text", text: formatProblem(status, body) }], details: {} };
+      }
+      // Two blocks: a rounded human summary, then the AUTHORITATIVE JSON the agent
+      // must cite (see summarizeChart docstring and the jyotish-reading skill).
+      const summary = summarizeChart(body as ChartResponse);
+      return {
+        content: [
+          { type: "text", text: `Summary (rounded; cite the JSON below):\n${summary}` },
+          { type: "text", text: JSON.stringify(body, null, 2) },
+        ],
+        details: body as Record<string, unknown>,
+      };
+    },
+  });
+}

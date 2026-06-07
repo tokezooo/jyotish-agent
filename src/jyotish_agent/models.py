@@ -7,6 +7,10 @@ Pydantic-free means the calculation code imports and tests without a web stack.
 
 Date/time use ``datetime.date`` / ``datetime.time`` so Pydantic rejects impossible
 values (2025-02-30, 25:00) with a 422 before any calculation runs.
+
+MIRROR: the Pi extension's typebox schemas in ``.pi/extensions/jyotish.ts`` duplicate
+these field shapes (ranges, enums, date/time formats, year bounds). Change both
+together; the extension's drift-guard test only catches divergence it knows about.
 """
 
 from __future__ import annotations

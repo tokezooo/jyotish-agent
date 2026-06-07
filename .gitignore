@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .env
+node_modules/
 
 # uv.lock IS committed: PyJHora declares no runtime deps, so the lock is the only
 # record of the headless calculation dependency set. Do not ignore it.

@@ -12,11 +12,12 @@ The first milestone is deliberately narrow:
 
 ## Current State
 
-Phases 1–3 are in place: Python 3.12 project, headless PyJHora deps pinned,
+Phases 1–4 are in place: Python 3.12 project, headless PyJHora deps pinned,
 ephemeris/data check, the calculation facade (`compute_chart()` → deterministic
 ascendant, D1, D9, panchanga basics, current Vimshottari period, golden-tested),
-and a FastAPI service exposing validation and chart computation. The Pi tooling
-(Phases 4–5) is not implemented yet. See:
+a FastAPI service exposing validation and chart computation, and a Pi extension
+exposing those as agent tools. The interpretation contract (Phase 5) is not
+implemented yet. See:
 
 - [PRD.md](PRD.md)
 - [PLAN.md](PLAN.md)
@@ -56,6 +57,30 @@ Regenerate the golden test fixture after intentional output changes:
 ```bash
 uv run python scripts/regen_golden.py
 ```
+
+## Pi extension
+
+The repo holds two toolchains: `src/jyotish_agent/` is the Python service, `.pi/` is
+the Pi agent harness (extension + skill). The extension calls the HTTP API above, so
+**start the service first**, then load the extension.
+
+```bash
+bun install                                   # TS deps for the extension
+bun run typecheck                             # tsc against real Pi types
+bun test ./.pi/extensions/jyotish.test.ts     # pure-helper + schema + HTTP tests
+
+uv run uvicorn jyotish_agent.api:app          # terminal 1: the service
+pi --extension .pi/extensions/jyotish.ts      # terminal 2: a Pi session with the tools
+```
+
+Tools registered: `jyotish_validate_birth_data`, `jyotish_compute_chart`. Set
+`JYOTISH_API_URL` to point at a non-default service (loopback HTTP by default; a
+non-loopback non-HTTPS URL triggers a plaintext-PII warning). The `jyotish-reading`
+skill (`.pi/skills/`) tells the agent to cite only computed facts.
+
+Note: the `pi.registerTool` wiring needs a live Pi session and is not covered by the
+bun tests (which cover the pure helpers, the typebox schema as a Python-model drift
+guard, and the HTTP path via a mocked `fetch`).
 
 ## Source References
 

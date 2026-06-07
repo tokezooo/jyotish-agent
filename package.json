@@ -1,0 +1,20 @@
+{
+  "name": "jyotish-agent-pi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pi extension exposing the Jyotish calculation service as agent tools.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "bun test ./.pi/extensions/jyotish.test.ts"
+  },
+  "dependencies": {
+    "@earendil-works/pi-ai": "0.78.1",
+    "@earendil-works/pi-coding-agent": "0.78.1",
+    "typebox": "1.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "typescript": "^5.6"
+  }
+}
