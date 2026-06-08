@@ -1,11 +1,16 @@
 {
   "defaultProvider": "gemini",
-  "defaultModel": "gemini-3-flash",
+  "defaultModel": "gemini-3.5-flash",
   "defaultThinkingLevel": "high",
   "theme": "dark",
-  "compaction": { "enabled": true, "reserveTokens": 16384 },
-  "retry": { "enabled": true, "maxRetries": 3 },
-  "enabledModels": ["gemini-3-flash"],
+  "compaction": {
+    "enabled": true,
+    "reserveTokens": 16384
+  },
+  "retry": {
+    "enabled": true,
+    "maxRetries": 3
+  },
   "providers": {
     "gemini": {
       "name": "Google Gemini",
@@ -14,9 +19,12 @@
       "apiKey": "$GEMINI_API_KEY",
       "models": [
         {
-          "id": "gemini-3-flash",
-          "name": "Gemini 3 Flash",
-          "input": ["text", "image"],
+          "id": "gemini-3.5-flash",
+          "name": "Gemini 3.5 Flash",
+          "input": [
+            "text",
+            "image"
+          ],
           "contextWindow": 1048576,
           "maxTokens": 65536,
           "reasoning": true
