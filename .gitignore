@@ -3,6 +3,7 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .env
+.pi/secrets.env
 node_modules/
 # Swiss ephemeris data is downloaded by scripts/install_ephemeris.py, licensed
 # separately, and not redistributed.

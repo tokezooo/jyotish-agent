@@ -209,7 +209,7 @@ def test_validate_answer_rejects_forged_facts():
     assert r.status_code == 200
     body = r.json()
     assert body["valid"] is False
-    assert "integrity" in body["violations"][0]
+    assert "not recognized" in body["violations"][0]
 
 
 def test_validate_answer_requires_nonempty_citations():
@@ -320,6 +320,36 @@ def test_aspect_fact_roundtrips_through_validation():
         },
     )
     assert v.json() == {"valid": True, "violations": []}
+
+
+@requires_engine
+def test_validate_with_token_only_uses_server_cache():
+    # The agent passes ONLY the facts_token (no facts echo); the server resolves facts
+    # from its cache. This is the fix for the integrity-fail loop.
+    c = client.post("/charts/compute", json=_compute_body()).json()
+    ok = client.post(
+        "/answers/validate",
+        json={
+            "answer": {
+                "summary": "Saturn mahadasha runs now.",
+                "facts_used": [{"path": "vimshottari.mahadasha.lord", "value": "Saturn"}],
+            },
+            "facts_token": c["facts_token"],  # no "facts" field
+        },
+    )
+    assert ok.json() == {"valid": True, "violations": []}
+    # An invented placement is still caught against the cached facts.
+    bad = client.post(
+        "/answers/validate",
+        json={
+            "answer": {
+                "summary": "Sun in Leo.",
+                "facts_used": [{"path": "d1.Sun.sign", "value": "Leo"}],
+            },
+            "facts_token": c["facts_token"],
+        },
+    )
+    assert bad.json()["valid"] is False
 
 
 @requires_engine

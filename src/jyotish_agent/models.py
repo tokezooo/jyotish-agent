@@ -141,11 +141,13 @@ class ValidateAnswerRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     answer: AnswerContract
-    # The `facts` block AND `facts_token` from a prior /charts/compute response. The
-    # token binds validation to real compute output (see signing.py); a forged or
-    # modified facts block fails the integrity check.
-    facts: dict
+    # `facts_token` from a prior /charts/compute response is required and is the source
+    # of truth: the server looks up the facts it cached under that token. `facts` is
+    # optional and only used as a fallback (HMAC-verified) if the token isn't cached
+    # (e.g. after a server restart). Agents should pass the token alone — they cannot
+    # faithfully echo the full facts dict.
     facts_token: str
+    facts: dict | None = None
 
 
 class ValidateAnswerResponse(BaseModel):

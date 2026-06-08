@@ -20,6 +20,7 @@ import hmac
 import json
 import os
 import secrets
+from collections import OrderedDict
 
 _env_key = os.environ.get("JYOTISH_SIGNING_KEY", "")
 _SIGNING_KEY: bytes = _env_key.encode("utf-8") if _env_key else secrets.token_bytes(32)
@@ -40,3 +41,32 @@ def verify_facts(facts: dict, token: str) -> bool:
     """Constant-time check that ``token`` was produced by this service for ``facts``."""
     expected = sign_facts(facts)
     return hmac.compare_digest(expected, token)
+
+
+# Server-side facts cache, keyed by token. The agent cannot faithfully echo the full
+# 14 KB facts JSON back through an LLM context (it rounds/drops fields), so requiring
+# that for /answers/validate caused every integrity check to fail and the agent to
+# loop. Instead /charts/compute caches facts here under the token, and
+# /answers/validate looks them up — the agent only passes the token. Process-local
+# (single uvicorn worker for the local MVP); bounded LRU.
+_FACTS_CACHE: "OrderedDict[str, dict]" = OrderedDict()
+_CACHE_MAX = 256
+
+
+def cache_facts(facts: dict) -> str:
+    """Sign + cache facts; return the token. Called by /charts/compute."""
+    token = sign_facts(facts)
+    _FACTS_CACHE[token] = facts
+    _FACTS_CACHE.move_to_end(token)
+    while len(_FACTS_CACHE) > _CACHE_MAX:
+        _FACTS_CACHE.popitem(last=False)
+    return token
+
+
+def get_cached_facts(token: str) -> dict | None:
+    """Return server-held facts for a token, or None if not cached (e.g. after a
+    restart or eviction). Refreshes LRU recency."""
+    facts = _FACTS_CACHE.get(token)
+    if facts is not None:
+        _FACTS_CACHE.move_to_end(token)
+    return facts

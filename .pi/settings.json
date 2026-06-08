@@ -1,0 +1,27 @@
+{
+  "defaultProvider": "gemini",
+  "defaultModel": "gemini-3-flash",
+  "defaultThinkingLevel": "high",
+  "theme": "dark",
+  "compaction": { "enabled": true, "reserveTokens": 16384 },
+  "retry": { "enabled": true, "maxRetries": 3 },
+  "enabledModels": ["gemini-3-flash"],
+  "providers": {
+    "gemini": {
+      "name": "Google Gemini",
+      "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+      "api": "google-generative-ai",
+      "apiKey": "$GEMINI_API_KEY",
+      "models": [
+        {
+          "id": "gemini-3-flash",
+          "name": "Gemini 3 Flash",
+          "input": ["text", "image"],
+          "contextWindow": 1048576,
+          "maxTokens": 65536,
+          "reasoning": true
+        }
+      ]
+    }
+  }
+}

@@ -352,13 +352,14 @@ export default function (pi: ExtensionAPI) {
     label: "Check answer citations",
     description:
       "Verify that a drafted interpretive answer cites only computed facts. Pass the " +
-      "answer's facts_used, summary, and the `facts` + `facts_token` from " +
-      "jyotish_compute_chart. Returns violations for any cited fact that is invented or " +
-      "has the wrong value, AND for '<Planet> in <Sign>' claims in the summary that " +
-      "contradict the charts. Call before giving the final answer; if it returns " +
-      "violations, fix them.",
+      "answer (summary + facts_used) and the `facts_token` from jyotish_compute_chart. " +
+      "Do NOT echo the `facts` object — the server looks it up by token. Returns " +
+      "violations for any cited fact that is invented or has the wrong value, AND for " +
+      "'<Planet> in <Sign>' claims in the summary that contradict the charts. Call " +
+      "before giving the final answer; if it returns violations, fix them.",
     promptGuidelines: [
       "Always call jyotish_check_answer before finalizing a chart interpretation.",
+      "Pass only the facts_token from jyotish_compute_chart, not the facts object.",
       "If it returns violations, correct facts_used and the prose, then re-check.",
     ],
     parameters: Type.Object(
@@ -381,10 +382,11 @@ export default function (pi: ExtensionAPI) {
           },
           NO_EXTRA,
         ),
-        // Pass BOTH `facts` and `facts_token` exactly as returned by
-        // jyotish_compute_chart; the token proves the facts are real.
-        facts: Type.Record(Type.String(), Type.Unknown()),
+        // Pass the `facts_token` from jyotish_compute_chart; the server resolves the
+        // facts from it. `facts` is optional (rarely needed) and must NOT be a
+        // reconstructed/edited copy — omit it and rely on the token.
         facts_token: Type.String(),
+        facts: Type.Optional(Type.Record(Type.String(), Type.Unknown())),
       },
       NO_EXTRA,
     ),

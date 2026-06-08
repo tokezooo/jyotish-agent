@@ -21,11 +21,12 @@ product's whole value is the visible boundary between **computed facts** and
    time is imprecise. Surface any warnings it returns.
 4. Call `jyotish_compute_chart` (pass a `reference_date` for dasha questions). Treat
    the returned JSON block as authoritative; the summary line is rounded. Keep the
-   `facts` block and `facts_token` from the response — you need both for step 6.
+   `facts_token` from the response — you need it for step 6.
 5. Draft your answer in the answer contract shape below.
-6. Call `jyotish_check_answer` with your `facts_used` and the `facts` + `facts_token`
-   from step 4. If it returns violations, fix `facts_used` and the prose, then
-   re-check. Do not give the user an answer that hasn't passed this check.
+6. Call `jyotish_check_answer` with your `summary`, `facts_used`, and the
+   `facts_token` from step 4. Do NOT pass the `facts` object — the server looks it up
+   by token. If it returns violations, fix `facts_used` and the prose, then re-check.
+   Do not give the user an answer that hasn't passed this check.
 
 This check verifies that the facts you *chose to cite* are real and unmodified (the
 `facts_token` binds them to the computed chart). It also scans your `summary` for

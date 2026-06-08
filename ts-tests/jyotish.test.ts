@@ -7,7 +7,7 @@ import {
   formatProblem,
   postJson,
   summarizeChart,
-} from "./jyotish";
+} from "../.pi/extensions/jyotish";
 
 describe("formatProblem", () => {
   test("renders problem/cause/fix triad", () => {

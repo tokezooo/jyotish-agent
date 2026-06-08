@@ -31,7 +31,7 @@ from .models import (
     ValidateResponse,
 )
 from .pyjhora_facade import compute_chart
-from .signing import sign_facts, verify_facts
+from .signing import cache_facts, get_cached_facts, verify_facts
 from .validation import normalized_profile, profile_warnings
 
 logger = logging.getLogger("jyotish_agent.api")
@@ -99,27 +99,33 @@ async def compute(req: ChartComputeRequest) -> ChartComputeResponse:
         facts=result["facts"],
         provenance=result["provenance"],
         warnings=warnings,
-        facts_token=sign_facts(result["facts"]),
+        facts_token=cache_facts(result["facts"]),
     )
 
 
 @app.post("/answers/validate", response_model=ValidateAnswerResponse)
 async def validate_answer_endpoint(req: ValidateAnswerRequest) -> ValidateAnswerResponse:
-    # Integrity first: the facts must be the ones THIS service computed (token binds
-    # validation to real output, so the agent can't self-certify against forged facts).
-    if not verify_facts(req.facts, req.facts_token):
-        return ValidateAnswerResponse(
-            valid=False,
-            violations=[
-                "facts failed integrity check: not produced by this service or modified "
-                "after computation. Recompute the chart and use its facts + facts_token."
-            ],
-        )
+    # Resolve facts from the server-side cache by token (the agent passes only the
+    # token). Fall back to HMAC-verified client-supplied facts if the token isn't
+    # cached (e.g. after a restart). This is what binds validation to real output —
+    # the agent can't self-certify against forged facts.
+    facts = get_cached_facts(req.facts_token)
+    if facts is None:
+        if req.facts is not None and verify_facts(req.facts, req.facts_token):
+            facts = req.facts
+        else:
+            return ValidateAnswerResponse(
+                valid=False,
+                violations=[
+                    "facts_token not recognized (and no valid facts fallback). Recompute "
+                    "the chart with /charts/compute and pass the returned facts_token."
+                ],
+            )
     # Then the fact-citation contract: every cited fact must exist with a matching value.
     facts_used = [ref.model_dump() for ref in req.answer.facts_used]
     # Pass the summary so prose placement claims that contradict the facts are caught,
     # not just the explicitly-cited facts_used.
-    violations = validate_answer(facts_used, req.facts, summary=req.answer.summary)
+    violations = validate_answer(facts_used, facts, summary=req.answer.summary)
     return ValidateAnswerResponse(valid=not violations, violations=violations)
 
 

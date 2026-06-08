@@ -6,7 +6,7 @@
   "description": "Pi extension exposing the Jyotish calculation service as agent tools.",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "bun test ./.pi/extensions/jyotish.test.ts"
+    "test": "bun test ./ts-tests/jyotish.test.ts"
   },
   "dependencies": {
     "@earendil-works/pi-ai": "0.78.1",
