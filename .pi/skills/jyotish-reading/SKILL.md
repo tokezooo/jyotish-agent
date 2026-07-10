@@ -69,6 +69,12 @@ stands: back every factual claim in `summary` with an entry in `facts_used`.
   alias.
 - `bhava.<chart>.<N>.sign`, `bhava.<chart>.<N>.lord` for each chart's 12-house bhava
   table (N = 1..12), e.g. `bhava.d9.10.lord`. `houses.<N>` is the d1 alias.
+- `shadbala.<Planet>.rupas`, `shadbala.<Planet>.strength_ratio`,
+  `shadbala.<Planet>.components.<sthana|kaala|dig|cheshta|naisargika|drik>` — six-fold
+  strength for the 7 classical grahas (no Rahu/Ketu). Request via
+  `config.modules: ["shadbala"]` when the question concerns planetary strength.
+  Numbers only: do NOT assert "strong/weak" thresholds as facts (cutoffs vary by
+  school); a ratio > 1 means the planet exceeds its classical minimum, say it that way.
 - `yogas.<Name>.present` (`true`/`false`) for the supported geometric yogas
   (Gajakesari, Chandra-Mangala, Budha-Aditya). Each yoga in `facts.yogas` also carries
   the exact `definition` used and the `basis` geometry — cite the definition, and only

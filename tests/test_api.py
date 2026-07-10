@@ -380,6 +380,32 @@ def test_unknown_chart_returns_422():
 
 
 @requires_engine
+def test_unknown_module_returns_422():
+    r = client.post("/charts/compute", json=_compute_body(modules=["nope"]))
+    assert r.status_code == 422
+    r2 = client.post("/charts/compute", json=_compute_body(modules=["transits"]))
+    assert r2.status_code == 422  # known but not yet implemented
+    assert "not implemented" in r2.json()["problem"]
+
+
+@requires_engine
+def test_shadbala_fact_roundtrips_through_validation():
+    c = client.post("/charts/compute", json=_compute_body(modules=["shadbala"])).json()
+    rupas = c["facts"]["shadbala"]["Sun"]["total_rupas"]
+    v = client.post(
+        "/answers/validate",
+        json={
+            "answer": {
+                "summary": "Sun's strength.",
+                "facts_used": [{"path": "shadbala.Sun.rupas", "value": rupas}],
+            },
+            "facts_token": c["facts_token"],
+        },
+    )
+    assert v.json() == {"valid": True, "violations": []}
+
+
+@requires_engine
 def test_unknown_node_aspects_returns_422():
     r = client.post("/charts/compute", json=_compute_body(node_aspects="nope"))
     assert r.status_code == 422

@@ -110,6 +110,19 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
             for to_planet in info.get("aspects_planets") or []:
                 atoms[f"aspects.{from_planet}.{to_planet}"] = "true"
 
+    # Shadbala (module): shadbala.<Planet>.rupas / .strength_ratio / .components.<name>
+    shadbala = facts.get("shadbala")
+    if isinstance(shadbala, dict):
+        for planet, info in shadbala.items():
+            if not isinstance(info, dict):
+                continue
+            if info.get("total_rupas") is not None:
+                atoms[f"shadbala.{planet}.rupas"] = str(info["total_rupas"])
+            if info.get("strength_ratio") is not None:
+                atoms[f"shadbala.{planet}.strength_ratio"] = str(info["strength_ratio"])
+            for comp, val in (info.get("components") or {}).items():
+                atoms[f"shadbala.{planet}.components.{comp}"] = str(val)
+
     # Yogas: yogas.<Name>.present = "true"/"false"
     yogas = facts.get("yogas")
     if isinstance(yogas, dict):

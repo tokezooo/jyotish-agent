@@ -82,17 +82,21 @@ class CalculationConfigRequest(BaseModel):
     # Divisional charts to compute. Unknown names are rejected by the engine (422);
     # D1 is always added. Defaults to D1+D9.
     charts: list[str] = Field(default_factory=lambda: list(DEFAULT_CHARTS))
+    # Opt-in fact modules (shadbala, ashtakavarga, transits, yogas_engine,
+    # varshaphal). Unknown names are rejected by the engine (422). Default: none.
+    modules: list[str] = Field(default_factory=list)
     # Consumed by the route (defaults to today there), NOT by the engine config.
     reference_date: _dt.date | None = None
 
     def to_calculation_config(self) -> CalculationConfig:
-        # Field validity (ayanamsa / rahu_ketu / node_aspects / charts) is enforced by
-        # the engine (single source of truth).
+        # Field validity (ayanamsa / rahu_ketu / node_aspects / charts / modules) is
+        # enforced by the engine (single source of truth).
         return CalculationConfig(
             ayanamsa=self.ayanamsa,
             rahu_ketu=self.rahu_ketu,
             node_aspects=self.node_aspects,
             charts=tuple(self.charts),
+            modules=tuple(self.modules),
         )
 
 

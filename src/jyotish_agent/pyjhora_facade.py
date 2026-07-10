@@ -127,6 +127,39 @@ def _aspects(chart, node_aspects: str = "standard") -> dict:
     return result
 
 
+# Shadbala applies to the seven classical grahas only (no Rahu/Ketu by definition).
+_SHADBALA_PLANETS = tuple(range(7))
+# Row order of strength.shad_bala output, verified against strength.py:995 and the
+# classical naisargika constants (Sun 60 ... Saturn 8.57 virupas). kaala BEFORE dig.
+_SHADBALA_COMPONENTS = ("sthana", "kaala", "dig", "cheshta", "naisargika", "drik")
+
+
+def _shadbala(jd, place) -> dict:
+    """Six-fold planetary strength for the 7 classical grahas.
+
+    Emits per planet: total virupas (`total`), rupas (`total_rupas` = total/60),
+    `strength_ratio` (rupas / classical minimum), and the six named components.
+    Values are engine output rounded to 2dp; `drik` can legitimately be negative.
+    No rank field: rank-by-rupas and rank-by-ratio differ, agent orders by either."""
+    from jhora.horoscope.chart import strength
+
+    sb = strength.shad_bala(jd, place)
+    # sb rows: 6 components, then sum, rupa, strength_ratio — each a list of 7.
+    out: dict[str, dict] = {}
+    for p in _SHADBALA_PLANETS:
+        components = {
+            name: round(float(sb[i][p]), 2) for i, name in enumerate(_SHADBALA_COMPONENTS)
+        }
+        # No `total` (virupas) field: redundant (= total_rupas * 60) and an uncited
+        # sibling would trip agents into citing a path that has no atom.
+        out[names.planet_name(p)] = {
+            "components": components,
+            "total_rupas": round(float(sb[7][p]), 2),
+            "strength_ratio": round(float(sb[8][p]), 2),
+        }
+    return out
+
+
 def _houses(chart) -> list[dict]:
     """Whole-sign bhava table for a chart: 12 houses from the lagna with sign + lord."""
     lagna_sign = _lagna_sign(chart)
@@ -254,6 +287,7 @@ def compute_chart(
 
         applied = apply_config(config)
         resolved = applied.resolved_charts()  # {name: factor}, always includes D1
+        modules = applied.resolved_modules()  # validate BEFORE burning the compute
         place = drik.Place(profile.name, profile.latitude, profile.longitude, profile.timezone)
         jd = utils.julian_day_number(profile.date, profile.time)
         # Anchor the reference at local noon to avoid date-boundary ambiguity.
@@ -265,6 +299,9 @@ def compute_chart(
         }
         panchanga = _panchanga(jd, place)
         vimshottari = _vimshottari_current(ref_jd, jd, place)
+        module_facts: dict[str, dict] = {}
+        if "shadbala" in modules:
+            module_facts["shadbala"] = _shadbala(jd, place)
 
     # Each divisional chart becomes a lowercase fact key (d1, d9, d10, ...). The
     # ascendant is taken from D1, which resolved_charts guarantees is present.
@@ -294,6 +331,7 @@ def compute_chart(
             "rahu_ketu": applied.rahu_ketu,
             "node_aspects": applied.node_aspects,
             "charts": list(resolved),
+            "modules": sorted(modules),
             # reference_date drives the running Vimshottari period; surfaced here so a
             # quoted/cached result is fully reproducible from calculation_config alone.
             "reference_date": list(reference_date),
@@ -306,6 +344,7 @@ def compute_chart(
             "aspects": aspects,
             "yogas": yogas,
             **divisional_facts,
+            **module_facts,
             "panchanga": panchanga,
             "vimshottari": vimshottari,
         },

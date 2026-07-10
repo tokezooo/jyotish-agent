@@ -14,3 +14,4 @@ tests/fixtures/golden_chennai_1990_swiss.json
 
 # uv.lock IS committed: PyJHora declares no runtime deps, so the lock is the only
 # record of the headless calculation dependency set. Do not ignore it.
+.gstack/

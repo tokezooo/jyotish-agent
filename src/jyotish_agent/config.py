@@ -59,6 +59,17 @@ DIVISIONAL_FACTORS: dict[str, int] = {
 }
 DEFAULT_CHARTS: tuple[str, ...] = ("D1", "D9")
 
+# Opt-in fact modules (Milestone 3). Default OFF: always-on would ~2.5x the citation
+# atoms, grow the ENGINE_LOCK hold (engine yoga scan measured at ~0.7s), and churn the
+# default golden fixtures. The agent requests modules per question via config.modules.
+KNOWN_MODULES: frozenset[str] = frozenset(
+    {"shadbala", "ashtakavarga", "transits", "yogas_engine", "varshaphal"}
+)
+# Modules with a facade implementation. A known-but-unimplemented module is a 422
+# (never a silent 200-with-nothing — the agent would loop on the missing facts).
+# Grows one entry per Milestone-3 phase.
+IMPLEMENTED_MODULES: frozenset[str] = frozenset({"shadbala"})
+
 # Held by the facade across apply_config()+compute to serialize PyJHora global state.
 # apply_config does NOT acquire it (callers compose apply+compute under one hold).
 ENGINE_LOCK = threading.Lock()
@@ -86,6 +97,25 @@ class CalculationConfig:
     # Rahu/Ketu drishti: "standard" = 7th only; "jupiter_like" = 5th/7th/9th (some
     # schools). Affects only the nodes' aspects.
     node_aspects: str = "standard"
+    # Opt-in fact modules (see KNOWN_MODULES). Empty by default.
+    modules: tuple[str, ...] = ()
+
+    def resolved_modules(self) -> frozenset[str]:
+        """Validated, deduplicated module set. Raises ConfigError on unknown names and
+        on known-but-not-yet-implemented modules (silent absence would mislead)."""
+        requested = {m.lower() for m in self.modules}
+        unknown = requested - KNOWN_MODULES
+        if unknown:
+            raise ConfigError(
+                f"unknown modules {sorted(unknown)}; supported: {sorted(IMPLEMENTED_MODULES)}"
+            )
+        pending = requested - IMPLEMENTED_MODULES
+        if pending:
+            raise ConfigError(
+                f"modules {sorted(pending)} are not implemented yet; "
+                f"available: {sorted(IMPLEMENTED_MODULES)}"
+            )
+        return frozenset(requested)
 
     def resolved_charts(self) -> dict[str, int]:
         """Validated {chart_name: factor}, always including D1, order-stable.
