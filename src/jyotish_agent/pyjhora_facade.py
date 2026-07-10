@@ -225,7 +225,7 @@ def _planet_sign(chart, planet_index: int) -> int:
 
 
 def _transits(ref_jd, place, natal_moon_sign: int, natal_lagna_sign: int,
-              reference_date: DateTuple) -> dict:
+              reference_date: DateTuple, timezone: float) -> dict:
     """Classical gochara: D1 planet positions at the REFERENCE moment, not birth.
 
     ``ref_jd`` must be ``reference_date`` at local noon (the caller computes it that
@@ -253,7 +253,9 @@ def _transits(ref_jd, place, natal_moon_sign: int, natal_lagna_sign: int,
             "house_from_lagna": ((sign - natal_lagna_sign) % 12) + 1,
         }
     return {
-        "anchor": "%04d-%02d-%02dT12:00:00" % tuple(reference_date),
+        # Offset-aware so the instant is unambiguous; citable as transits.anchor.
+        "anchor": "%04d-%02d-%02dT12:00:00%+03d:%02d"
+        % (*reference_date, int(timezone), round(abs(timezone) % 1 * 60)),
         "natal_moon_sign": names.sign_name(natal_moon_sign),
         "planets": planets,
     }
@@ -406,20 +408,22 @@ def compute_chart(
         if "ashtakavarga" in modules:
             module_facts["ashtakavarga"] = _ashtakavarga(raw_charts["D1"])
         if "transits" in modules:
-            transits = _transits(
+            module_facts["transits"] = _transits(
                 ref_jd,
                 place,
                 natal_moon_sign=_planet_sign(raw_charts["D1"], 1),  # Moon = index 1
                 natal_lagna_sign=_lagna_sign(raw_charts["D1"]),
                 reference_date=reference_date,
+                timezone=profile.timezone,
             )
-            # Gochara×SAV join: with ashtakavarga also on, each transit planet gets
-            # the SAV bindus of its transited sign (classical transit strength).
-            if "ashtakavarga" in module_facts:
-                sav = module_facts["ashtakavarga"]["sav"]
-                for planet in transits["planets"].values():
-                    planet["sav_points"] = sav[planet["sign"]]
-            module_facts["transits"] = transits
+
+        # Cross-module joins run AFTER all modules are computed so they never depend
+        # on module execution order. Gochara×SAV: each transit planet gets the SAV
+        # bindus of its transited sign (classical transit strength).
+        if "transits" in module_facts and "ashtakavarga" in module_facts:
+            sav = module_facts["ashtakavarga"]["sav"]
+            for planet in module_facts["transits"]["planets"].values():
+                planet["sav_points"] = sav[planet["sign"]]
 
     # Each divisional chart becomes a lowercase fact key (d1, d9, d10, ...). The
     # ascendant is taken from D1, which resolved_charts guarantees is present.

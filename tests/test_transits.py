@@ -47,7 +47,7 @@ def test_shape_anchor_and_natal_moon():
     tr = _facts()["transits"]
     assert set(tr) == {"anchor", "natal_moon_sign", "planets"}
     # Anchor is the documented noon-local snapshot of the reference date.
-    assert tr["anchor"] == "2026-06-07T12:00:00"
+    assert tr["anchor"] == "2026-06-07T12:00:00+05:30"
     assert set(tr["planets"]) == set(names.PLANETS)  # all 9, no 'L' row
     for planet, info in tr["planets"].items():
         assert set(info) == {
@@ -100,11 +100,12 @@ def test_house_from_moon_math_via_sentinel(monkeypatch):
 
     monkeypatch.setattr(engine_charts, "divisional_chart", fake)
     out = facade._transits(
-        0.0, None, natal_moon_sign=4, natal_lagna_sign=0, reference_date=(2026, 6, 7)
+        0.0, None, natal_moon_sign=4, natal_lagna_sign=0,
+        reference_date=(2026, 6, 7), timezone=5.5,
     )
     assert captured["factor"] == 1  # transit chart is D1
     assert out["natal_moon_sign"] == "Leo"
-    assert out["anchor"] == "2026-06-07T12:00:00"
+    assert out["anchor"] == "2026-06-07T12:00:00+05:30"
     assert out["planets"]["Sun"]["house_from_moon"] == 1
     assert out["planets"]["Moon"]["house_from_moon"] == 12
     assert out["planets"]["Sun"]["house_from_lagna"] == 5  # sign 4 from natal lagna 0
@@ -142,8 +143,9 @@ def test_atoms_and_citation_roundtrip():
     assert atoms["transits.Saturn.house_from_lagna"] == str(saturn["house_from_lagna"])
     assert atoms["transits.Saturn.sav_points"] == str(saturn["sav_points"])
     assert atoms["transits.natal_moon_sign"] == facts["transits"]["natal_moon_sign"]
-    # anchor is context (the snapshot convention), not a citable claim.
-    assert "transits.anchor" not in atoms
+    # anchor is citable (offset-aware snapshot moment) and degrees have atoms too.
+    assert atoms["transits.anchor"] == facts["transits"]["anchor"]
+    assert atoms["transits.Saturn.degrees"] == str(saturn["degrees"])
 
     ok = validate_answer(
         [

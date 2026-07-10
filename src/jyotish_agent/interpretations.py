@@ -136,16 +136,18 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
 
     # Transits (module): transits.<Planet>.sign / .house_from_moon / .house_from_lagna
     # (+ .sav_points when the ashtakavarga module is also on) and
-    # transits.natal_moon_sign. `anchor` is context (the noon-snapshot convention),
+    # transits.natal_moon_sign and transits.anchor (offset-aware snapshot moment),
     # not a citable claim — deliberately no atom.
     transits = facts.get("transits")
     if isinstance(transits, dict):
         if transits.get("natal_moon_sign") is not None:
             atoms["transits.natal_moon_sign"] = str(transits["natal_moon_sign"])
+        if transits.get("anchor") is not None:
+            atoms["transits.anchor"] = str(transits["anchor"])
         for planet, info in (transits.get("planets") or {}).items():
             if not isinstance(info, dict):
                 continue
-            for field in ("sign", "house_from_moon", "house_from_lagna", "sav_points"):
+            for field in ("sign", "degrees", "house_from_moon", "house_from_lagna", "sav_points"):
                 if info.get(field) is not None:
                     atoms[f"transits.{planet}.{field}"] = str(info[field])
 
