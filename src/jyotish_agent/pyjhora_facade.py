@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from . import ENGINE_VERSION, names
-from .config import ENGINE_LOCK, CalculationConfig, apply_config, ephemeris_mode
+from .config import ENGINE_LOCK, CalculationConfig, ConfigError, apply_config, ephemeris_mode
 from .yogas import detect_yogas
 
 
@@ -248,10 +248,17 @@ def _yogas_engine(jd, place, resolved: dict[str, int]) -> dict:
     import contextlib
     import io
 
-    from jhora.horoscope.chart import yoga as engine_yoga
-
+    # NOTE: redirect_stdout/redirect_stderr swap PROCESS-global streams. This runs
+    # under ENGINE_LOCK in a single-process local service, so the ~60ms window can
+    # at worst swallow an unrelated log line — accepted for the MVP over a
+    # subprocess round-trip. Revisit if this ever serves concurrent multi-worker
+    # traffic. The first jhora yoga import also prints path noise, so the import
+    # happens INSIDE the capture boundary.
     engine_errors = 0
     charts_out: dict[str, list[dict]] = {}
+    _import_buf = io.StringIO()
+    with contextlib.redirect_stdout(_import_buf), contextlib.redirect_stderr(_import_buf):
+        from jhora.horoscope.chart import yoga as engine_yoga
     for name, factor in resolved.items():
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
@@ -260,8 +267,12 @@ def _yogas_engine(jd, place, resolved: dict[str, int]) -> dict:
             detected, _found, _total = engine_yoga.get_yoga_details(
                 jd, place, divisional_chart_factor=factor, language="en"
             )
+        # Anchored: the engine prints exactly "Error executing <fn> ..." per failed
+        # yoga; substring matching would overcount multi-line tracebacks.
         engine_errors += sum(
-            1 for line in buf.getvalue().splitlines() if _YOGA_ENGINE_ERROR_MARKER in line
+            1
+            for line in buf.getvalue().splitlines()
+            if line.startswith(_YOGA_ENGINE_ERROR_MARKER)
         )
         entries: list[dict] = []
         for fn_key, details in detected.items():
@@ -292,16 +303,20 @@ def _yoga_tier_mismatches(our_yogas: dict, engine_yogas: dict) -> list[str]:
 
     Our verified geometric tier is authoritative; a disagreement with the engine's
     unaudited detection is surfaced as a warning string for the agent to relay as
-    uncertainty — never as a changed verdict. Engine matching is by 'gajakesari'
-    substring on the underscore-stripped D1 keys (the engine names it
-    'gaja_kesari_yoga'). Skipped when the engine tier is unavailable (no detection
-    happened, so absence means nothing)."""
+    uncertainty — never as a changed verdict. Engine matching is exact
+    normalized-key equality against 'gaja_kesari_yoga'. Skipped unless the engine
+    scan completed cleanly (status "ok") — on "partial"/"unavailable" absence
+    means nothing."""
     ours = our_yogas.get("Gajakesari")
-    if ours is None or engine_yogas.get("status") == "unavailable":
+    # Compare only when the engine scan is fully trustworthy: on "partial" the very
+    # function under comparison may be among the failed ones, so its absence means
+    # nothing and would produce a false mismatch warning.
+    if ours is None or engine_yogas.get("status") != "ok":
         return []
     d1_entries = (engine_yogas.get("charts") or {}).get("d1") or []
+    # Exact normalized-key equality: substring matching would accept unrelated keys.
     engine_present = any(
-        "gajakesari" in str(e.get("key", "")).replace("_", "") for e in d1_entries
+        str(e.get("key", "")).replace("_", "") == "gajakesariyoga" for e in d1_entries
     )
     our_present = bool(ours.get("present"))
     if our_present == engine_present:
@@ -521,6 +536,8 @@ def compute_chart(
             # under a particular ephemeris/date; the rest of the chart must survive.
             try:
                 module_facts["yogas_engine"] = _yogas_engine(jd, place, resolved)
+            except ConfigError:
+                raise  # a config defect is a caller error, never "engine unavailable"
             except Exception:
                 module_facts["yogas_engine"] = dict(_YOGAS_ENGINE_UNAVAILABLE)
 

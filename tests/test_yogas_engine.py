@@ -233,3 +233,16 @@ def test_no_engine_yoga_atoms_without_module():
 def test_config_echoes_modules():
     out = _compute()
     assert out["calculation_config"]["modules"] == ["yogas_engine"]
+
+
+def test_all_engine_yoga_names_are_prose_free():
+    # Resource-wide (all ~284 entries), not just fixture-detected: no display name
+    # may carry prediction prose. Descriptions/benefits are dropped by the facade;
+    # this pins that what we DO keep (names) is clean across the whole resource set.
+    from jhora.horoscope.chart import yoga as engine_yoga
+
+    resources = engine_yoga.get_yoga_resources(language="en")
+    for key, details in resources.items():
+        display = str(details[1]) if isinstance(details, (list, tuple)) and len(details) > 1 else ""
+        low = display.lower()
+        assert "you will" not in low and "king" not in low, (key, display)
