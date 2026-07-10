@@ -12,6 +12,7 @@ That is what makes the golden-fixture test meaningful.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -216,6 +217,104 @@ def _ashtakavarga(chart_d1) -> dict:
     return {"sav": sav_named, "bav": bav_named}
 
 
+# The engine's yoga scan (yoga.get_yoga_details) eval()s ~284 '<fn>_from_jd_place'
+# checks, CATCHES every per-yoga exception and print()s it ("Error executing ..." via
+# utils.show_exception) — so a failing yoga silently vanishes from the result. We
+# capture stdout/stderr and count marker lines so a shrunken yoga list surfaces as
+# engine_errors > 0 / status "partial" instead of passing silently.
+_YOGA_ENGINE_ERROR_MARKER = "Error executing"
+# Engine fn keys are snake_case already (verified: 'vesi_yoga', 'dharidhra_yoga_149');
+# sanitized defensively anyway so a resource-file change can't break atom paths.
+_YOGA_KEY_SANITIZE = re.compile(r"[^a-z0-9_]+")
+
+
+def _yogas_engine(jd, place, resolved: dict[str, int]) -> dict:
+    """PyJHora's own yoga scan per configured chart — the UNAUDITED second tier.
+
+    Detection definitions are the engine's and are NOT independently verified; the
+    skill mandates hedged phrasing, and our geometric ``facts["yogas"]`` tier stays
+    authoritative on any conflict (see ``_yoga_tier_mismatches``). Detected-only:
+    presence is implied by inclusion, absence is never asserted as a fact. The
+    engine's benefit/prediction prose ("You will ...") is deliberately excluded —
+    deterministic-outcome text must not become citable facts.
+
+    Returns ``{"status": "ok"|"partial", "engine_errors": <int>, "charts":
+    {<chart lowercase>: [{"key", "name"}]}}`` where ``key`` is the engine's stable
+    snake_case function key (e.g. ``vesi_yoga`` — the dict key of get_yoga_details'
+    result, not the locale display name) and ``name`` the English display name.
+    ``status`` is "partial" when the engine printed per-yoga errors (the list may be
+    silently short). Must run under ENGINE_LOCK (reads global ayanamsa state).
+    """
+    import contextlib
+    import io
+
+    from jhora.horoscope.chart import yoga as engine_yoga
+
+    engine_errors = 0
+    charts_out: dict[str, list[dict]] = {}
+    for name, factor in resolved.items():
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(buf):
+            # Returns (detected: {fn_key: [chart_id, name, description, benefits]},
+            # found_count, total_count); counts are redundant with len(detected).
+            detected, _found, _total = engine_yoga.get_yoga_details(
+                jd, place, divisional_chart_factor=factor, language="en"
+            )
+        engine_errors += sum(
+            1 for line in buf.getvalue().splitlines() if _YOGA_ENGINE_ERROR_MARKER in line
+        )
+        entries: list[dict] = []
+        for fn_key, details in detected.items():
+            key = _YOGA_KEY_SANITIZE.sub("_", str(fn_key).lower()).strip("_")
+            if not key:
+                continue
+            display = (
+                str(details[1])
+                if isinstance(details, (list, tuple)) and len(details) > 1
+                else key
+            )
+            entries.append({"key": key, "name": display})
+        charts_out[name.lower()] = entries
+    return {
+        "status": "ok" if engine_errors == 0 else "partial",
+        "engine_errors": engine_errors,
+        "charts": charts_out,
+    }
+
+
+# Degraded yogas_engine payload when the whole engine scan raises. engine_errors=-1
+# distinguishes "could not run" from "ran with N suppressed failures".
+_YOGAS_ENGINE_UNAVAILABLE = {"status": "unavailable", "engine_errors": -1, "charts": {}}
+
+
+def _yoga_tier_mismatches(our_yogas: dict, engine_yogas: dict) -> list[str]:
+    """Cross-check the two yoga tiers on the one yoga both cover (Gajakesari).
+
+    Our verified geometric tier is authoritative; a disagreement with the engine's
+    unaudited detection is surfaced as a warning string for the agent to relay as
+    uncertainty — never as a changed verdict. Engine matching is by 'gajakesari'
+    substring on the underscore-stripped D1 keys (the engine names it
+    'gaja_kesari_yoga'). Skipped when the engine tier is unavailable (no detection
+    happened, so absence means nothing)."""
+    ours = our_yogas.get("Gajakesari")
+    if ours is None or engine_yogas.get("status") == "unavailable":
+        return []
+    d1_entries = (engine_yogas.get("charts") or {}).get("d1") or []
+    engine_present = any(
+        "gajakesari" in str(e.get("key", "")).replace("_", "") for e in d1_entries
+    )
+    our_present = bool(ours.get("present"))
+    if our_present == engine_present:
+        return []
+    return [
+        "yoga tier mismatch: the verified geometric tier (facts.yogas) says "
+        f"Gajakesari present={str(our_present).lower()} but the PyJHora engine "
+        f"{'detects' if engine_present else 'does not detect'} a gajakesari-like "
+        "yoga in D1. The verified tier is authoritative; treat the engine verdict "
+        "as unverified."
+    ]
+
+
 def _planet_sign(chart, planet_index: int) -> int:
     """Sign index of a planet in a raw engine chart, or raise."""
     for body, pos in chart:
@@ -416,6 +515,14 @@ def compute_chart(
                 reference_date=reference_date,
                 timezone=profile.timezone,
             )
+        if "yogas_engine" in modules:
+            # The ONLY module allowed to degrade instead of failing the compute: it
+            # dispatches ~284 unaudited engine functions, any of which may raise
+            # under a particular ephemeris/date; the rest of the chart must survive.
+            try:
+                module_facts["yogas_engine"] = _yogas_engine(jd, place, resolved)
+            except Exception:
+                module_facts["yogas_engine"] = dict(_YOGAS_ENGINE_UNAVAILABLE)
 
         # Cross-module joins run AFTER all modules are computed so they never depend
         # on module execution order. Gochara×SAV: each transit planet gets the SAV
@@ -430,6 +537,13 @@ def compute_chart(
     divisional_facts = {name.lower(): _placements(chart) for name, chart in raw_charts.items()}
     ascendant = _ascendant(raw_charts["D1"])
     yogas = detect_yogas(divisional_facts["d1"])  # narrow geometric set, D1 only
+    if "yogas_engine" in module_facts:
+        # Two-tier cross-check, run after BOTH tiers exist so it never depends on
+        # module execution order. Always present (possibly empty) so the agent can
+        # rely on the field; strings are context to surface, deliberately NOT atoms.
+        module_facts["yogas_engine"]["mismatches"] = _yoga_tier_mismatches(
+            yogas, module_facts["yogas_engine"]
+        )
     # D1 ascendant/houses are retained as top-level aliases for back-compat; the
     # general per-chart forms are `lagnas` and `bhava` (which include D1). Keys are
     # lowercased (d1, d9, ...) to match the divisional placement key convention.

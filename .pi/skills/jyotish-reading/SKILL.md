@@ -100,6 +100,19 @@ stands: back every factual claim in `summary` with an entry in `facts_used`.
   claim a yoga when `present` is `true`. This is a deliberately NARROW geometric set
   (not full yoga coverage) with no strength/combustion/cancellation analysis; do not
   imply completeness or claim a yoga's effect as deterministic.
+- `yogas_engine.<chart>.<key>.present` (always `true`) and `yogas_engine.status` —
+  the PyJHora engine's own yoga scan (~284 checks) per computed chart (chart keys
+  lowercase like `d1`/`d9`), requested via `config.modules: ["yogas_engine"]`. Keys
+  are the engine's stable snake_case identifiers (e.g. `vesi_yoga`). MANDATORY
+  hedge: these are UNVERIFIED engine verdicts — phrase every one as "the PyJHora
+  engine detects X; this definition is not independently verified", never as bare
+  fact. Detected-only: a yoga's ABSENCE is not a fact — phrase it as "not among the
+  engine-detected yogas", never "the chart has no X". If `yogas_engine.status` is
+  `"partial"`, some engine checks failed silently (the list may be incomplete — say
+  so); if `"unavailable"`, the scan could not run at all. On any conflict with the
+  verified geometric tier (`yogas.<Name>.present`), the verified tier WINS: surface
+  any strings in `facts.yogas_engine.mismatches` under `uncertainty` and side with
+  `facts.yogas`.
 - `panchanga.tithi`, `panchanga.nakshatra` (+ `panchanga.nakshatra.pada`),
   `panchanga.yoga`, `panchanga.karana`, `panchanga.weekday`
 - `vimshottari.mahadasha.lord` / `.start` / `.end` (and `bhukti`, `antara`)

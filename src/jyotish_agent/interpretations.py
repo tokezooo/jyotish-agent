@@ -158,6 +158,21 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
             if isinstance(info, dict) and "present" in info:
                 atoms[f"yogas.{name}.present"] = "true" if info["present"] else "false"
 
+    # Engine yogas (module): yogas_engine.<chart>.<key>.present = "true" — detected
+    # only, an absence is NOT a citable fact — plus yogas_engine.status. The
+    # engine_errors count and mismatches strings are context for the agent,
+    # deliberately NOT atoms (they are about the scan, not the chart).
+    engine_yogas = facts.get("yogas_engine")
+    if isinstance(engine_yogas, dict):
+        if engine_yogas.get("status") is not None:
+            atoms["yogas_engine.status"] = str(engine_yogas["status"])
+        charts_map = engine_yogas.get("charts")
+        if isinstance(charts_map, dict):
+            for chart_key, entries in charts_map.items():
+                for entry in entries or []:
+                    if isinstance(entry, dict) and entry.get("key"):
+                        atoms[f"yogas_engine.{chart_key}.{entry['key']}.present"] = "true"
+
     panchanga = facts.get("panchanga") or {}
     for key, entry in panchanga.items():
         if not isinstance(entry, dict):

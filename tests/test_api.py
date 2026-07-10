@@ -450,6 +450,30 @@ def test_transit_fact_roundtrips_through_validation():
 
 
 @requires_engine
+def test_yogas_engine_fact_roundtrips_through_validation():
+    c = client.post("/charts/compute", json=_compute_body(modules=["yogas_engine"])).json()
+    ye = c["facts"]["yogas_engine"]
+    assert ye["status"] == "ok"
+    key = ye["charts"]["d1"][0]["key"]
+    v = client.post(
+        "/answers/validate",
+        json={
+            "answer": {
+                "summary": (
+                    "The PyJHora engine detects this yoga; the definition is not "
+                    "independently verified."
+                ),
+                "facts_used": [
+                    {"path": f"yogas_engine.d1.{key}.present", "value": "true"}
+                ],
+            },
+            "facts_token": c["facts_token"],
+        },
+    )
+    assert v.json() == {"valid": True, "violations": []}
+
+
+@requires_engine
 def test_unknown_node_aspects_returns_422():
     r = client.post("/charts/compute", json=_compute_body(node_aspects="nope"))
     assert r.status_code == 422
