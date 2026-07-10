@@ -75,6 +75,13 @@ stands: back every factual claim in `summary` with an entry in `facts_used`.
   `config.modules: ["shadbala"]` when the question concerns planetary strength.
   Numbers only: do NOT assert "strong/weak" thresholds as facts (cutoffs vary by
   school); a ratio > 1 means the planet exceeds its classical minimum, say it that way.
+- `ashtakavarga.sav.<Sign>`, `ashtakavarga.bav.<Planet|Lagna>.<Sign>` — raw
+  (pre-sodhana) Samudaya/Bhinna Ashtakavarga bindu counts. Request via
+  `config.modules: ["ashtakavarga"]`. SAV points (per sign, out of a fixed 337
+  total) measure how favorable a sign is for transits — higher is more
+  supportive. Numbers only: do NOT assert good/bad cutoffs (e.g. "below 28 is
+  weak") as facts; cite the points and phrase any threshold as interpretive
+  convention, not computation.
 - `yogas.<Name>.present` (`true`/`false`) for the supported geometric yogas
   (Gajakesari, Chandra-Mangala, Budha-Aditya). Each yoga in `facts.yogas` also carries
   the exact `definition` used and the `basis` geometry — cite the definition, and only

@@ -123,6 +123,17 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
             for comp, val in (info.get("components") or {}).items():
                 atoms[f"shadbala.{planet}.components.{comp}"] = str(val)
 
+    # Ashtakavarga (module): ashtakavarga.sav.<Sign>, ashtakavarga.bav.<Planet|Lagna>.<Sign>
+    ashtakavarga = facts.get("ashtakavarga")
+    if isinstance(ashtakavarga, dict):
+        for sign, points in (ashtakavarga.get("sav") or {}).items():
+            atoms[f"ashtakavarga.sav.{sign}"] = str(points)
+        for row, cells in (ashtakavarga.get("bav") or {}).items():
+            if not isinstance(cells, dict):
+                continue
+            for sign, points in cells.items():
+                atoms[f"ashtakavarga.bav.{row}.{sign}"] = str(points)
+
     # Yogas: yogas.<Name>.present = "true"/"false"
     yogas = facts.get("yogas")
     if isinstance(yogas, dict):

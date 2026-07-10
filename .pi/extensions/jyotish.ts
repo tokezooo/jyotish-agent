@@ -90,7 +90,9 @@ const ConfigSchema = Type.Object(
     // Opt-in fact modules; request only what the question needs (e.g. shadbala for
     // planetary-strength questions). Default: none. This enum lists ONLY implemented
     // modules — grows one entry per Milestone-3 phase (mirror of IMPLEMENTED_MODULES).
-    modules: Type.Optional(Type.Array(StringEnum(["shadbala"] as const))),
+    modules: Type.Optional(
+      Type.Array(StringEnum(["shadbala", "ashtakavarga"] as const)),
+    ),
   },
   NO_EXTRA,
 );

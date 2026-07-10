@@ -165,6 +165,42 @@ def _shadbala(jd, place) -> dict:
     return out
 
 
+# BAV row order of get_ashtaka_varga output: Sun..Saturn then Lagna (row 7), per
+# ashtakavarga.planet_list ['sun',...,'saturn','lagnam'].
+_ASHTAKAVARGA_ROWS = tuple(names.PLANETS[:7]) + ("Lagna",)
+
+
+def _ashtakavarga(chart_d1) -> dict:
+    """Bhinna (BAV) and Samudaya (SAV) Ashtakavarga from the D1 chart.
+
+    These are the RAW (pre-sodhana) tables — no trikona/ekadhipatya reductions
+    applied. Input must be the RAW engine D1 chart (with 'L' and the nodes):
+    the engine derives contributor positions from the full house->planet list,
+    so the normalized placements (which drop 'L') must NOT be used here. Emits
+    `sav` (12 signs; bindus always total 337) and `bav` (8 rows: the 7 classical
+    grahas plus "Lagna", each cell 0..8 bindus per sign)."""
+    from jhora import utils
+    from jhora.horoscope.chart import ashtakavarga
+
+    h_to_p = utils.get_house_planet_list_from_planet_positions(chart_d1)
+    bav, sav, _pav = ashtakavarga.get_ashtaka_varga(h_to_p)
+    if len(sav) != 12:
+        raise EngineOutputError(
+            f"get_ashtaka_varga returned unexpected SAV shape {len(sav)} signs"
+        )
+    if len(bav) != 8 or any(len(row) != 12 for row in bav):
+        raise EngineOutputError(
+            f"get_ashtaka_varga returned unexpected BAV shape {len(bav)} rows"
+        )
+    return {
+        "sav": {names.sign_name(s): int(sav[s]) for s in range(12)},
+        "bav": {
+            row_name: {names.sign_name(s): int(bav[p][s]) for s in range(12)}
+            for p, row_name in enumerate(_ASHTAKAVARGA_ROWS)
+        },
+    }
+
+
 def _houses(chart) -> list[dict]:
     """Whole-sign bhava table for a chart: 12 houses from the lagna with sign + lord."""
     lagna_sign = _lagna_sign(chart)
@@ -309,6 +345,8 @@ def compute_chart(
         module_facts: dict[str, dict] = {}
         if "shadbala" in modules:
             module_facts["shadbala"] = _shadbala(jd, place)
+        if "ashtakavarga" in modules:
+            module_facts["ashtakavarga"] = _ashtakavarga(raw_charts["D1"])
 
     # Each divisional chart becomes a lowercase fact key (d1, d9, d10, ...). The
     # ascendant is taken from D1, which resolved_charts guarantees is present.

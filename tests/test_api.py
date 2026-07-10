@@ -406,6 +406,23 @@ def test_shadbala_fact_roundtrips_through_validation():
 
 
 @requires_engine
+def test_ashtakavarga_fact_roundtrips_through_validation():
+    c = client.post("/charts/compute", json=_compute_body(modules=["ashtakavarga"])).json()
+    points = c["facts"]["ashtakavarga"]["sav"]["Aries"]
+    v = client.post(
+        "/answers/validate",
+        json={
+            "answer": {
+                "summary": "SAV points for Aries.",
+                "facts_used": [{"path": "ashtakavarga.sav.Aries", "value": points}],
+            },
+            "facts_token": c["facts_token"],
+        },
+    )
+    assert v.json() == {"valid": True, "violations": []}
+
+
+@requires_engine
 def test_unknown_node_aspects_returns_422():
     r = client.post("/charts/compute", json=_compute_body(node_aspects="nope"))
     assert r.status_code == 422
