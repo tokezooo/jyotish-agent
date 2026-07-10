@@ -391,7 +391,7 @@ def test_unknown_module_returns_422():
 @requires_engine
 def test_shadbala_fact_roundtrips_through_validation():
     c = client.post("/charts/compute", json=_compute_body(modules=["shadbala"])).json()
-    rupas = c["facts"]["shadbala"]["Sun"]["total_rupas"]
+    rupas = c["facts"]["shadbala"]["Sun"]["rupas"]
     v = client.post(
         "/answers/validate",
         json={

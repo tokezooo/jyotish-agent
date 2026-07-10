@@ -78,7 +78,7 @@ def test_component_sum_matches_rupas():
     sb = _facts()["shadbala"]
     for planet, info in sb.items():
         virupa_sum = sum(info["components"].values())
-        assert abs(virupa_sum / 60 - info["total_rupas"]) < 0.05, planet
+        assert abs(virupa_sum / 60 - info["rupas"]) < 0.05, planet
 
 
 def test_negative_drik_is_allowed():
@@ -97,7 +97,7 @@ def test_atoms_and_citation_roundtrip():
     from jyotish_agent.interpretations import validate_answer
 
     ok = validate_answer(
-        [{"path": "shadbala.Sun.rupas", "value": facts["shadbala"]["Sun"]["total_rupas"]}],
+        [{"path": "shadbala.Sun.rupas", "value": facts["shadbala"]["Sun"]["rupas"]}],
         facts,
     )
     assert ok == []
@@ -110,3 +110,33 @@ def test_config_echoes_modules():
         _PROFILE, reference_date=_REFERENCE, config=CalculationConfig(modules=("shadbala",))
     )
     assert out["calculation_config"]["modules"] == ["shadbala"]
+
+
+def test_component_labels_via_sentinel_rows(monkeypatch):
+    # Unique sentinel per row: ANY row/label permutation fails, not just naisargika.
+    import jyotish_agent.pyjhora_facade as facade
+    from jhora.horoscope.chart import strength
+
+    sentinel = [[float(100 * (i + 1) + p) for p in range(7)] for i in range(9)]
+    monkeypatch.setattr(strength, "shad_bala", lambda jd, place: sentinel)
+    out = facade._shadbala(0.0, None)
+    sun = out["Sun"]
+    expected = dict(zip(
+        ("sthana", "kaala", "dig", "cheshta", "naisargika", "drik"),
+        (100.0, 200.0, 300.0, 400.0, 500.0, 600.0),
+    ))
+    assert sun["components"] == expected
+    assert sun["rupas"] == 800.0 and sun["strength_ratio"] == 900.0
+
+
+def test_engine_shape_guard(monkeypatch):
+    import jyotish_agent.pyjhora_facade as facade
+    from jyotish_agent.pyjhora_facade import EngineOutputError
+    from jhora.horoscope.chart import strength
+
+    monkeypatch.setattr(strength, "shad_bala", lambda jd, place: [[1.0] * 7] * 3)
+    with pytest.raises(EngineOutputError, match="unexpected shape"):
+        facade._shadbala(0.0, None)
+    monkeypatch.setattr(strength, "shad_bala", lambda jd, place: [[float("nan")] * 7] * 9)
+    with pytest.raises(EngineOutputError, match="non-finite"):
+        facade._shadbala(0.0, None)

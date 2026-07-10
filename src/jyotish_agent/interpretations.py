@@ -116,8 +116,8 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
         for planet, info in shadbala.items():
             if not isinstance(info, dict):
                 continue
-            if info.get("total_rupas") is not None:
-                atoms[f"shadbala.{planet}.rupas"] = str(info["total_rupas"])
+            if info.get("rupas") is not None:
+                atoms[f"shadbala.{planet}.rupas"] = str(info["rupas"])
             if info.get("strength_ratio") is not None:
                 atoms[f"shadbala.{planet}.strength_ratio"] = str(info["strength_ratio"])
             for comp, val in (info.get("components") or {}).items():

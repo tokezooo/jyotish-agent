@@ -137,25 +137,30 @@ _SHADBALA_COMPONENTS = ("sthana", "kaala", "dig", "cheshta", "naisargika", "drik
 def _shadbala(jd, place) -> dict:
     """Six-fold planetary strength for the 7 classical grahas.
 
-    Emits per planet: total virupas (`total`), rupas (`total_rupas` = total/60),
-    `strength_ratio` (rupas / classical minimum), and the six named components.
-    Values are engine output rounded to 2dp; `drik` can legitimately be negative.
-    No rank field: rank-by-rupas and rank-by-ratio differ, agent orders by either."""
+    Emits per planet exactly: `rupas` (total strength in rupas), `strength_ratio`
+    (rupas / classical minimum), and `components` (six named virupa values). Field
+    names match the citation atoms one-to-one so a path copied from the JSON always
+    validates. Values are engine output rounded to 2dp; `drik` can be negative."""
+    import math as _math
+
     from jhora.horoscope.chart import strength
 
     sb = strength.shad_bala(jd, place)
-    # sb rows: 6 components, then sum, rupa, strength_ratio — each a list of 7.
+    # Expected engine shape: 9 rows (6 components, sum, rupa, ratio) x 7 planets.
+    if len(sb) < 9 or any(len(row) < len(_SHADBALA_PLANETS) for row in sb[:9]):
+        raise EngineOutputError(f"shad_bala returned unexpected shape {len(sb)} rows")
     out: dict[str, dict] = {}
     for p in _SHADBALA_PLANETS:
+        values = [float(sb[i][p]) for i in range(9)]
+        if not all(_math.isfinite(v) for v in values):
+            raise EngineOutputError(f"shad_bala returned non-finite value for planet {p}")
         components = {
-            name: round(float(sb[i][p]), 2) for i, name in enumerate(_SHADBALA_COMPONENTS)
+            name: round(values[i], 2) for i, name in enumerate(_SHADBALA_COMPONENTS)
         }
-        # No `total` (virupas) field: redundant (= total_rupas * 60) and an uncited
-        # sibling would trip agents into citing a path that has no atom.
         out[names.planet_name(p)] = {
             "components": components,
-            "total_rupas": round(float(sb[7][p]), 2),
-            "strength_ratio": round(float(sb[8][p]), 2),
+            "rupas": round(values[7], 2),
+            "strength_ratio": round(values[8], 2),
         }
     return out
 
@@ -279,6 +284,10 @@ def compute_chart(
     PyJHora's global ayanamsa mid-computation.
     """
     config = config or CalculationConfig()
+    # Pure config validation happens BEFORE acquiring the lock: an invalid request
+    # must not contend on (or burn time inside) the engine critical section.
+    resolved = config.resolved_charts()  # {name: factor}, always includes D1
+    modules = config.resolved_modules()
 
     with ENGINE_LOCK:
         from jhora import utils
@@ -286,8 +295,6 @@ def compute_chart(
         from jhora.panchanga import drik
 
         applied = apply_config(config)
-        resolved = applied.resolved_charts()  # {name: factor}, always includes D1
-        modules = applied.resolved_modules()  # validate BEFORE burning the compute
         place = drik.Place(profile.name, profile.latitude, profile.longitude, profile.timezone)
         jd = utils.julian_day_number(profile.date, profile.time)
         # Anchor the reference at local noon to avoid date-boundary ambiguity.
