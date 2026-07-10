@@ -383,7 +383,7 @@ def test_unknown_chart_returns_422():
 def test_unknown_module_returns_422():
     r = client.post("/charts/compute", json=_compute_body(modules=["nope"]))
     assert r.status_code == 422
-    r2 = client.post("/charts/compute", json=_compute_body(modules=["transits"]))
+    r2 = client.post("/charts/compute", json=_compute_body(modules=["varshaphal"]))
     assert r2.status_code == 422  # known but not yet implemented
     assert "not implemented" in r2.json()["problem"]
 
@@ -415,6 +415,33 @@ def test_ashtakavarga_fact_roundtrips_through_validation():
             "answer": {
                 "summary": "SAV points for Aries.",
                 "facts_used": [{"path": "ashtakavarga.sav.Aries", "value": points}],
+            },
+            "facts_token": c["facts_token"],
+        },
+    )
+    assert v.json() == {"valid": True, "violations": []}
+
+
+@requires_engine
+def test_transit_fact_roundtrips_through_validation():
+    # Both modules on -> the gochara x SAV join is present and a transit house fact
+    # is citable end-to-end via the server-cached facts_token.
+    c = client.post(
+        "/charts/compute", json=_compute_body(modules=["transits", "ashtakavarga"])
+    ).json()
+    saturn = c["facts"]["transits"]["planets"]["Saturn"]
+    assert "sav_points" in saturn  # join active with ashtakavarga on
+    v = client.post(
+        "/answers/validate",
+        json={
+            "answer": {
+                "summary": "Saturn's transit house from the natal Moon.",
+                "facts_used": [
+                    {
+                        "path": "transits.Saturn.house_from_moon",
+                        "value": saturn["house_from_moon"],
+                    }
+                ],
             },
             "facts_token": c["facts_token"],
         },

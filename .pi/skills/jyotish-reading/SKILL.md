@@ -82,6 +82,18 @@ stands: back every factual claim in `summary` with an entry in `facts_used`.
   supportive. Numbers only: do NOT assert good/bad cutoffs (e.g. "below 28 is
   weak") as facts; cite the points and phrase any threshold as interpretive
   convention, not computation.
+- `transits.<Planet>.sign`, `transits.<Planet>.house_from_moon`,
+  `transits.<Planet>.house_from_lagna`, and `transits.natal_moon_sign` — classical
+  gochara: D1 positions at the reference moment (NOT birth). Request via
+  `config.modules: ["transits"]` (pass `config.reference_date` for a specific day);
+  add `"ashtakavarga"` too to also get `transits.<Planet>.sav_points`, the SAV
+  bindus of the transited sign — the classical SAV-weighted transit strength.
+  Houses are whole-sign counts from the NATAL Moon (`house_from_moon`, the classical
+  gochara reference) and from the NATAL lagna (`house_from_lagna`) — always name
+  which reference you are counting from. The transit anchor is local noon of
+  `reference_date` (surfaced as `facts.transits.anchor`, context only — not
+  citable); the Moon moves ~13°/day, so its transit sign is a noon snapshot — say
+  so whenever the question hinges on the transit Moon.
 - `yogas.<Name>.present` (`true`/`false`) for the supported geometric yogas
   (Gajakesari, Chandra-Mangala, Budha-Aditya). Each yoga in `facts.yogas` also carries
   the exact `definition` used and the `basis` geometry — cite the definition, and only

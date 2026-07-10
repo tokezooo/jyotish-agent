@@ -216,6 +216,49 @@ def _ashtakavarga(chart_d1) -> dict:
     return {"sav": sav_named, "bav": bav_named}
 
 
+def _planet_sign(chart, planet_index: int) -> int:
+    """Sign index of a planet in a raw engine chart, or raise."""
+    for body, pos in chart:
+        if body != "L" and int(body) == planet_index:
+            return int(pos[0])
+    raise EngineOutputError(f"planet {planet_index} not in chart output")
+
+
+def _transits(ref_jd, place, natal_moon_sign: int, natal_lagna_sign: int,
+              reference_date: DateTuple) -> dict:
+    """Classical gochara: D1 planet positions at the REFERENCE moment, not birth.
+
+    ``ref_jd`` must be ``reference_date`` at local noon (the caller computes it that
+    way); the anchor is surfaced so the snapshot convention is a visible fact — the
+    Moon moves ~13°/day, so its transit sign is only valid for that moment. Houses
+    are whole-sign counts from the NATAL Moon (classical gochara) and the NATAL
+    lagna. ``_placements`` is deliberately NOT reused: its ``house`` is relative to
+    the transit chart's own lagna (the ascendant at the reference moment over the
+    birth place), which is meaningless for gochara — the transit 'L' row is dropped.
+    """
+    from jhora.horoscope.chart import charts
+
+    chart = charts.divisional_chart(ref_jd, place, divisional_chart_factor=1)
+    planets: dict[str, dict] = {}
+    for body, pos in chart:
+        if body == "L":
+            continue  # transit-chart lagna: meaningless for gochara, dropped
+        sign = int(pos[0])
+        planets[names.planet_name(int(body))] = {
+            "sign_index": sign,
+            "sign": names.sign_name(sign),
+            "degrees": _round_deg(pos[1]),
+            # Whole-sign house counted from the natal reference: 1 = same sign.
+            "house_from_moon": ((sign - natal_moon_sign) % 12) + 1,
+            "house_from_lagna": ((sign - natal_lagna_sign) % 12) + 1,
+        }
+    return {
+        "anchor": "%04d-%02d-%02dT12:00:00" % tuple(reference_date),
+        "natal_moon_sign": names.sign_name(natal_moon_sign),
+        "planets": planets,
+    }
+
+
 def _houses(chart) -> list[dict]:
     """Whole-sign bhava table for a chart: 12 houses from the lagna with sign + lord."""
     lagna_sign = _lagna_sign(chart)
@@ -362,6 +405,21 @@ def compute_chart(
             module_facts["shadbala"] = _shadbala(jd, place)
         if "ashtakavarga" in modules:
             module_facts["ashtakavarga"] = _ashtakavarga(raw_charts["D1"])
+        if "transits" in modules:
+            transits = _transits(
+                ref_jd,
+                place,
+                natal_moon_sign=_planet_sign(raw_charts["D1"], 1),  # Moon = index 1
+                natal_lagna_sign=_lagna_sign(raw_charts["D1"]),
+                reference_date=reference_date,
+            )
+            # Gochara×SAV join: with ashtakavarga also on, each transit planet gets
+            # the SAV bindus of its transited sign (classical transit strength).
+            if "ashtakavarga" in module_facts:
+                sav = module_facts["ashtakavarga"]["sav"]
+                for planet in transits["planets"].values():
+                    planet["sav_points"] = sav[planet["sign"]]
+            module_facts["transits"] = transits
 
     # Each divisional chart becomes a lowercase fact key (d1, d9, d10, ...). The
     # ascendant is taken from D1, which resolved_charts guarantees is present.

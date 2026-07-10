@@ -59,7 +59,7 @@ def test_known_but_unimplemented_module_rejected():
     # pathology as the facts_token echo bug). Must be a hard error until implemented.
     with pytest.raises(ConfigError, match="not implemented yet"):
         compute_chart(
-            _PROFILE, reference_date=_REFERENCE, config=CalculationConfig(modules=("transits",))
+            _PROFILE, reference_date=_REFERENCE, config=CalculationConfig(modules=("varshaphal",))
         )
 
 

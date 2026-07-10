@@ -91,7 +91,7 @@ const ConfigSchema = Type.Object(
     // planetary-strength questions). Default: none. This enum lists ONLY implemented
     // modules — grows one entry per Milestone-3 phase (mirror of IMPLEMENTED_MODULES).
     modules: Type.Optional(
-      Type.Array(StringEnum(["shadbala", "ashtakavarga"] as const)),
+      Type.Array(StringEnum(["shadbala", "ashtakavarga", "transits"] as const)),
     ),
   },
   NO_EXTRA,

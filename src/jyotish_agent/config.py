@@ -68,7 +68,7 @@ KNOWN_MODULES: frozenset[str] = frozenset(
 # Modules with a facade implementation. A known-but-unimplemented module is a 422
 # (never a silent 200-with-nothing — the agent would loop on the missing facts).
 # Grows one entry per Milestone-3 phase.
-IMPLEMENTED_MODULES: frozenset[str] = frozenset({"shadbala", "ashtakavarga"})
+IMPLEMENTED_MODULES: frozenset[str] = frozenset({"shadbala", "ashtakavarga", "transits"})
 
 # Held by the facade across apply_config()+compute to serialize PyJHora global state.
 # apply_config does NOT acquire it (callers compose apply+compute under one hold).
