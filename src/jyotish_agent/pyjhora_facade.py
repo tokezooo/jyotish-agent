@@ -192,13 +192,28 @@ def _ashtakavarga(chart_d1) -> dict:
         raise EngineOutputError(
             f"get_ashtaka_varga returned unexpected BAV shape {len(bav)} rows"
         )
-    return {
-        "sav": {names.sign_name(s): int(sav[s]) for s in range(12)},
-        "bav": {
-            row_name: {names.sign_name(s): int(bav[p][s]) for s in range(12)}
-            for p, row_name in enumerate(_ASHTAKAVARGA_ROWS)
-        },
-    }
+    def _bindu(v, what: str) -> int:
+        # Strict: these become authoritative cited facts. Reject bools, non-integral
+        # floats, and out-of-range values instead of silently coercing.
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or int(v) != v:
+            raise EngineOutputError(f"non-integral {what} bindu {v!r}")
+        return int(v)
+
+    sav_named = {names.sign_name(s): _bindu(sav[s], "SAV") for s in range(12)}
+    bav_named: dict[str, dict] = {}
+    for p, row_name in enumerate(_ASHTAKAVARGA_ROWS):
+        row: dict[str, int] = {}
+        for s in range(12):
+            b = _bindu(bav[p][s], f"BAV[{row_name}]")
+            if not 0 <= b <= 8:
+                raise EngineOutputError(f"BAV[{row_name}] bindu {b} outside 0..8")
+            row[names.sign_name(s)] = b
+        bav_named[row_name] = row
+    if sum(sav_named.values()) != 337:
+        raise EngineOutputError(
+            f"SAV total {sum(sav_named.values())} != 337 (classical invariant)"
+        )
+    return {"sav": sav_named, "bav": bav_named}
 
 
 def _houses(chart) -> list[dict]:
