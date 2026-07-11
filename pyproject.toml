@@ -32,6 +32,9 @@ dependencies = [
     "python-dateutil>=2.9,<3",
 ]
 
+[project.scripts]
+jyotish = "jyotish_agent.cli:entrypoint"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=8.3,<9",

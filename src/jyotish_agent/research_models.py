@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+import uuid
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -12,6 +13,7 @@ from .models import BirthTimeConfidence, CalculationConfigRequest
 
 _ID_RE = re.compile(r"^op_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 _RUN_ID_RE = re.compile(r"^rr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+_CLAIM_ID_PATTERN = r"^cl_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
 NumericLegacyOffset = Annotated[
     float,
     Field(ge=-12, le=14, allow_inf_nan=False),
@@ -192,3 +194,69 @@ class ResearchCalculationResponse(ResearchOperationResponse):
     provenance: dict
     warnings: list[str]
     evidence_ids: list[str]
+
+
+class ClaimBase(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    claim_id: str = Field(pattern=_CLAIM_ID_PATTERN)
+    materiality: Literal["major", "supporting"]
+    confidence: float = Field(ge=0, le=1, allow_inf_nan=False)
+    supports: list[str] = Field(min_length=1)
+    caveats: list[str] = Field(default_factory=list)
+    conflicts: list[str] = Field(default_factory=list)
+
+    @field_validator("claim_id")
+    @classmethod
+    def valid_claim_id(cls, value: str) -> str:
+        if not value.startswith("cl_"):
+            raise ValueError("claim_id must use the cl_ prefix")
+        try:
+            parsed = uuid.UUID(value[3:])
+        except ValueError as exc:
+            raise ValueError("claim_id must be a cl_ prefixed UUID4") from exc
+        if parsed.version != 4:
+            raise ValueError("claim_id must be a cl_ prefixed UUID4")
+        return value
+
+
+class ComputedClaim(ClaimBase):
+    claim_type: Literal["computed"]
+
+
+class SourceClaim(ClaimBase):
+    claim_type: Literal["source"]
+    text: str = Field(min_length=1, max_length=20_000)
+
+
+class SynthesisClaim(ClaimBase):
+    claim_type: Literal["synthesis"]
+    text: str = Field(min_length=1, max_length=20_000)
+
+
+ClaimV2 = Annotated[
+    ComputedClaim | SourceClaim | SynthesisClaim,
+    Field(discriminator="claim_type"),
+]
+
+
+class AnswerContractV2(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    schema_version: Literal["2.0"]
+    run_status: str = Field(min_length=1, max_length=100)
+    title: str = Field(min_length=1, max_length=500)
+    claims: list[ClaimV2] = Field(min_length=1)
+    limitations: list[str] = Field(default_factory=list)
+    followups: list[str] = Field(default_factory=list)
+
+
+class SubmitAnswerRequest(ResearchOperationRequest):
+    answer: AnswerContractV2
+
+
+class ResearchAnswerResponse(ResearchOperationResponse):
+    valid: bool
+    violations: list[str]
+    repair_remaining: int
+    answer_id: str | None = None
+    markdown: str | None = None
+    markdown_sha256: str | None = None

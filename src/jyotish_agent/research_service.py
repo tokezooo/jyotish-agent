@@ -10,6 +10,7 @@ from collections.abc import Callable
 from typing import Any
 
 from . import ENGINE, ENGINE_VERSION
+from .answer_contract import render_answer_markdown, validate_answer_contract
 from .interpretations import iter_fact_atoms, redirect_message, screen_question
 from .models import BirthProfileRequest, CalculationConfigRequest
 from .pyjhora_facade import compute_chart
@@ -17,10 +18,12 @@ from .research_models import (
     CreateResearchRunRequest,
     FixedOffsetLegacy,
     ResearchCalculationResponse,
+    ResearchAnswerResponse,
     ResearchEventsResponse,
     ResearchOperationRequest,
     ResearchRunResponse,
     ResearchScreenResponse,
+    SubmitAnswerRequest,
     TimezoneResolution,
 )
 from .research_store import ResearchStore, RunNotFound, canonical_json, new_id, sha256_text
@@ -227,6 +230,118 @@ class ResearchService:
             producer_version=ENGINE_VERSION,
         )
         return ResearchCalculationResponse(**self._operation_response(event, revision))
+
+    def submit_answer(
+        self, run_id: str, request: SubmitAnswerRequest
+    ) -> ResearchAnswerResponse:
+        request_payload = {"answer": request.answer.model_dump(mode="json")}
+        prior = self.store.get_operation_result(
+            operation_id=request.operation_id,
+            run_id=run_id,
+            expected_revision=request.expected_revision,
+            event_type="research_run.answer_submitted",
+            request_payload=request_payload,
+            producer="jyotish-agent",
+            producer_version=ENGINE_VERSION,
+        )
+        if prior is not None:
+            event, revision = prior
+            return ResearchAnswerResponse(**self._operation_response(event, revision))
+
+        run = self._require_run(run_id)
+        if run["status"] not in {"calculated", "answer_needs_repair"}:
+            raise InvalidRunTransition(
+                "answers require a calculated run with repair budget remaining"
+            )
+        if run["revision"] != request.expected_revision:
+            raise InvalidRunTransition("expected revision does not match current revision")
+        prior_attempts = self.store.list_answer_attempts(run_id)
+        if len(prior_attempts) >= 2:
+            raise InvalidRunTransition("answer repair budget is exhausted")
+
+        evidence = self.store.list_evidence(run_id)
+        violations = []
+        if request.answer.run_status != run["status"]:
+            violations.append("answer run_status does not match authoritative run status")
+        violations.extend(validate_answer_contract(request.answer, evidence))
+        violations = list(dict.fromkeys(violations))
+        valid = not violations
+        attempt_no = len(prior_attempts) + 1
+        repair_remaining = max(0, 2 - attempt_no)
+        answer_id = new_id("ans_") if valid else None
+        rendered = render_answer_markdown(request.answer, evidence) if valid else None
+        status = (
+            "validated"
+            if valid
+            else "answer_needs_repair"
+            if repair_remaining
+            else "answer_repair_exhausted"
+        )
+        result = {
+            "run_id": run_id,
+            "operation_id": request.operation_id,
+            "status": status,
+            "valid": valid,
+            "violations": violations,
+            "repair_remaining": repair_remaining,
+            "answer_id": answer_id,
+            "markdown": rendered.markdown if rendered else None,
+            "markdown_sha256": rendered.sha256 if rendered else None,
+        }
+        contract_payload = request.answer.model_dump(mode="json")
+        answer_record = None
+        claim_records = []
+        claim_supports = []
+        if valid and answer_id and rendered:
+            answer_record = {
+                "answer_id": answer_id,
+                "schema_version": request.answer.schema_version,
+                "payload": {
+                    "contract": contract_payload,
+                    "markdown": rendered.markdown,
+                    "markdown_sha256": rendered.sha256,
+                },
+            }
+            for claim in request.answer.claims:
+                claim_records.append(
+                    {
+                        "claim_id": claim.claim_id,
+                        "claim_type": claim.claim_type,
+                        "payload": claim.model_dump(mode="json"),
+                    }
+                )
+                if claim.claim_type in {"computed", "source"}:
+                    claim_supports.extend(
+                        {
+                            "claim_id": claim.claim_id,
+                            "evidence_id": support,
+                            "support_type": claim.claim_type,
+                        }
+                        for support in claim.supports
+                    )
+        event, revision = self.store.append_event(
+            run_id,
+            operation_id=request.operation_id,
+            expected_revision=request.expected_revision,
+            event_type="research_run.answer_submitted",
+            payload={"status": status, "result": result},
+            request_payload=request_payload,
+            next_status=status,
+            answer_attempt={
+                "attempt_id": request.operation_id,
+                "attempt_no": attempt_no,
+                "contract_hash": sha256_text(canonical_json(contract_payload)),
+                "valid": valid,
+                "violations": violations,
+                "answer_id": answer_id,
+            },
+            answer_record=answer_record,
+            claim_records=claim_records,
+            claim_supports=claim_supports,
+            producer="jyotish-agent",
+            producer_version=ENGINE_VERSION,
+        )
+        return ResearchAnswerResponse(**self._operation_response(event, revision))
 
     def _prior_operation(
         self,

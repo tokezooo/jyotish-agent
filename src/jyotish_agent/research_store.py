@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 DATABASE_NAME = "research.sqlite3"
 
 
@@ -186,7 +186,39 @@ CREATE TRIGGER evidence_items_no_delete
 BEFORE DELETE ON evidence_items BEGIN SELECT RAISE(ABORT, 'evidence_items are append-only'); END;
 """
 
-_MIGRATIONS: dict[int, str] = {1: _MIGRATION_1, 2: _MIGRATION_2}
+_MIGRATION_3 = """
+CREATE TABLE answer_attempts (
+    attempt_id TEXT PRIMARY KEY,
+    operation_id TEXT NOT NULL UNIQUE REFERENCES operations(operation_id),
+    run_id TEXT NOT NULL REFERENCES research_runs(run_id) ON DELETE CASCADE,
+    attempt_no INTEGER NOT NULL CHECK (attempt_no IN (1, 2)),
+    contract_hash TEXT NOT NULL,
+    valid INTEGER NOT NULL CHECK (valid IN (0, 1)),
+    violations_json TEXT NOT NULL,
+    answer_id TEXT REFERENCES answers(answer_id),
+    created_at TEXT NOT NULL,
+    UNIQUE (run_id, attempt_no)
+);
+
+CREATE TRIGGER answers_no_update
+BEFORE UPDATE ON answers BEGIN SELECT RAISE(ABORT, 'answers are append-only'); END;
+CREATE TRIGGER answers_no_delete
+BEFORE DELETE ON answers BEGIN SELECT RAISE(ABORT, 'answers are append-only'); END;
+CREATE TRIGGER answer_attempts_no_update
+BEFORE UPDATE ON answer_attempts BEGIN SELECT RAISE(ABORT, 'answer_attempts are append-only'); END;
+CREATE TRIGGER answer_attempts_no_delete
+BEFORE DELETE ON answer_attempts BEGIN SELECT RAISE(ABORT, 'answer_attempts are append-only'); END;
+CREATE TRIGGER claims_no_update
+BEFORE UPDATE ON claims BEGIN SELECT RAISE(ABORT, 'claims are append-only'); END;
+CREATE TRIGGER claims_no_delete
+BEFORE DELETE ON claims BEGIN SELECT RAISE(ABORT, 'claims are append-only'); END;
+"""
+
+_MIGRATIONS: dict[int, str] = {
+    1: _MIGRATION_1,
+    2: _MIGRATION_2,
+    3: _MIGRATION_3,
+}
 
 
 def _event_envelope(event: Mapping[str, Any]) -> dict[str, Any]:
@@ -404,6 +436,10 @@ class ResearchStore:
         request_payload: Mapping[str, Any] | None = None,
         next_status: str | None = None,
         evidence_items: Iterable[Mapping[str, Any]] = (),
+        answer_attempt: Mapping[str, Any] | None = None,
+        answer_record: Mapping[str, Any] | None = None,
+        claim_records: Iterable[Mapping[str, Any]] = (),
+        claim_supports: Iterable[Mapping[str, str]] = (),
     ) -> tuple[dict[str, Any], int]:
         payload_json = canonical_json(payload)
         semantic_payload = (
@@ -420,6 +456,8 @@ class ResearchStore:
             producer_version=producer_version,
         )
         evidence_rows = [dict(item) for item in evidence_items]
+        claims = [dict(item) for item in claim_records]
+        supports = [dict(item) for item in claim_supports]
         connection = self._ready_connection()
         try:
             connection.execute("BEGIN IMMEDIATE")
@@ -479,6 +517,67 @@ class ResearchStore:
                         item["evidence_type"],
                         evidence_payload,
                         sha256_text(evidence_payload),
+                        now,
+                    ),
+                )
+            if answer_record is not None:
+                answer_payload = canonical_json(answer_record["payload"])
+                connection.execute(
+                    """INSERT INTO answers (
+                        answer_id, run_id, schema_version, payload_json,
+                        payload_hash, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        answer_record["answer_id"],
+                        run_id,
+                        answer_record["schema_version"],
+                        answer_payload,
+                        sha256_text(answer_payload),
+                        now,
+                    ),
+                )
+                for claim in claims:
+                    claim_payload = canonical_json(claim["payload"])
+                    connection.execute(
+                        """INSERT INTO claims (
+                            claim_id, run_id, claim_type, payload_json,
+                            payload_hash, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?)""",
+                        (
+                            claim["claim_id"],
+                            run_id,
+                            claim["claim_type"],
+                            claim_payload,
+                            sha256_text(claim_payload),
+                            now,
+                        ),
+                    )
+                for support in supports:
+                    connection.execute(
+                        """INSERT INTO claim_supports (
+                            claim_id, evidence_id, support_type
+                        ) VALUES (?, ?, ?)""",
+                        (
+                            support["claim_id"],
+                            support["evidence_id"],
+                            support["support_type"],
+                        ),
+                    )
+            if answer_attempt is not None:
+                connection.execute(
+                    """INSERT INTO answer_attempts (
+                        attempt_id, operation_id, run_id, attempt_no,
+                        contract_hash, valid, violations_json, answer_id, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        answer_attempt["attempt_id"],
+                        operation_id,
+                        run_id,
+                        answer_attempt["attempt_no"],
+                        answer_attempt["contract_hash"],
+                        int(answer_attempt["valid"]),
+                        canonical_json(answer_attempt["violations"]),
+                        answer_attempt.get("answer_id"),
                         now,
                     ),
                 )
@@ -648,6 +747,40 @@ class ResearchStore:
             for row in rows:
                 item = dict(row)
                 item["payload"] = json.loads(item.pop("payload_json"))
+                result.append(item)
+            return result
+        finally:
+            connection.close()
+
+    def list_answers(self, run_id: str) -> list[dict[str, Any]]:
+        connection = self._ready_connection()
+        try:
+            rows = connection.execute(
+                "SELECT * FROM answers WHERE run_id=? ORDER BY created_at, answer_id",
+                (run_id,),
+            ).fetchall()
+            result = []
+            for row in rows:
+                item = dict(row)
+                item["payload"] = json.loads(item.pop("payload_json"))
+                result.append(item)
+            return result
+        finally:
+            connection.close()
+
+    def list_answer_attempts(self, run_id: str) -> list[dict[str, Any]]:
+        connection = self._ready_connection()
+        try:
+            rows = connection.execute(
+                """SELECT * FROM answer_attempts
+                   WHERE run_id=? ORDER BY attempt_no""",
+                (run_id,),
+            ).fetchall()
+            result = []
+            for row in rows:
+                item = dict(row)
+                item["valid"] = bool(item["valid"])
+                item["violations"] = json.loads(item.pop("violations_json"))
                 result.append(item)
             return result
         finally:

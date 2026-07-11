@@ -101,6 +101,53 @@ const ConfigSchema = Type.Object(
   NO_EXTRA,
 );
 
+const ClaimCommon = {
+  claim_id: Type.String({
+    pattern: "^cl_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+  }),
+  materiality: StringEnum(["major", "supporting"] as const),
+  confidence: Type.Number({ minimum: 0, maximum: 1 }),
+  supports: Type.Array(Type.String(), { minItems: 1 }),
+  caveats: Type.Optional(Type.Array(Type.String())),
+  conflicts: Type.Optional(Type.Array(Type.String())),
+};
+
+const ComputedClaimSchema = Type.Object(
+  { claim_type: Type.Literal("computed"), ...ClaimCommon },
+  NO_EXTRA,
+);
+const SourceClaimSchema = Type.Object(
+  {
+    claim_type: Type.Literal("source"),
+    ...ClaimCommon,
+    text: Type.String({ minLength: 1, maxLength: 20_000 }),
+  },
+  NO_EXTRA,
+);
+const SynthesisClaimSchema = Type.Object(
+  {
+    claim_type: Type.Literal("synthesis"),
+    ...ClaimCommon,
+    text: Type.String({ minLength: 1, maxLength: 20_000 }),
+  },
+  NO_EXTRA,
+);
+
+export const AnswerContractV2Schema = Type.Object(
+  {
+    schema_version: Type.Literal("2.0"),
+    run_status: Type.String({ minLength: 1, maxLength: 100 }),
+    title: Type.String({ minLength: 1, maxLength: 500 }),
+    claims: Type.Array(
+      Type.Union([ComputedClaimSchema, SourceClaimSchema, SynthesisClaimSchema]),
+      { minItems: 1 },
+    ),
+    limitations: Type.Optional(Type.Array(Type.String())),
+    followups: Type.Optional(Type.Array(Type.String())),
+  },
+  NO_EXTRA,
+);
+
 // --- pure helpers (unit-tested in jyotish.test.ts) ----------------------------
 
 interface Problem {
@@ -385,6 +432,7 @@ const STATE_ADVANCING_TOOLS = new Set([
   "jyotish_create_research_run",
   "jyotish_screen_research_run",
   "jyotish_calculate_research_run",
+  "jyotish_submit_answer",
 ]);
 const ZERO_EVENT_HASH = "0".repeat(64);
 
@@ -498,6 +546,7 @@ export class ResearchRuntime {
   private messageLeafId?: string;
   private incomplete = false;
   private refusalText?: string;
+  private validatedMarkdown?: string;
   private capabilityFailure?: string;
 
   restore(entries: readonly unknown[]): void {
@@ -510,6 +559,7 @@ export class ResearchRuntime {
     this.messageLeafId = undefined;
     this.incomplete = false;
     this.refusalText = undefined;
+    this.validatedMarkdown = undefined;
     for (const raw of entries) {
       if (typeof raw !== "object" || raw === null) continue;
       const entry = raw as Record<string, unknown>;
@@ -688,6 +738,16 @@ export class ResearchRuntime {
           return { block: true, reason: "Calculation requires a safely screened run." };
         }
       }
+      if (
+        toolName === "jyotish_submit_answer" &&
+        this.current.status !== "calculated" &&
+        this.current.status !== "answer_needs_repair"
+      ) {
+        return {
+          block: true,
+          reason: "Answer submission requires calculated state and remaining repair budget.",
+        };
+      }
     }
     const reservation: ResearchMirror = {
       run_id: parsed.runId,
@@ -736,6 +796,11 @@ export class ResearchRuntime {
       append({ ...reservation.prior, operation_id: reservation.mirror.operation_id, status: "operation_failed" });
     } else {
       this.current = result;
+      const detailRecord = details as Record<string, unknown>;
+      this.validatedMarkdown =
+        result.status === "validated" && typeof detailRecord.markdown === "string"
+          ? detailRecord.markdown
+          : undefined;
       if (
         result.status === "refused_unsafe" &&
         typeof (details as Record<string, unknown>).redirect === "string"
@@ -810,6 +875,18 @@ export class ResearchRuntime {
         }
       }
     }
+    if (mirror.status === "validated") {
+      const payload = latest.payload;
+      if (typeof payload === "object" && payload !== null) {
+        const result = (payload as Record<string, unknown>).result;
+        this.validatedMarkdown =
+          typeof result === "object" &&
+          result !== null &&
+          typeof (result as Record<string, unknown>).markdown === "string"
+            ? ((result as Record<string, unknown>).markdown as string)
+            : undefined;
+      }
+    }
     const reservations = [...this.pending.values()];
     const matchingReservation = reservations.some(
       (reservation) => reservation.mirror.operation_id === latest.operation_id,
@@ -851,21 +928,21 @@ export class ResearchRuntime {
   gateFinalMessage<T extends { role: string; content?: unknown }>(message: T): T | undefined {
     if (message.role !== "assistant") return undefined;
     const state = this.snapshot();
-    if (
-      !this.capabilityFailure &&
-      !this.incomplete &&
-      (!state || (state.status === "validated" && !state.needs_reconciliation))
-    ) {
-      return undefined;
-    }
+    if (!this.capabilityFailure && !this.incomplete && !state) return undefined;
     if (!Array.isArray(message.content)) return undefined;
     const content = message.content as Array<{ type?: string; text?: string }>;
     if (content.some((item) => item.type === "toolCall")) return undefined;
     if (!content.some((item) => item.type === "text" && item.text?.trim())) return undefined;
     const text =
-      state?.status === "refused_unsafe" && !state.needs_reconciliation && this.refusalText
-        ? this.refusalText
-        : FAIL_CLOSED_TEXT;
+      state?.status === "validated" &&
+      !state.needs_reconciliation &&
+      this.validatedMarkdown
+        ? this.validatedMarkdown
+        : state?.status === "refused_unsafe" &&
+            !state.needs_reconciliation &&
+            this.refusalText
+          ? this.refusalText
+          : FAIL_CLOSED_TEXT;
     return { ...message, content: [{ type: "text", text }] } as T;
   }
 }
@@ -1081,6 +1158,52 @@ export default function (pi: ExtensionAPI) {
           { type: "text", text: `Summary (rounded; cite the JSON below):\n${summarizeChart(response)}` },
           { type: "text", text: JSON.stringify(body, null, 2) },
         ],
+        details: body as Record<string, unknown>,
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "jyotish_submit_answer",
+    label: "Submit canonical research answer",
+    description:
+      "Submit AnswerContract v2 to the authoritative backend. The backend validates " +
+      "the claim DAG and returns the only Markdown permitted as the final answer.",
+    parameters: Type.Object(
+      {
+        run_id: Type.String({
+          pattern: "^rr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        }),
+        operation_id: Type.String({
+          pattern: "^op_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        }),
+        expected_revision: Type.Integer({ minimum: 1 }),
+        answer: AnswerContractV2Schema,
+      },
+      NO_EXTRA,
+    ),
+    async execute(_toolCallId, params, signal) {
+      const { run_id, ...payload } = params;
+      const { ok, status, body } = await postJson(
+        `/v2/research-runs/${encodeURIComponent(run_id)}/answers`,
+        payload,
+        signal,
+      );
+      if (!ok) {
+        return { content: [{ type: "text", text: formatProblem(status, body) }], details: {} };
+      }
+      const result = body as {
+        valid?: boolean;
+        violations?: string[];
+        repair_remaining?: number;
+      };
+      const text = result.valid
+        ? "Answer accepted. The final message will be replaced by backend canonical Markdown."
+        : `ANSWER REJECTED (${result.repair_remaining ?? 0} repair remaining):\n- ${(
+            result.violations ?? []
+          ).join("\n- ")}`;
+      return {
+        content: [{ type: "text", text }],
         details: body as Record<string, unknown>,
       };
     },

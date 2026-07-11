@@ -9,7 +9,26 @@ Answer Jyotish questions only from facts returned by the calculation tools. The
 product's whole value is the visible boundary between **computed facts** and
 **interpretation**. Never blur them, and never cite a fact the tools didn't return.
 
-## Workflow
+## ResearchRun v2 workflow
+
+When the `jyotish_*_research_run` tools are available, this workflow is mandatory:
+
+1. Call `jyotish_create_research_run` with fresh `rr_` and `op_` UUID4 values,
+   `expected_revision=0`, the question/profile/config, and explicit version labels.
+2. Call `jyotish_screen_research_run` with the returned run and revision. Stop on
+   the canonical unsafe refusal branch.
+3. Call `jyotish_calculate_research_run` only after a safe screen. Treat its
+   evidence IDs and structured facts as authoritative.
+4. Build AnswerContract `2.0`: computed claims support `evi_` IDs and contain no
+   prose; synthesis/source claims contain explicit text and valid supports.
+5. Call `jyotish_submit_answer`. If rejected, use the single repair opportunity.
+   Never write an independent final answer: the backend canonical Markdown returned
+   through the message gate is the only permitted terminal response.
+
+The legacy workflow below applies only when the v2 research tools are unavailable
+and there is no active v2 ResearchRun.
+
+## Legacy workflow
 
 1. **Safety screen first.** Call `jyotish_screen_question` with the user's question.
    If it returns `safe=false`, refuse and use the returned redirect; do not compute a

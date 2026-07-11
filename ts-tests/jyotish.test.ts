@@ -3,6 +3,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { Value } from "typebox/value";
 
 import {
+  AnswerContractV2Schema,
   BirthProfileSchema,
   FAIL_CLOSED_TEXT,
   RESEARCH_MIRROR_TYPE,
@@ -125,6 +126,41 @@ describe("BirthProfileSchema (drift guard vs Pydantic)", () => {
       Value.Check(BirthProfileSchema, { ...valid, birth_time_confidence: "guess" }),
     ).toBe(false);
     expect(Value.Check(BirthProfileSchema, { ...valid, extra: "x" })).toBe(false);
+  });
+});
+
+describe("AnswerContractV2Schema (drift guard vs OpenAPI)", () => {
+  const computedClaim = {
+    claim_type: "computed",
+    claim_id: "cl_11111111-1111-4111-8111-111111111111",
+    materiality: "major",
+    confidence: 0.9,
+    supports: ["evi_11111111-1111-4111-8111-111111111111"],
+    caveats: [],
+    conflicts: [],
+  };
+  const valid = {
+    schema_version: "2.0",
+    run_status: "calculated",
+    title: "Canonical memo",
+    claims: [computedClaim],
+    limitations: [],
+    followups: [],
+  };
+
+  test("accepts the OpenAPI v2 field contract", () => {
+    expect(Value.Check(AnswerContractV2Schema, valid)).toBe(true);
+  });
+
+  test("rejects unknown schema, claim discriminator, and extra fields", () => {
+    expect(Value.Check(AnswerContractV2Schema, { ...valid, schema_version: "3.0" })).toBe(false);
+    expect(
+      Value.Check(AnswerContractV2Schema, {
+        ...valid,
+        claims: [{ ...computedClaim, claim_type: "invented" }],
+      }),
+    ).toBe(false);
+    expect(Value.Check(AnswerContractV2Schema, { ...valid, extra: true })).toBe(false);
   });
 });
 
@@ -640,13 +676,76 @@ describe("ResearchRuntime", () => {
     expect(replacement?.content).toEqual([{ type: "text", text: FAIL_CLOSED_TEXT }]);
 
     runtime.restore([mirror("validated", calculateOp, 4, hash2)]);
-    expect(runtime.gateFinalMessage(message)).toBeUndefined();
+    expect(runtime.gateFinalMessage(message)?.content).toEqual([
+      { type: "text", text: FAIL_CLOSED_TEXT },
+    ]);
     expect(
       runtime.gateFinalMessage({
         role: "assistant",
         content: [{ type: "toolCall", id: "x", name: "tool", arguments: {} }],
       }),
     ).toBeUndefined();
+  });
+
+  test("submit answer replaces terminal prose with backend canonical markdown", () => {
+    const submitOp = "op_44444444-4444-4444-8444-444444444444";
+    const runtime = new ResearchRuntime();
+    runtime.restore([mirror("calculated", calculateOp, 3, hash2)]);
+    runtime.beginAssistantMessage("submit-leaf");
+    expect(
+      runtime.reserve(
+        "submit-call",
+        "jyotish_submit_answer",
+        { run_id: runId, operation_id: submitOp, expected_revision: 3, answer: {} },
+        () => {},
+      ),
+    ).toBeUndefined();
+    runtime.settle(
+      "submit-call",
+      false,
+      {
+        run_id: runId,
+        operation_id: submitOp,
+        backend_seq: 4,
+        event_hash: hash1,
+        status: "validated",
+        valid: true,
+        markdown: "# Canonical backend memo\n",
+        markdown_sha256: "c".repeat(64),
+      },
+      () => {},
+    );
+    const replacement = runtime.gateFinalMessage({
+      role: "assistant",
+      content: [{ type: "text", text: "agent-authored draft must not escape" }],
+    });
+    expect(replacement?.content).toEqual([
+      { type: "text", text: "# Canonical backend memo\n" },
+    ]);
+  });
+
+  test("reconciliation restores canonical validated markdown without a mirror payload", () => {
+    const submitOp = "op_44444444-4444-4444-8444-444444444444";
+    const runtime = new ResearchRuntime();
+    runtime.restore([mirror("validated", submitOp, 4, hash1)]);
+    runtime.reconcile(
+      { run_id: runId, status: "validated", revision: 4 },
+      [
+        {
+          seq: 4,
+          operation_id: submitOp,
+          event_hash: hash1,
+          payload: { result: { markdown: "# Restored canonical memo\n" } },
+        },
+      ],
+      () => {},
+    );
+    expect(
+      runtime.gateFinalMessage({
+        role: "assistant",
+        content: [{ type: "text", text: "draft" }],
+      })?.content,
+    ).toEqual([{ type: "text", text: "# Restored canonical memo\n" }]);
   });
 
   test("unsafe final prose is replaced by the canonical backend refusal", () => {
@@ -716,6 +815,7 @@ describe("ResearchRuntime", () => {
     expect(tools).toContain("jyotish_create_research_run");
     expect(tools).toContain("jyotish_screen_research_run");
     expect(tools).toContain("jyotish_calculate_research_run");
+    expect(tools).toContain("jyotish_submit_answer");
 
     await handlers.get("session_start")?.[0]?.({ type: "session_start" }, context);
     await handlers.get("message_start")?.[0]?.(

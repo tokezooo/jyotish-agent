@@ -35,10 +35,12 @@ from .pyjhora_facade import compute_chart
 from .research_models import (
     CreateResearchRunRequest,
     ResearchCalculationResponse,
+    ResearchAnswerResponse,
     ResearchEventsResponse,
     ResearchOperationRequest,
     ResearchRunResponse,
     ResearchScreenResponse,
+    SubmitAnswerRequest,
 )
 from .research_service import InvalidRunTransition, ResearchService, UnsupportedTimezoneMode
 from .research_store import (
@@ -202,6 +204,30 @@ async def calculate_research_run(
         )
     except ConfigError as exc:
         raise CalculationError(str(exc)) from exc
+
+
+@app.post(
+    "/v2/research-runs/{run_id}/answers", response_model=ResearchAnswerResponse
+)
+async def submit_research_answer(
+    run_id: str, req: SubmitAnswerRequest, request: Request
+) -> ResearchAnswerResponse | JSONResponse:
+    try:
+        return _research_service(request).submit_answer(run_id, req)
+    except RunNotFound:
+        return _research_problem(
+            404,
+            "Research run not found",
+            "No persisted research run has that ID.",
+            "Check the rr_ run ID and retry.",
+        )
+    except (OptimisticConflict, InvalidRunTransition):
+        return _research_problem(
+            409,
+            "Research answer conflict",
+            "The answer is stale, changed under a reused operation ID, or the repair budget is exhausted.",
+            "Refresh the run and retry once with the current revision and a fresh operation ID.",
+        )
 
 
 @app.post("/birth-profiles/validate", response_model=ValidateResponse)
