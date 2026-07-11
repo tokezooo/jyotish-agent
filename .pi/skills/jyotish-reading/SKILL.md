@@ -113,9 +113,13 @@ stands: back every factual claim in `summary` with an entry in `facts_used`.
   verified geometric tier (`yogas.<Name>.present`), the verified tier WINS: surface
   any strings in `facts.yogas_engine.mismatches` under `uncertainty` and side with
   `facts.yogas`.
-- `varshaphal.lagna.sign`, `varshaphal.<Planet>.sign`, `varshaphal.munthi.sign`,
+- `varshaphal.lagna.sign`, `varshaphal.lagna.degrees`, `varshaphal.<Planet>.sign`,
+  `varshaphal.<Planet>.degrees`, `varshaphal.munthi.sign`,
   and `varshaphal.pravesh` — the Tajaka varshaphal, i.e. the Vedic ANNUAL
-  (solar-return) chart active at the reference date. Request via
+  (solar-return) chart active at the reference date. Year selection is anchored at
+  LOCAL NOON of the reference date: on the pravesh day itself, a return later that
+  day means the PREVIOUS year's chart is still reported — check
+  `varshaphal.pravesh` for the exact moment when that matters. Request via
   `config.modules: ["varshaphal"]` (with `config.reference_date`) for "what does
   this year hold" questions. This is NOT Western progressions — call it the
   annual/varshaphal chart. The chart is valid pravesh-to-pravesh (from the solar

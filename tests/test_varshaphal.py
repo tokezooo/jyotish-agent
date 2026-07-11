@@ -91,7 +91,7 @@ def test_pravesh_boundary_both_sides():
 
 
 def test_reference_before_birth_rejected():
-    with pytest.raises(ConfigError, match="before the birth"):
+    with pytest.raises(ConfigError, match="before birth"):
         _compute(reference=(1989, 6, 1))
 
 
@@ -164,3 +164,52 @@ def test_no_varshaphal_atoms_without_module():
 def test_config_echoes_modules():
     out = _compute()
     assert out["calculation_config"]["modules"] == ["varshaphal"]
+
+
+def test_reference_on_birth_date_is_valid_for_afternoon_birth():
+    # Birth 12:30 local; ref_jd anchors at noon (< birth moment). The birth DATE is
+    # still a valid reference: date-level guard + clamp must yield age_year 1.
+    out = compute_chart(
+        _PROFILE, reference_date=(1990, 1, 1), config=CalculationConfig(modules=("varshaphal",))
+    )
+    v = out["facts"]["varshaphal"]
+    assert v["age_year"] == 1
+    # pravesh of year 1 IS the birth moment.
+    assert v["pravesh"].startswith("1990-01-01T12:30")
+
+
+def test_exact_pravesh_moment_selects_new_year():
+    # Half-open [pravesh(n), pravesh(n+1)): ref_jd exactly AT a pravesh belongs to
+    # the NEW year. Only reachable at unit level (API refs are noon-anchored).
+    import warnings
+
+    from jhora import utils
+    from jhora.panchanga import drik
+
+    import jyotish_agent.pyjhora_facade as facade
+    from jyotish_agent.config import apply_config
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        apply_config(CalculationConfig())
+        place = drik.Place("Chennai", 13.0827, 80.2707, 5.5)
+        jd = utils.julian_day_number((1990, 1, 1), (12, 30, 0))
+        p37 = drik.next_solar_date(jd, place, years=37)
+        natal_lagna = facade._lagna_sign(
+            __import__("jhora.horoscope.chart.charts", fromlist=["charts"]).rasi_chart(jd, place)
+        )
+        out = facade._varshaphal(
+            jd, place, p37, natal_lagna,
+            birth_date=(1990, 1, 1), reference_date=(2026, 1, 1),
+        )
+    assert out["age_year"] == 37
+
+
+def test_varshaphal_degrees_atoms_citable():
+    facts = compute_chart(
+        _PROFILE, reference_date=_REFERENCE, config=CalculationConfig(modules=("varshaphal",))
+    )["facts"]
+    atoms = iter_fact_atoms(facts)
+    v = facts["varshaphal"]
+    assert atoms["varshaphal.lagna.degrees"] == str(v["lagna"]["degrees"])
+    assert atoms["varshaphal.Sun.degrees"] == str(v["planets"]["Sun"]["degrees"])

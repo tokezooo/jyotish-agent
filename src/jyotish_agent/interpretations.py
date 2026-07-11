@@ -159,14 +159,23 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
         if varshaphal.get("pravesh") is not None:
             atoms["varshaphal.pravesh"] = str(varshaphal["pravesh"])
         lagna = varshaphal.get("lagna")
-        if isinstance(lagna, dict) and lagna.get("sign") is not None:
-            atoms["varshaphal.lagna.sign"] = str(lagna["sign"])
+        if isinstance(lagna, dict):
+            if lagna.get("sign") is not None:
+                atoms["varshaphal.lagna.sign"] = str(lagna["sign"])
+            if lagna.get("degrees") is not None:
+                atoms["varshaphal.lagna.degrees"] = str(lagna["degrees"])
         munthi = varshaphal.get("munthi")
         if isinstance(munthi, dict) and munthi.get("sign") is not None:
             atoms["varshaphal.munthi.sign"] = str(munthi["sign"])
         for planet, info in (varshaphal.get("planets") or {}).items():
-            if isinstance(info, dict) and info.get("sign") is not None:
+            if not isinstance(info, dict):
+                continue
+            if info.get("sign") is not None:
                 atoms[f"varshaphal.{planet}.sign"] = str(info["sign"])
+            # degrees citable, matching the project-wide convention (ascendant,
+            # d<N> placements, transits all atomize degrees).
+            if info.get("degrees") is not None:
+                atoms[f"varshaphal.{planet}.degrees"] = str(info["degrees"])
 
     # Yogas: yogas.<Name>.present = "true"/"false"
     yogas = facts.get("yogas")

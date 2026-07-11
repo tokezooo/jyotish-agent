@@ -409,12 +409,18 @@ def _varshaphal(jd, place, ref_jd, natal_lagna_sign: int,
     from jhora.horoscope.transit import tajaka
     from jhora.panchanga import drik
 
-    if ref_jd < jd:
+    # Date-level guard: ref_jd is anchored at local NOON, so comparing raw JDs
+    # would reject reference_date == birth date for afternoon births (noon < 12:30).
+    # The birth DATE itself is always a valid reference; clamp the bracketing input
+    # to the birth moment so pravesh(1) (= the birth jd) still satisfies the
+    # half-open [pravesh(n), pravesh(n+1)) invariant.
+    if tuple(reference_date) < tuple(birth_date):
         raise ConfigError(
-            "reference_date is before the birth moment; varshaphal (the annual "
-            "solar-return chart) is undefined before birth. Use a reference_date "
-            "on or after the birth date."
+            "reference_date is before birth; varshaphal (the annual solar-return "
+            "chart) is undefined before birth. Use a reference_date on or after "
+            "the birth date."
         )
+    ref_jd = max(ref_jd, jd)
 
     def pravesh_jd(n: int) -> float:
         # The engine works in local-frame JDs throughout (julian_day_number takes

@@ -498,7 +498,7 @@ def test_varshaphal_reference_before_birth_returns_422():
     )
     assert r.status_code == 422
     assert r.headers["content-type"].startswith("application/problem+json")
-    assert "before the birth" in r.json()["problem"]
+    assert "before birth" in r.json()["problem"]
 
 
 @requires_engine
