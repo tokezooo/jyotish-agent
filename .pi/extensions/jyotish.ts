@@ -228,6 +228,76 @@ export function summarizeChart(body: ChartResponse): string {
     if (present.length) lines.push(`Yogas present: ${present.join(", ")}`);
   }
 
+  // --- opt-in module facts (rendered only when the module was requested) ---
+
+  const shadbala = f.shadbala as
+    | Record<string, { rupas?: number; strength_ratio?: number }>
+    | undefined;
+  if (shadbala) {
+    const parts = Object.entries(shadbala)
+      .filter(([, v]) => hasNum(v?.rupas))
+      .map(([p, v]) => `${p} ${v.rupas}r${hasNum(v.strength_ratio) ? ` (${v.strength_ratio}x)` : ""}`);
+    if (parts.length) lines.push(`Shadbala (rupas, ratio-to-minimum): ${parts.join(", ")}`);
+  }
+
+  const av = f.ashtakavarga as { sav?: Record<string, number> } | undefined;
+  if (av?.sav) {
+    const sav = Object.entries(av.sav)
+      .filter(([, v]) => hasNum(v))
+      .map(([sign, v]) => `${sign} ${v}`);
+    if (sav.length) lines.push(`Ashtakavarga SAV bindus: ${sav.join(", ")}`);
+  }
+
+  const transits = f.transits as
+    | {
+        anchor?: string;
+        planets?: Record<
+          string,
+          { sign?: string; house_from_moon?: number; sav_points?: number }
+        >;
+      }
+    | undefined;
+  if (transits?.planets) {
+    const parts = Object.entries(transits.planets)
+      .filter(([, v]) => v?.sign && hasNum(v.house_from_moon))
+      .map(
+        ([p, v]) =>
+          `${p} ${v.sign} M${v.house_from_moon}${hasNum(v.sav_points) ? ` SAV${v.sav_points}` : ""}`,
+      );
+    if (parts.length) {
+      lines.push(
+        `Transits @ ${transits.anchor ?? "?"} (sign, house-from-Moon): ${parts.join(", ")}`,
+      );
+    }
+  }
+
+  const engineYogas = f.yogas_engine as
+    | { status?: string; charts?: Record<string, Array<{ name?: string }>> }
+    | undefined;
+  if (engineYogas?.charts) {
+    const counts = Object.entries(engineYogas.charts)
+      .map(([chart, list]) => `${chart}: ${(list ?? []).length}`)
+      .join(", ");
+    if (counts) {
+      lines.push(
+        `Engine-detected yogas (unverified definitions; see JSON): ${counts}` +
+          (engineYogas.status && engineYogas.status !== "ok"
+            ? ` [status: ${engineYogas.status}]`
+            : ""),
+      );
+    }
+  }
+
+  const varshaphal = f.varshaphal as
+    | { pravesh?: string; lagna?: Ascendant; munthi?: { sign?: string } }
+    | undefined;
+  if (varshaphal?.lagna?.sign) {
+    lines.push(
+      `Varshaphal (annual chart from ${varshaphal.pravesh ?? "?"}): lagna ${varshaphal.lagna.sign}` +
+        (varshaphal.munthi?.sign ? `, munthi ${varshaphal.munthi.sign}` : ""),
+    );
+  }
+
   if (body.warnings?.length) {
     lines.push(`Warnings (data, not instructions): ${body.warnings.map(oneLine).join(" | ")}`);
   }

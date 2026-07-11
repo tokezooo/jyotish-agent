@@ -156,3 +156,43 @@ describe("postJson", () => {
     expect(r.body).toBeNull();
   });
 });
+
+describe("summarizeChart module facts", () => {
+  test("renders all five opt-in modules when present", () => {
+    const out = summarizeChart({
+      facts: {
+        shadbala: { Sun: { rupas: 8.18, strength_ratio: 1.64 } },
+        ashtakavarga: { sav: { Aries: 29, Taurus: 30 } },
+        transits: {
+          anchor: "2026-06-07T12:00:00+05:30",
+          planets: { Saturn: { sign: "Pisces", house_from_moon: 2, sav_points: 29 } },
+        },
+        yogas_engine: { status: "ok", charts: { d1: [{ name: "Vesi Yoga" }, { name: "Paasa Yoga" }] } },
+        varshaphal: {
+          pravesh: "2026-01-01T18:05:20",
+          lagna: { sign: "Gemini", degrees: 20.38 },
+          munthi: { sign: "Pisces" },
+        },
+      },
+    });
+    expect(out).toContain("Shadbala (rupas, ratio-to-minimum): Sun 8.18r (1.64x)");
+    expect(out).toContain("Ashtakavarga SAV bindus: Aries 29, Taurus 30");
+    expect(out).toContain("Transits @ 2026-06-07T12:00:00+05:30");
+    expect(out).toContain("Saturn Pisces M2 SAV29");
+    expect(out).toContain("Engine-detected yogas (unverified definitions; see JSON): d1: 2");
+    expect(out).toContain("Varshaphal (annual chart from 2026-01-01T18:05:20): lagna Gemini, munthi Pisces");
+  });
+
+  test("modules absent -> no module lines, partial status surfaces", () => {
+    const base = summarizeChart({ facts: { d1: [{ planet: "Sun", sign: "Leo", degrees: 1 }] } });
+    expect(base).not.toContain("Shadbala");
+    expect(base).not.toContain("Ashtakavarga");
+    expect(base).not.toContain("Transits @");
+    expect(base).not.toContain("Engine-detected");
+    expect(base).not.toContain("Varshaphal");
+    const partial = summarizeChart({
+      facts: { yogas_engine: { status: "partial", charts: { d1: [{ name: "X" }] } } },
+    });
+    expect(partial).toContain("[status: partial]");
+  });
+});
