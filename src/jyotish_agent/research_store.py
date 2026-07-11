@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 DATABASE_NAME = "research.sqlite3"
 
 
@@ -214,10 +214,18 @@ CREATE TRIGGER claims_no_delete
 BEFORE DELETE ON claims BEGIN SELECT RAISE(ABORT, 'claims are append-only'); END;
 """
 
+_MIGRATION_4 = """
+CREATE TRIGGER claim_supports_no_update
+BEFORE UPDATE ON claim_supports BEGIN SELECT RAISE(ABORT, 'claim_supports are append-only'); END;
+CREATE TRIGGER claim_supports_no_delete
+BEFORE DELETE ON claim_supports BEGIN SELECT RAISE(ABORT, 'claim_supports are append-only'); END;
+"""
+
 _MIGRATIONS: dict[int, str] = {
     1: _MIGRATION_1,
     2: _MIGRATION_2,
     3: _MIGRATION_3,
+    4: _MIGRATION_4,
 }
 
 

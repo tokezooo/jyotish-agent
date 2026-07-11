@@ -687,6 +687,49 @@ describe("ResearchRuntime", () => {
     ).toBeUndefined();
   });
 
+  test("required-v2 mode blocks no-run prose while ordinary interactive mode stays legacy-compatible", () => {
+    const message = {
+      role: "assistant",
+      content: [{ type: "text", text: "arbitrary no-run answer" }],
+    };
+    expect(new ResearchRuntime().gateFinalMessage(message)).toBeUndefined();
+    expect(new ResearchRuntime(true).gateFinalMessage(message)?.content).toEqual([
+      { type: "text", text: FAIL_CLOSED_TEXT },
+    ]);
+  });
+
+  test("extension consumes the CLI required-v2 environment signal", async () => {
+    const previous = process.env.JYOTISH_REQUIRE_V2;
+    process.env.JYOTISH_REQUIRE_V2 = "1";
+    try {
+      const handlers = new Map<string, Array<(event: any, context: any) => any>>();
+      const fakePi = {
+        on(event: string, handler: (event: any, context: any) => any) {
+          handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+        },
+        registerTool() {},
+        appendEntry() {},
+      };
+      registerJyotishExtension(fakePi as any);
+      const context = {
+        sessionManager: { getBranch: () => [], getLeafId: () => "required-leaf" },
+        ui: { notify() {} },
+      };
+      await handlers.get("session_start")?.[0]?.({ type: "session_start" }, context);
+      const gated = await handlers.get("message_end")?.[0]?.(
+        {
+          type: "message_end",
+          message: { role: "assistant", content: [{ type: "text", text: "no run" }] },
+        },
+        context,
+      );
+      expect(gated.message.content).toEqual([{ type: "text", text: FAIL_CLOSED_TEXT }]);
+    } finally {
+      if (previous === undefined) delete process.env.JYOTISH_REQUIRE_V2;
+      else process.env.JYOTISH_REQUIRE_V2 = previous;
+    }
+  });
+
   test("submit answer replaces terminal prose with backend canonical markdown", () => {
     const submitOp = "op_44444444-4444-4444-8444-444444444444";
     const runtime = new ResearchRuntime();

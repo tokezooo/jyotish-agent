@@ -203,6 +203,18 @@ def test_submit_answer_persists_immutable_canonical_artifact(tmp_path: Path, mon
                 "UPDATE answers SET schema_version='tampered' WHERE answer_id=?",
                 (result["answer_id"],),
             )
+        connection.rollback()
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            connection.execute(
+                "UPDATE claim_supports SET support_type='tampered' WHERE claim_id=?",
+                (body["answer"]["claims"][0]["claim_id"],),
+            )
+        connection.rollback()
+        with pytest.raises(sqlite3.IntegrityError, match="append-only"):
+            connection.execute(
+                "DELETE FROM claim_supports WHERE claim_id=?",
+                (body["answer"]["claims"][0]["claim_id"],),
+            )
 
 
 def test_one_repair_budget_is_persisted_and_exhausted(tmp_path: Path, monkeypatch):

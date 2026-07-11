@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import shutil
@@ -12,6 +13,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+import uuid
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -21,6 +23,9 @@ from .research_models import ResearchBirthProfileRequest
 from .research_store import canonical_json, default_data_root
 
 DEFAULT_API_URL = "http://127.0.0.1:8000"
+REQUIRED_V2_BLOCKER = (
+    "Jyotish research answer blocked: no backend-validated final answer is available."
+)
 PI_TOOLS = (
     "jyotish_create_research_run",
     "jyotish_screen_research_run",
@@ -40,13 +45,17 @@ def _api_base() -> str:
     return os.environ.get("JYOTISH_API_URL", DEFAULT_API_URL).rstrip("/")
 
 
-def _health(base: str) -> dict | None:
+def _get_json(base: str, path: str) -> dict | None:
     try:
-        with urllib.request.urlopen(f"{base}/health", timeout=1) as response:
+        with urllib.request.urlopen(f"{base}{path}", timeout=2) as response:
             body = json.loads(response.read().decode("utf-8"))
         return body if isinstance(body, dict) else None
     except (OSError, ValueError, urllib.error.URLError):
         return None
+
+
+def _health(base: str) -> dict | None:
+    return _get_json(base, "/health")
 
 
 def _loopback_address(base: str) -> tuple[str, int]:
@@ -112,14 +121,28 @@ def _load_profile(path: Path) -> dict:
     return value
 
 
-def _private_prompt(question: str, profile: dict) -> Path:
+def _private_prompt(
+    question: str,
+    profile: dict,
+    *,
+    run_id: str,
+    create_operation_id: str,
+) -> Path:
     runtime = default_data_root() / "runtime"
     runtime.mkdir(mode=0o700, parents=True, exist_ok=True)
     os.chmod(runtime, 0o700)
+    cli_request = {
+        "run_id": run_id,
+        "create_operation_id": create_operation_id,
+        "question": question,
+        "birth_profile": profile,
+    }
     prompt = (
         "Use only the Jyotish research tools. Create a v2 run, screen it, calculate "
         "it, construct AnswerContract 2.0, and submit it. The final response must be "
-        "the backend canonical Markdown.\n\n"
+        "the backend canonical Markdown. Use the exact assigned run_id and create "
+        "operation_id below; do not substitute another identity.\n\n"
+        f"CLI request JSON: {canonical_json(cli_request)}\n"
         f"Question: {question}\n"
         f"Birth profile JSON: {canonical_json(profile)}\n"
     )
@@ -134,6 +157,54 @@ def _private_prompt(question: str, profile: dict) -> Path:
         path.unlink(missing_ok=True)
         raise
     return path
+
+
+def _validated_artifact(base: str, run_id: str) -> str | None:
+    run = _get_json(base, f"/v2/research-runs/{run_id}")
+    event_body = _get_json(base, f"/v2/research-runs/{run_id}/events")
+    if not run or run.get("run_id") != run_id or run.get("status") != "validated":
+        return None
+    events = event_body.get("events") if isinstance(event_body, dict) else None
+    if not isinstance(events, list) or not events:
+        return None
+    latest = events[-1]
+    if not isinstance(latest, dict) or latest.get("event_type") != "research_run.answer_submitted":
+        return None
+    payload = latest.get("payload")
+    result = payload.get("result") if isinstance(payload, dict) else None
+    if not isinstance(result, dict):
+        return None
+    markdown = result.get("markdown")
+    claimed_hash = result.get("markdown_sha256")
+    if (
+        result.get("run_id") != run_id
+        or result.get("status") != "validated"
+        or result.get("valid") is not True
+        or not isinstance(result.get("answer_id"), str)
+        or not result["answer_id"].startswith("ans_")
+        or not isinstance(markdown, str)
+        or not markdown
+        or not isinstance(claimed_hash, str)
+    ):
+        return None
+    actual_hash = hashlib.sha256(markdown.encode("utf-8")).hexdigest()
+    return markdown if actual_hash == claimed_hash else None
+
+
+def _emit_required_v2_blocker(as_json: bool) -> int:
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "answer": REQUIRED_V2_BLOCKER,
+                    "error_code": "VALIDATED_ARTIFACT_REQUIRED",
+                },
+                sort_keys=True,
+            )
+        )
+    else:
+        print(REQUIRED_V2_BLOCKER)
+    return 5
 
 
 def _doctor(_args: argparse.Namespace) -> int:
@@ -171,10 +242,17 @@ def _ask(args: argparse.Namespace) -> int:
     _loopback_address(base)
     child = None
     prompt_path = None
+    run_id = f"rr_{uuid.uuid4()}"
+    create_operation_id = f"op_{uuid.uuid4()}"
     try:
         if not _health(base):
             child = _start_api(base)
-        prompt_path = _private_prompt(args.question, profile)
+        prompt_path = _private_prompt(
+            args.question,
+            profile,
+            run_id=run_id,
+            create_operation_id=create_operation_id,
+        )
         command = [
             pi,
             "--print",
@@ -194,14 +272,18 @@ def _ask(args: argparse.Namespace) -> int:
         completed = subprocess.run(
             command,
             cwd=PROJECT_ROOT,
-            env={**os.environ, "JYOTISH_API_URL": base},
+            env={
+                **os.environ,
+                "JYOTISH_API_URL": base,
+                "JYOTISH_REQUIRE_V2": "1",
+            },
             text=True,
             capture_output=True,
             check=False,
         )
-        if completed.returncode != 0:
-            raise CliError("Pi print-mode execution failed", 4)
-        answer = completed.stdout.strip()
+        answer = _validated_artifact(base, run_id)
+        if completed.returncode != 0 or answer is None:
+            return _emit_required_v2_blocker(args.json)
         if args.json:
             print(json.dumps({"answer": answer}, ensure_ascii=False, sort_keys=True))
         else:

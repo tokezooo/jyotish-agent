@@ -549,6 +549,8 @@ export class ResearchRuntime {
   private validatedMarkdown?: string;
   private capabilityFailure?: string;
 
+  constructor(private readonly requiredV2 = false) {}
+
   restore(entries: readonly unknown[]): void {
     this.current = undefined;
     this.unresolved = undefined;
@@ -921,6 +923,9 @@ export class ResearchRuntime {
       return `Research backend unavailable: runtime capability gate failed (${this.capabilityFailure}).`;
     }
     const state = this.snapshot();
+    if (!state && this.requiredV2) {
+      return "Research backend: AnswerContract v2 is required; no authoritative run exists yet.";
+    }
     if (!state) return undefined;
     return `Research backend: run_id=${state.run_id} status=${state.status} backend_seq=${state.backend_seq} event_hash=${state.event_hash}`;
   }
@@ -928,7 +933,9 @@ export class ResearchRuntime {
   gateFinalMessage<T extends { role: string; content?: unknown }>(message: T): T | undefined {
     if (message.role !== "assistant") return undefined;
     const state = this.snapshot();
-    if (!this.capabilityFailure && !this.incomplete && !state) return undefined;
+    if (!this.capabilityFailure && !this.incomplete && !state && !this.requiredV2) {
+      return undefined;
+    }
     if (!Array.isArray(message.content)) return undefined;
     const content = message.content as Array<{ type?: string; text?: string }>;
     if (content.some((item) => item.type === "toolCall")) return undefined;
@@ -964,7 +971,7 @@ export function probeResearchRuntimeCapabilities(
 // --- extension --------------------------------------------------------------
 
 export default function (pi: ExtensionAPI) {
-  const researchRuntime = new ResearchRuntime();
+  const researchRuntime = new ResearchRuntime(process.env.JYOTISH_REQUIRE_V2 === "1");
   const registeredHooks = new Set<string>();
   const appendMirror = (entry: ResearchMirror) => pi.appendEntry(RESEARCH_MIRROR_TYPE, entry);
 
