@@ -32,6 +32,10 @@ class OptimisticConflict(ResearchStoreError):
     pass
 
 
+class EventChainError(ResearchStoreError):
+    pass
+
+
 def canonical_json(value: Any) -> str:
     """Return UTF-8-safe canonical JSON and reject NaN/Infinity."""
     return json.dumps(
@@ -175,6 +179,53 @@ CREATE TABLE source_fragments (
 );
 """
 
+_MIGRATIONS: dict[int, str] = {1: _MIGRATION_1}
+
+
+def _event_envelope(event: Mapping[str, Any]) -> dict[str, Any]:
+    """Select exactly the immutable event fields covered by ``event_hash``."""
+    return {
+        "created_at": event["created_at"],
+        "event_id": event["event_id"],
+        "event_type": event["event_type"],
+        "event_version": event["event_version"],
+        "operation_id": event["operation_id"],
+        "payload_hash": event["payload_hash"],
+        "previous_event_hash": event["previous_event_hash"],
+        "producer": event["producer"],
+        "producer_version": event["producer_version"],
+        "run_id": event["run_id"],
+        "schema_version": event["schema_version"],
+        "seq": event["seq"],
+    }
+
+
+def _verify_event_chain(events: list[dict[str, Any]]) -> None:
+    if not events:
+        return
+    run_id = events[0]["run_id"]
+    previous_hash: str | None = None
+    for expected_seq, event in enumerate(events, start=1):
+        if event["run_id"] != run_id:
+            raise EventChainError("event chain contains another run_id")
+        if event["seq"] != expected_seq:
+            raise EventChainError("event chain sequence is not contiguous")
+        try:
+            decoded_payload = json.loads(event["payload_json"])
+            canonical_payload = canonical_json(decoded_payload)
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise EventChainError("event payload is not canonical JSON") from exc
+        if canonical_payload != event["payload_json"]:
+            raise EventChainError("event payload JSON is not canonical")
+        if sha256_text(event["payload_json"]) != event["payload_hash"]:
+            raise EventChainError("event payload hash does not match payload")
+        if event["previous_event_hash"] != previous_hash:
+            raise EventChainError("event previous hash link is broken")
+        expected_hash = sha256_text(canonical_json(_event_envelope(event)))
+        if event["event_hash"] != expected_hash:
+            raise EventChainError("event hash does not match immutable envelope")
+        previous_hash = event["event_hash"]
+
 
 class ResearchStore:
     def __init__(self, data_root: Path | str | None = None, *, busy_timeout_ms: int = 5_000):
@@ -185,7 +236,6 @@ class ResearchStore:
     def initialize(self) -> None:
         self.data_root.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chmod(self.data_root, 0o700)
-        existed = self.database_path.exists()
         connection = self._connect()
         try:
             current = int(connection.execute("PRAGMA user_version").fetchone()[0])
@@ -197,14 +247,29 @@ class ResearchStore:
                 connection.close()
                 self._backup_for_migration(current)
                 connection = self._connect()
-            if current < 1:
-                connection.executescript(_MIGRATION_1)
-                connection.execute("PRAGMA user_version = 1")
-                connection.commit()
+            for target_version in range(current + 1, SCHEMA_VERSION + 1):
+                script = _MIGRATIONS.get(target_version)
+                if script is None:
+                    raise ResearchStoreError(
+                        f"missing migration for schema version {target_version}"
+                    )
+                try:
+                    # ``executescript`` commits any pending transaction first, so
+                    # the transaction envelope must be part of the script itself.
+                    connection.executescript(
+                        "BEGIN IMMEDIATE;\n"
+                        f"{script}\n"
+                        f"PRAGMA user_version = {target_version};\n"
+                        "COMMIT;"
+                    )
+                except Exception:
+                    if connection.in_transaction:
+                        connection.rollback()
+                    raise
         finally:
             connection.close()
-        if self.database_path.exists() or existed:
-            os.chmod(self.database_path, 0o600)
+            if self.database_path.exists():
+                os.chmod(self.database_path, 0o600)
 
     def _backup_for_migration(self, version: int) -> Path:
         stamp = dt.datetime.now(dt.UTC).strftime("%Y%m%dT%H%M%S%fZ")
@@ -325,7 +390,16 @@ class ResearchStore:
     ) -> tuple[dict[str, Any], int]:
         payload_json = canonical_json(payload)
         request_hash = sha256_text(
-            canonical_json({"event_type": event_type, "payload": json.loads(payload_json)})
+            canonical_json(
+                {
+                    "run_id": run_id,
+                    "expected_revision": expected_revision,
+                    "event_type": event_type,
+                    "payload": json.loads(payload_json),
+                    "producer": producer,
+                    "producer_version": producer_version,
+                }
+            )
         )
         connection = self._ready_connection()
         try:
@@ -412,7 +486,7 @@ class ResearchStore:
         event_id = new_id("ev_")
         payload_json = canonical_json(payload)
         payload_hash = sha256_text(payload_json)
-        envelope = {
+        envelope = _event_envelope({
             "created_at": created_at,
             "event_id": event_id,
             "event_type": event_type,
@@ -425,7 +499,7 @@ class ResearchStore:
             "run_id": run_id,
             "schema_version": 1,
             "seq": seq,
-        }
+        })
         event_hash = sha256_text(canonical_json(envelope))
         connection.execute(
             """INSERT INTO run_events (
@@ -472,6 +546,7 @@ class ResearchStore:
         events = self.list_events(run_id)
         if not events:
             raise RunNotFound(run_id)
+        _verify_event_chain(events)
         first = events[0]
         if first["event_type"] != "research_run.created":
             raise ResearchStoreError("run ledger does not start with research_run.created")

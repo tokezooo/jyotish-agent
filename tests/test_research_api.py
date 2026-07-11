@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import logging
+import math
 import uuid
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from jyotish_agent.api import app
+from jyotish_agent.research_models import ResearchPlace
 from jyotish_agent.research_service import ResearchService
 from jyotish_agent.research_store import ResearchStore
 
@@ -121,6 +125,20 @@ def test_v2_rejects_timezone_aware_civil_time(tmp_path: Path):
     body["birth_profile"]["time"] = "12:30:00+05:30"
     response = client.post("/v2/research-runs", json=body)
     assert response.status_code == 422
+
+
+def test_numeric_legacy_timezone_accepts_inclusive_bounds():
+    for offset in (-12.0, 14.0):
+        place = ResearchPlace(
+            name="Boundary", latitude=0, longitude=0, timezone=offset
+        )
+        assert place.timezone == offset
+
+
+@pytest.mark.parametrize("offset", [-12.0001, 14.0001, math.nan, math.inf, -math.inf])
+def test_numeric_legacy_timezone_rejects_out_of_range_and_non_finite(offset: float):
+    with pytest.raises(ValidationError):
+        ResearchPlace(name="Invalid", latitude=0, longitude=0, timezone=offset)
 
 
 def test_create_access_log_never_contains_request_body(tmp_path: Path, caplog):

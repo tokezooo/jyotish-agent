@@ -12,6 +12,7 @@ import pytest
 from jyotish_agent.research_store import (
     OptimisticConflict,
     ResearchStore,
+    ResearchStoreError,
     canonical_json,
 )
 
@@ -128,12 +129,133 @@ def test_stale_revision_conflicts_without_appending(tmp_path: Path):
     assert len(store.list_events(run["run_id"])) == 1
 
 
+def test_operation_id_cannot_replay_an_event_from_another_run(tmp_path: Path):
+    store = ResearchStore(tmp_path / "data")
+    first_run = _run()
+    second_run = _run()
+    store.create_run(first_run, operation_id=_id("op_"), expected_revision=0)
+    store.create_run(second_run, operation_id=_id("op_"), expected_revision=0)
+    operation_id = _id("op_")
+    store.append_event(
+        first_run["run_id"],
+        operation_id=operation_id,
+        expected_revision=1,
+        event_type="research_run.noted",
+        payload={"note_type": "fixture"},
+        producer="pytest",
+        producer_version="1",
+    )
+
+    with pytest.raises(OptimisticConflict):
+        store.append_event(
+            second_run["run_id"],
+            operation_id=operation_id,
+            expected_revision=1,
+            event_type="research_run.noted",
+            payload={"note_type": "fixture"},
+            producer="pytest",
+            producer_version="1",
+        )
+    assert len(store.list_events(second_run["run_id"])) == 1
+
+
+@pytest.mark.parametrize(
+    ("changed"),
+    [
+        {"event_type": "research_run.changed"},
+        {"payload": {"note_type": "changed"}},
+        {"producer": "another-producer"},
+        {"producer_version": "2"},
+        {"expected_revision": 99},
+    ],
+)
+def test_operation_id_conflicts_when_any_semantic_input_changes(
+    tmp_path: Path, changed: dict
+):
+    store = ResearchStore(tmp_path / "data")
+    run = _run()
+    store.create_run(run, operation_id=_id("op_"), expected_revision=0)
+    operation_id = _id("op_")
+    arguments = {
+        "operation_id": operation_id,
+        "expected_revision": 1,
+        "event_type": "research_run.noted",
+        "payload": {"note_type": "fixture"},
+        "producer": "pytest",
+        "producer_version": "1",
+    }
+    store.append_event(run["run_id"], **arguments)
+    with pytest.raises(OptimisticConflict):
+        store.append_event(run["run_id"], **{**arguments, **changed})
+
+
 def test_canonical_json_is_stable_and_rejects_non_finite_numbers():
     assert canonical_json({"b": 2, "a": [3, 1]}) == '{"a":[3,1],"b":2}'
     with pytest.raises(ValueError):
         canonical_json({"invalid": float("nan")})
     with pytest.raises(ValueError):
         canonical_json({"invalid": float("inf")})
+
+
+def test_failed_initial_migration_rolls_back_every_statement(tmp_path: Path, monkeypatch):
+    import jyotish_agent.research_store as store_module
+
+    monkeypatch.setattr(store_module, "SCHEMA_VERSION", 1)
+    monkeypatch.setattr(
+        store_module,
+        "_MIGRATIONS",
+        {
+            1: """
+            CREATE TABLE must_rollback (value TEXT);
+            INSERT INTO missing_table VALUES ('force failure');
+            """
+        },
+        raising=False,
+    )
+    store = ResearchStore(tmp_path / "data")
+    with pytest.raises(sqlite3.OperationalError):
+        store.initialize()
+
+    with sqlite3.connect(store.database_path) as connection:
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
+        partial = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='must_rollback'"
+        ).fetchone()
+    assert version == 0
+    assert partial is None
+
+
+def test_failed_non_initial_migration_keeps_version_and_backup(tmp_path: Path, monkeypatch):
+    import jyotish_agent.research_store as store_module
+
+    store = ResearchStore(tmp_path / "data")
+    store.initialize()
+    monkeypatch.setattr(store_module, "SCHEMA_VERSION", 2)
+    monkeypatch.setattr(
+        store_module,
+        "_MIGRATIONS",
+        {
+            1: store_module._MIGRATION_1,
+            2: """
+            CREATE TABLE must_rollback_upgrade (value TEXT);
+            INSERT INTO missing_table VALUES ('force failure');
+            """,
+        },
+    )
+    with pytest.raises(sqlite3.OperationalError):
+        store.initialize()
+
+    with sqlite3.connect(store.database_path) as connection:
+        version = connection.execute("PRAGMA user_version").fetchone()[0]
+        partial = connection.execute(
+            "SELECT name FROM sqlite_master "
+            "WHERE type='table' AND name='must_rollback_upgrade'"
+        ).fetchone()
+    backups = list(store.data_root.glob("research.sqlite3.v1.*.bak"))
+    assert version == 1
+    assert partial is None
+    assert len(backups) == 1
+    assert backups[0].stat().st_mode & 0o777 == 0o600
 
 
 def test_rebuild_and_memo_are_equal_after_restart(tmp_path: Path):
@@ -172,6 +294,46 @@ def test_rebuild_matches_projection_after_later_events(tmp_path: Path):
         producer_version="1",
     )
     assert store.rebuild_run(run["run_id"]) == store.get_run(run["run_id"])
+
+
+def _store_with_two_events(tmp_path: Path) -> tuple[ResearchStore, dict]:
+    store = ResearchStore(tmp_path / "data")
+    run = _run()
+    store.create_run(run, operation_id=_id("op_"), expected_revision=0)
+    store.append_event(
+        run["run_id"],
+        operation_id=_id("op_"),
+        expected_revision=1,
+        event_type="research_run.noted",
+        payload={"note_type": "fixture"},
+        producer="pytest",
+        producer_version="1",
+    )
+    return store, run
+
+
+@pytest.mark.parametrize(
+    ("sql", "parameters"),
+    [
+        ("UPDATE run_events SET seq=3 WHERE seq=2", ()),
+        ("UPDATE run_events SET payload_json='{}' WHERE seq=2", ()),
+        ("UPDATE run_events SET previous_event_hash='broken' WHERE seq=2", ()),
+        ("UPDATE run_events SET producer='tampered' WHERE seq=2", ()),
+        ("UPDATE run_events SET event_hash='broken' WHERE seq=2", ()),
+    ],
+    ids=["sequence", "payload-hash", "previous-link", "envelope", "event-hash"],
+)
+def test_rebuild_rejects_tampered_event_chain(
+    tmp_path: Path, sql: str, parameters: tuple
+):
+    store, run = _store_with_two_events(tmp_path)
+    with sqlite3.connect(store.database_path) as connection:
+        connection.execute("DROP TRIGGER run_events_no_update")
+        connection.execute(sql, parameters)
+        connection.commit()
+
+    with pytest.raises(ResearchStoreError):
+        store.rebuild_run(run["run_id"])
 
 
 def test_test_corpus_seed_is_explicit_and_metadata_safe(tmp_path: Path):

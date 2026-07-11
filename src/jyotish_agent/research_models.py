@@ -11,12 +11,16 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from .models import BirthTimeConfidence, CalculationConfigRequest
 
 _ID_RE = re.compile(r"^op_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+NumericLegacyOffset = Annotated[
+    float,
+    Field(ge=-12, le=14, allow_inf_nan=False),
+]
 
 
 class FixedOffsetLegacy(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["fixed_offset_legacy"]
-    offset_hours: float = Field(ge=-12, le=14)
+    offset_hours: float = Field(ge=-12, le=14, allow_inf_nan=False)
 
 
 class IanaTimezone(BaseModel):
@@ -29,7 +33,7 @@ class IanaWithAssertedOffset(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["iana_with_asserted_offset"]
     zone_id: str = Field(min_length=1, max_length=100)
-    asserted_offset_hours: float = Field(ge=-12, le=14)
+    asserted_offset_hours: float = Field(ge=-12, le=14, allow_inf_nan=False)
 
 
 TimezoneSpec = Annotated[
@@ -43,7 +47,7 @@ class ResearchPlace(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
-    timezone: float | TimezoneSpec
+    timezone: NumericLegacyOffset | TimezoneSpec
 
 
 class ResearchBirthProfileRequest(BaseModel):
