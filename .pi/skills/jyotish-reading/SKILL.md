@@ -113,6 +113,19 @@ stands: back every factual claim in `summary` with an entry in `facts_used`.
   verified geometric tier (`yogas.<Name>.present`), the verified tier WINS: surface
   any strings in `facts.yogas_engine.mismatches` under `uncertainty` and side with
   `facts.yogas`.
+- `varshaphal.lagna.sign`, `varshaphal.<Planet>.sign`, `varshaphal.munthi.sign`,
+  and `varshaphal.pravesh` — the Tajaka varshaphal, i.e. the Vedic ANNUAL
+  (solar-return) chart active at the reference date. Request via
+  `config.modules: ["varshaphal"]` (with `config.reference_date`) for "what does
+  this year hold" questions. This is NOT Western progressions — call it the
+  annual/varshaphal chart. The chart is valid pravesh-to-pravesh (from the solar
+  return in `varshaphal.pravesh` until the next return, roughly one year later
+  near the birthday) — when answering year questions, state those boundary dates,
+  not calendar years. `varshaphal.age_year` is context (the year of life the
+  chart covers), not citable. `munthi` is the classical progressed point (natal
+  lagna + one sign per completed year). No year lord (varsheshvara) is emitted —
+  its rule is school-dependent and unverified here; if asked, say it is not
+  computed rather than deriving one.
 - `panchanga.tithi`, `panchanga.nakshatra` (+ `panchanga.nakshatra.pada`),
   `panchanga.yoga`, `panchanga.karana`, `panchanga.weekday`
 - `vimshottari.mahadasha.lord` / `.start` / `.end` (and `bhukti`, `antara`)

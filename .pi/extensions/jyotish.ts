@@ -92,7 +92,9 @@ const ConfigSchema = Type.Object(
     // modules — grows one entry per Milestone-3 phase (mirror of IMPLEMENTED_MODULES).
     modules: Type.Optional(
       Type.Array(
-        StringEnum(["shadbala", "ashtakavarga", "transits", "yogas_engine"] as const),
+        StringEnum(
+          ["shadbala", "ashtakavarga", "transits", "yogas_engine", "varshaphal"] as const,
+        ),
       ),
     ),
   },

@@ -151,6 +151,23 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
                 if info.get(field) is not None:
                     atoms[f"transits.{planet}.{field}"] = str(info[field])
 
+    # Varshaphal (module): varshaphal.pravesh (ISO local solar-return moment),
+    # varshaphal.lagna.sign, varshaphal.<Planet>.sign, varshaphal.munthi.sign.
+    # age_year is context for year bracketing, deliberately NOT an atom.
+    varshaphal = facts.get("varshaphal")
+    if isinstance(varshaphal, dict):
+        if varshaphal.get("pravesh") is not None:
+            atoms["varshaphal.pravesh"] = str(varshaphal["pravesh"])
+        lagna = varshaphal.get("lagna")
+        if isinstance(lagna, dict) and lagna.get("sign") is not None:
+            atoms["varshaphal.lagna.sign"] = str(lagna["sign"])
+        munthi = varshaphal.get("munthi")
+        if isinstance(munthi, dict) and munthi.get("sign") is not None:
+            atoms["varshaphal.munthi.sign"] = str(munthi["sign"])
+        for planet, info in (varshaphal.get("planets") or {}).items():
+            if isinstance(info, dict) and info.get("sign") is not None:
+                atoms[f"varshaphal.{planet}.sign"] = str(info["sign"])
+
     # Yogas: yogas.<Name>.present = "true"/"false"
     yogas = facts.get("yogas")
     if isinstance(yogas, dict):

@@ -54,9 +54,19 @@ def test_unknown_module_rejected():
         )
 
 
-def test_known_but_unimplemented_module_rejected():
+def test_known_but_unimplemented_module_rejected(monkeypatch):
     # Silent 200-with-nothing would make the agent loop on missing facts (same
     # pathology as the facts_token echo bug). Must be a hard error until implemented.
+    # As of Phase 15 every KNOWN module is implemented, so the pending state is
+    # simulated by shrinking IMPLEMENTED_MODULES — the guard must survive for the
+    # next milestone's module additions.
+    import jyotish_agent.config as config_module
+
+    monkeypatch.setattr(
+        config_module,
+        "IMPLEMENTED_MODULES",
+        config_module.IMPLEMENTED_MODULES - {"varshaphal"},
+    )
     with pytest.raises(ConfigError, match="not implemented yet"):
         compute_chart(
             _PROFILE, reference_date=_REFERENCE, config=CalculationConfig(modules=("varshaphal",))

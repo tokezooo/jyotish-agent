@@ -383,9 +383,6 @@ def test_unknown_chart_returns_422():
 def test_unknown_module_returns_422():
     r = client.post("/charts/compute", json=_compute_body(modules=["nope"]))
     assert r.status_code == 422
-    r2 = client.post("/charts/compute", json=_compute_body(modules=["varshaphal"]))
-    assert r2.status_code == 422  # known but not yet implemented
-    assert "not implemented" in r2.json()["problem"]
 
 
 @requires_engine
@@ -471,6 +468,37 @@ def test_yogas_engine_fact_roundtrips_through_validation():
         },
     )
     assert v.json() == {"valid": True, "violations": []}
+
+
+@requires_engine
+def test_varshaphal_fact_roundtrips_through_validation():
+    c = client.post("/charts/compute", json=_compute_body(modules=["varshaphal"])).json()
+    vp = c["facts"]["varshaphal"]
+    assert vp["age_year"] == 37  # ref 2026-06-07 is inside the 2026-01-01 pravesh year
+    v = client.post(
+        "/answers/validate",
+        json={
+            "answer": {
+                "summary": "The annual (varshaphal) chart lagna for this year.",
+                "facts_used": [
+                    {"path": "varshaphal.lagna.sign", "value": vp["lagna"]["sign"]}
+                ],
+            },
+            "facts_token": c["facts_token"],
+        },
+    )
+    assert v.json() == {"valid": True, "violations": []}
+
+
+@requires_engine
+def test_varshaphal_reference_before_birth_returns_422():
+    r = client.post(
+        "/charts/compute",
+        json=_compute_body(modules=["varshaphal"], reference_date="1989-06-01"),
+    )
+    assert r.status_code == 422
+    assert r.headers["content-type"].startswith("application/problem+json")
+    assert "before the birth" in r.json()["problem"]
 
 
 @requires_engine

@@ -375,6 +375,96 @@ def _transits(ref_jd, place, natal_moon_sign: int, natal_lagna_sign: int,
     }
 
 
+def _varshaphal(jd, place, ref_jd, natal_lagna_sign: int,
+                birth_date: DateTuple, reference_date: DateTuple) -> dict:
+    """Tajaka varshaphal: the Vedic ANNUAL (solar-return) chart active at the
+    reference date. This is the classical varshaphal — NOT Western progressions.
+
+    Year selection brackets the reference against actual pravesh (solar-return)
+    moments: the emitted ``age_year`` N satisfies ``pravesh_jd(N) <= ref_jd <
+    pravesh_jd(N+1)``, where ``tajaka.annual_chart(..., years=N)`` is the (N-1)th
+    solar return (``years=1`` is the birth moment itself). Calendar arithmetic
+    alone (ref.year - birth.year + 1) is wrong for every reference date that falls
+    before that calendar year's return — the ACTIVE annual chart is then still the
+    previous year's — so the candidate year is corrected against real pravesh JDs.
+
+    Munthi provenance: sign = (natal lagna sign + completed years) % 12, with
+    completed years = age_year - 1. This is the classical rule (munthi in the
+    lagna at birth, advancing one sign per year) and is computed via the engine's
+    own ``tajaka.muntha_house`` lambda — the same formula. NOTE the engine's
+    internal lord-of-year path feeds that lambda the ANNUAL ascendant and an
+    uncorrected year count; the classical natal-lagna form is emitted here.
+
+    Year lord (varsheshvara) is deliberately NOT emitted (documented deviation):
+    the engine's ``tajaka.lord_of_the_year`` locates the year via the MEAN
+    sidereal year (``jd + years*year_value``) — off by one year relative to
+    ``annual_chart``'s true-solar-return moment — and its panchavargeeya-bala
+    tie-break returns a candidate-list position instead of a planet index, so its
+    verdict cannot be verified against the pravesh chart emitted here. The
+    five-candidates rule is also school-dependent. Munthi only.
+
+    Must run under ENGINE_LOCK (reads global ayanamsa state).
+    """
+    from jhora import utils
+    from jhora.horoscope.transit import tajaka
+    from jhora.panchanga import drik
+
+    if ref_jd < jd:
+        raise ConfigError(
+            "reference_date is before the birth moment; varshaphal (the annual "
+            "solar-return chart) is undefined before birth. Use a reference_date "
+            "on or after the birth date."
+        )
+
+    def pravesh_jd(n: int) -> float:
+        # The engine works in local-frame JDs throughout (julian_day_number takes
+        # local civil time), so this compares directly against ref_jd.
+        return drik.next_solar_date(jd, place, years=n)
+
+    # Calendar candidate, then correct against actual pravesh JDs. Each step is one
+    # cheap engine call; the loops move at most one step in practice (they exist for
+    # returns that drift across the calendar-year boundary).
+    n = max(reference_date[0] - birth_date[0] + 1, 1)
+    while n > 1 and ref_jd < pravesh_jd(n):
+        n -= 1
+    while ref_jd >= pravesh_jd(n + 1):
+        n += 1
+
+    p_jd = pravesh_jd(n)
+    chart, ((p_y, p_m, p_d), _hms) = tajaka.annual_chart(jd, place, years=n)
+    # annual_chart derives its moment from the same next_solar_date call; a date
+    # disagreement means the engine changed underneath us.
+    y, m, d, hour_float = utils.jd_to_gregorian(p_jd)
+    if (int(p_y), int(p_m), int(p_d)) != (int(y), int(m), int(d)):
+        raise EngineOutputError(
+            f"annual_chart pravesh date ({p_y},{p_m},{p_d}) != next_solar_date "
+            f"date ({y},{m},{d}) for years={n}"
+        )
+
+    planets: dict[str, dict] = {}
+    for body, pos in chart:
+        if body == "L":
+            continue
+        sign = int(pos[0])
+        planets[names.planet_name(int(body))] = {
+            "sign_index": sign,
+            "sign": names.sign_name(sign),
+            "degrees": _round_deg(pos[1]),
+        }
+    munthi_sign = int(tajaka.muntha_house(natal_lagna_sign, n - 1))
+    return {
+        # ISO local datetime of the solar return via _fmt_dt (rollover-safe),
+        # not the engine's to_dms string.
+        "pravesh": _fmt_dt((y, m, d, hour_float)),
+        # The years= value used; year N of life, valid pravesh(N)..pravesh(N+1).
+        # Context for the agent, deliberately not a citation atom.
+        "age_year": n,
+        "lagna": _ascendant(chart),
+        "planets": planets,
+        "munthi": {"sign_index": munthi_sign, "sign": names.sign_name(munthi_sign)},
+    }
+
+
 def _houses(chart) -> list[dict]:
     """Whole-sign bhava table for a chart: 12 houses from the lagna with sign + lord."""
     lagna_sign = _lagna_sign(chart)
@@ -529,6 +619,15 @@ def compute_chart(
                 natal_lagna_sign=_lagna_sign(raw_charts["D1"]),
                 reference_date=reference_date,
                 timezone=profile.timezone,
+            )
+        if "varshaphal" in modules:
+            module_facts["varshaphal"] = _varshaphal(
+                jd,
+                place,
+                ref_jd,
+                natal_lagna_sign=_lagna_sign(raw_charts["D1"]),
+                birth_date=profile.date,
+                reference_date=reference_date,
             )
         if "yogas_engine" in modules:
             # The ONLY module allowed to degrade instead of failing the compute: it
