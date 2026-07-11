@@ -410,6 +410,7 @@ interface Reservation {
 interface CreateReservation {
   toolCallId: string;
   operationId: string;
+  runId: string;
 }
 
 type AppendMirror = (entry: ResearchMirror) => void;
@@ -626,16 +627,31 @@ export class ResearchRuntime {
     }
     if (toolName === "jyotish_create_research_run") {
       if (
+        typeof input.run_id !== "string" ||
         typeof input.operation_id !== "string" ||
         input.expected_revision !== 0
       ) {
-        return { block: true, reason: "Create requires operation_id and expected_revision=0." };
+        return { block: true, reason: "Create requires run_id, operation_id, and expected_revision=0." };
       }
       if (active) {
         return { block: true, reason: "This Pi branch already has an active or unresolved research run." };
       }
-      this.createReservation = { toolCallId, operationId: input.operation_id };
+      const reservation: ResearchMirror = {
+        run_id: input.run_id,
+        operation_id: input.operation_id,
+        backend_seq: 0,
+        event_hash: ZERO_EVENT_HASH,
+        status: "reserved",
+      };
+      this.createReservation = {
+        toolCallId,
+        operationId: input.operation_id,
+        runId: input.run_id,
+      };
       this.messageReservation = toolCallId;
+      this.unresolved = { ...reservation, status: "unresolved" };
+      this.incomplete = true;
+      append(reservation);
       return undefined;
     }
     const parsed = operationInput(input);
@@ -690,10 +706,13 @@ export class ResearchRuntime {
     if (this.createReservation?.toolCallId === toolCallId) {
       const create = this.createReservation;
       this.createReservation = undefined;
-      this.messageReservation = undefined;
       if (isError) return;
       const result = asMirror(details) ?? asUnresolvedMirror(details);
-      if (!result || result.operation_id !== create.operationId) {
+      if (
+        !result ||
+        result.operation_id !== create.operationId ||
+        result.run_id !== create.runId
+      ) {
         this.incomplete = true;
         return;
       }
@@ -717,7 +736,6 @@ export class ResearchRuntime {
       append(result);
     }
     this.pending.delete(reservation.mirror.operation_id);
-    this.messageReservation = undefined;
     this.incomplete = false;
   }
 
@@ -964,6 +982,9 @@ export default function (pi: ExtensionAPI) {
       "Use a fresh op_ UUID4 and expected_revision=0.",
     parameters: Type.Object(
       {
+        run_id: Type.String({
+          pattern: "^rr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        }),
         operation_id: Type.String({
           pattern: "^op_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
         }),

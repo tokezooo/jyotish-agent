@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from .models import BirthTimeConfidence, CalculationConfigRequest
 
 _ID_RE = re.compile(r"^op_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
+_RUN_ID_RE = re.compile(r"^rr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$")
 NumericLegacyOffset = Annotated[
     float,
     Field(ge=-12, le=14, allow_inf_nan=False),
@@ -75,6 +76,7 @@ class ResearchBirthProfileRequest(BaseModel):
 
 class CreateResearchRunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    run_id: str | None = None
     operation_id: str
     expected_revision: int = Field(default=0, ge=0)
     question: str = Field(min_length=1, max_length=10_000)
@@ -92,6 +94,13 @@ class CreateResearchRunRequest(BaseModel):
     def valid_operation_id(cls, value: str) -> str:
         if not _ID_RE.fullmatch(value):
             raise ValueError("operation_id must be an op_ prefixed UUID4")
+        return value
+
+    @field_validator("run_id")
+    @classmethod
+    def valid_run_id(cls, value: str | None) -> str | None:
+        if value is not None and not _RUN_ID_RE.fullmatch(value):
+            raise ValueError("run_id must be an rr_ prefixed UUID4")
         return value
 
 

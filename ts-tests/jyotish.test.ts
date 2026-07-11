@@ -248,6 +248,15 @@ describe("ResearchRuntime", () => {
     ).toBe(true);
 
     runtime.settle("call-screen", true, undefined, (entry) => appended.push(entry));
+    expect(
+      runtime.reserve(
+        "same-leaf-after-settle",
+        "jyotish_screen_research_run",
+        { run_id: runId, operation_id: screenOp, expected_revision: 1 },
+        (entry) => appended.push(entry),
+        "leaf-1",
+      )?.block,
+    ).toBe(true);
     runtime.beginAssistantMessage("leaf-2");
     expect(
       runtime.reserve(
@@ -329,25 +338,51 @@ describe("ResearchRuntime", () => {
 
   test("create participates in one-mutation lifecycle and unresolved commit fails closed", () => {
     const runtime = new ResearchRuntime();
+    const appended: unknown[] = [];
     runtime.beginAssistantMessage("create-leaf");
     expect(
       runtime.reserve(
         "create-call",
         "jyotish_create_research_run",
-        { operation_id: createOp, expected_revision: 0 },
-        () => {},
+        { run_id: runId, operation_id: createOp, expected_revision: 0 },
+        (entry) => appended.push(entry),
         "create-leaf",
       ),
     ).toBeUndefined();
+    expect(appended).toEqual([
+      {
+        run_id: runId,
+        operation_id: createOp,
+        backend_seq: 0,
+        event_hash: "0".repeat(64),
+        status: "reserved",
+      },
+    ]);
     expect(
       runtime.reserve(
         "sibling-create",
         "jyotish_create_research_run",
-        { operation_id: screenOp, expected_revision: 0 },
+        { run_id: runId, operation_id: screenOp, expected_revision: 0 },
         () => {},
         "create-leaf",
       )?.block,
     ).toBe(true);
+
+    // Simulate Pi restart after backend commit but before tool_result: the durable
+    // pre-execution mirror alone retains enough identity to reconcile.
+    const restarted = new ResearchRuntime();
+    restarted.restore(
+      appended.map((data) => ({ type: "custom", customType: RESEARCH_MIRROR_TYPE, data })),
+    );
+    expect(restarted.snapshot()?.run_id).toBe(runId);
+    expect(restarted.snapshot()?.needs_reconciliation).toBe(true);
+    restarted.reconcile(
+      { run_id: runId, status: "created", revision: 1 },
+      [{ seq: 1, operation_id: createOp, event_hash: hash1 }],
+      () => {},
+    );
+    expect(restarted.snapshot()?.status).toBe("created");
+    expect(restarted.snapshot()?.needs_reconciliation).toBe(false);
 
     runtime.settle(
       "create-call",
@@ -443,7 +478,7 @@ describe("ResearchRuntime", () => {
       mirror("refused_unsafe", screenOp, 2, hash2),
     ]);
     const appended: unknown[] = [];
-    runtime.beginAssistantMessage();
+    runtime.beginAssistantMessage("duplicate-screen-leaf");
     expect(
       runtime.reserve(
         "duplicate-screen",
@@ -464,7 +499,7 @@ describe("ResearchRuntime", () => {
       },
       (entry) => appended.push(entry),
     );
-    runtime.beginAssistantMessage();
+    runtime.beginAssistantMessage("after-duplicate-leaf");
     expect(
       runtime.reserve(
         "new-calculate",
@@ -697,7 +732,7 @@ describe("ResearchRuntime", () => {
         type: "tool_call",
         toolCallId: "create-call",
         toolName: "jyotish_create_research_run",
-        input: { operation_id: createOp, expected_revision: 0 },
+        input: { run_id: runId, operation_id: createOp, expected_revision: 0 },
       },
       context,
     );
@@ -716,6 +751,7 @@ describe("ResearchRuntime", () => {
       const result = await tools.get("jyotish_create_research_run").execute(
         "create-call",
         {
+          run_id: runId,
           operation_id: createOp,
           expected_revision: 0,
           question: "Career?",

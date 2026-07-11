@@ -77,14 +77,16 @@ class ResearchService:
             "offset_hours": offset_hours,
         }
         normalized_request = request.model_dump(
-            mode="json", exclude={"operation_id", "expected_revision"}
+            mode="json",
+            exclude={"operation_id", "expected_revision"},
+            exclude_none=True,
         )
         normalized_request["birth_profile"] = normalized_profile
         normalized_request["calculation_config"]["reference_date"] = reference_date.isoformat()
         request_hash = sha256_text(canonical_json(normalized_request))
         now = now_datetime.isoformat().replace("+00:00", "Z")
         stored = {
-            "run_id": new_id("rr_"),
+            "run_id": request.run_id or new_id("rr_"),
             "revision": 1,
             "status": "created",
             "question": request.question,

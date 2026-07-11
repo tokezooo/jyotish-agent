@@ -89,6 +89,24 @@ def test_create_is_idempotent_by_operation_id(tmp_path: Path):
     assert conflict.headers["content-type"].startswith("application/problem+json")
 
 
+def test_client_assigned_run_id_survives_restart_and_exact_replay(tmp_path: Path):
+    client = _client(tmp_path)
+    run_id = f"rr_{uuid.uuid4()}"
+    operation_id = _operation_id()
+    body = {**_body(operation_id), "run_id": run_id}
+
+    created = client.post("/v2/research-runs", json=body)
+    assert created.status_code == 201, created.text
+    assert created.json()["run_id"] == run_id
+
+    restarted = _client(tmp_path)
+    fetched = restarted.get(f"/v2/research-runs/{run_id}")
+    replayed = restarted.post("/v2/research-runs", json=body)
+    assert fetched.status_code == 200
+    assert replayed.status_code == 201
+    assert fetched.json() == replayed.json() == created.json()
+
+
 def test_numeric_and_explicit_fixed_offsets_have_same_normalized_hash(tmp_path: Path):
     client = _client(tmp_path)
     numeric = client.post("/v2/research-runs", json=_body()).json()
