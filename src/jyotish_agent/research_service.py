@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import math
 import re
 from collections.abc import Callable
 from typing import Any
@@ -317,7 +318,9 @@ class ResearchService:
 
 
 _INTEGER = re.compile(r"^-?(?:0|[1-9]\d*)$")
-_NUMBER = re.compile(r"^-?(?:0|[1-9]\d*)\.\d+$")
+_NUMBER = re.compile(
+    r"^-?(?:(?:0|[1-9]\d*)(?:\.\d+)?|\.\d+)(?:[eE][+-]?\d+)?$"
+)
 
 
 def _typed_fact_value(value: str) -> tuple[str | int | float | bool, str]:
@@ -328,5 +331,7 @@ def _typed_fact_value(value: str) -> tuple[str | int | float | bool, str]:
     if _INTEGER.fullmatch(value):
         return int(value), "integer"
     if _NUMBER.fullmatch(value):
-        return float(value), "number"
+        number = float(value)
+        if math.isfinite(number):
+            return number, "number"
     return value, "string"

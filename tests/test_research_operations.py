@@ -144,7 +144,7 @@ def test_calculation_persists_typed_immutable_evidence_once(tmp_path: Path, monk
             "normalized_input": {"fixture": True},
             "calculation_config": {"ayanamsa": "LAHIRI"},
             "facts": {
-                "ascendant": {"sign": "Pisces", "degrees": 12.5},
+                "ascendant": {"sign": "Pisces", "degrees": 1e-7},
                 "aspects": {"Saturn": {"aspects_planets": ["Moon"]}},
             },
             "provenance": {"engine": "PyJHora", "engine_version": "4.8.6"},
@@ -170,7 +170,7 @@ def test_calculation_persists_typed_immutable_evidence_once(tmp_path: Path, monk
     by_path = {item["payload"]["path"]: item["payload"] for item in evidence}
     assert by_path["ascendant.sign"]["value"] == "Pisces"
     assert by_path["ascendant.sign"]["value_type"] == "string"
-    assert by_path["ascendant.degrees"]["value"] == 12.5
+    assert by_path["ascendant.degrees"]["value"] == 1e-7
     assert by_path["ascendant.degrees"]["value_type"] == "number"
     assert by_path["aspects.Saturn.Moon"]["value"] is True
     assert by_path["aspects.Saturn.Moon"]["value_type"] == "boolean"

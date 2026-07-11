@@ -226,7 +226,7 @@ describe("ResearchRuntime", () => {
     const runtime = new ResearchRuntime();
     runtime.restore([mirror("created", screenOp)]);
     const appended: unknown[] = [];
-    runtime.beginAssistantMessage();
+    runtime.beginAssistantMessage("leaf-1");
 
     expect(
       runtime.reserve(
@@ -236,6 +236,8 @@ describe("ResearchRuntime", () => {
         (entry) => appended.push(entry),
       ),
     ).toBeUndefined();
+    // Re-observing the same assistant-message leaf must not reset the sibling gate.
+    runtime.beginAssistantMessage("leaf-1");
     expect(
       runtime.reserve(
         "call-calculate",
@@ -246,7 +248,7 @@ describe("ResearchRuntime", () => {
     ).toBe(true);
 
     runtime.settle("call-screen", true, undefined, (entry) => appended.push(entry));
-    runtime.beginAssistantMessage();
+    runtime.beginAssistantMessage("leaf-2");
     expect(
       runtime.reserve(
         "call-retry",
@@ -256,6 +258,117 @@ describe("ResearchRuntime", () => {
       ),
     ).toBeUndefined();
     expect(appended).toHaveLength(3); // reserved, failed, reserved retry
+  });
+
+  test("reservation-only compacted branch retains an unresolved run and reconciles", () => {
+    const branch = [mirror("reserved", screenOp)];
+    const runtime = new ResearchRuntime();
+    runtime.restore(branch);
+    expect(runtime.snapshot()).toEqual({
+      run_id: runId,
+      operation_id: screenOp,
+      backend_seq: 1,
+      event_hash: hash1,
+      status: "unresolved",
+      needs_reconciliation: true,
+    });
+    const blocked = runtime.gateFinalMessage({
+      role: "assistant",
+      content: [{ type: "text", text: "must not escape" }],
+    });
+    expect(blocked?.content).toEqual([{ type: "text", text: FAIL_CLOSED_TEXT }]);
+
+    runtime.reconcile(
+      { run_id: runId, status: "created", revision: 1 },
+      [{ seq: 1, operation_id: createOp, event_hash: hash2 }],
+      () => {},
+    );
+    expect(runtime.snapshot()?.status).toBe("created");
+    expect(runtime.snapshot()?.needs_reconciliation).toBe(false);
+  });
+
+  test("a later unresolved run is not hidden by an older valid mirror", () => {
+    const nextRun = "rr_44444444-4444-4444-8444-444444444444";
+    const runtime = new ResearchRuntime();
+    runtime.restore([
+      mirror("calculated", calculateOp, 3, hash1),
+      {
+        type: "custom",
+        customType: RESEARCH_MIRROR_TYPE,
+        data: {
+          run_id: nextRun,
+          operation_id: createOp,
+          backend_seq: 0,
+          event_hash: "0".repeat(64),
+          status: "unresolved",
+        },
+      },
+    ]);
+    expect(runtime.snapshot()?.run_id).toBe(nextRun);
+    expect(runtime.snapshot()?.status).toBe("unresolved");
+    expect(runtime.snapshot()?.needs_reconciliation).toBe(true);
+  });
+
+  test("a wholly malformed research mirror still fails final prose closed", () => {
+    const runtime = new ResearchRuntime();
+    runtime.restore([
+      {
+        type: "custom",
+        customType: RESEARCH_MIRROR_TYPE,
+        data: { status: "reserved" },
+      },
+    ]);
+    expect(runtime.snapshot()).toBeUndefined();
+    expect(
+      runtime.gateFinalMessage({
+        role: "assistant",
+        content: [{ type: "text", text: "must not escape" }],
+      })?.content,
+    ).toEqual([{ type: "text", text: FAIL_CLOSED_TEXT }]);
+  });
+
+  test("create participates in one-mutation lifecycle and unresolved commit fails closed", () => {
+    const runtime = new ResearchRuntime();
+    runtime.beginAssistantMessage("create-leaf");
+    expect(
+      runtime.reserve(
+        "create-call",
+        "jyotish_create_research_run",
+        { operation_id: createOp, expected_revision: 0 },
+        () => {},
+        "create-leaf",
+      ),
+    ).toBeUndefined();
+    expect(
+      runtime.reserve(
+        "sibling-create",
+        "jyotish_create_research_run",
+        { operation_id: screenOp, expected_revision: 0 },
+        () => {},
+        "create-leaf",
+      )?.block,
+    ).toBe(true);
+
+    runtime.settle(
+      "create-call",
+      false,
+      {
+        run_id: runId,
+        operation_id: createOp,
+        backend_seq: 0,
+        event_hash: "0".repeat(64),
+        status: "unresolved",
+      },
+      () => {},
+    );
+    expect(runtime.snapshot()?.run_id).toBe(runId);
+    expect(runtime.snapshot()?.needs_reconciliation).toBe(true);
+    expect(
+      runtime.gateFinalMessage({
+        role: "assistant",
+        content: [{ type: "text", text: "created but unresolved" }],
+      })?.content,
+    ).toEqual([{ type: "text", text: FAIL_CLOSED_TEXT }]);
   });
 
   test("restores only branch mirrors and identifies incomplete event pairs", () => {
@@ -362,6 +475,30 @@ describe("ResearchRuntime", () => {
     ).toContain("unsafe");
   });
 
+  test("legacy calculate is blocked only while active v2 run is unscreened or unsafe", () => {
+    const input = { birth_profile: {} };
+    for (const status of ["created", "refused_unsafe", "unresolved"]) {
+      const runtime = new ResearchRuntime();
+      runtime.restore([mirror(status, createOp)]);
+      runtime.beginAssistantMessage(`leaf-${status}`);
+      expect(
+        runtime.reserve(
+          `legacy-${status}`,
+          "jyotish_compute_chart",
+          input,
+          () => {},
+          `leaf-${status}`,
+        )?.block,
+      ).toBe(true);
+    }
+    const screened = new ResearchRuntime();
+    screened.restore([mirror("screened_safe", screenOp, 2)]);
+    screened.beginAssistantMessage("leaf-safe");
+    expect(
+      screened.reserve("legacy-safe", "jyotish_compute_chart", input, () => {}, "leaf-safe"),
+    ).toBeUndefined();
+  });
+
   test("fails closed for terminal assistant prose until validated", () => {
     const runtime = new ResearchRuntime();
     runtime.restore([mirror("calculated", calculateOp, 3, hash2)]);
@@ -437,7 +574,7 @@ describe("ResearchRuntime", () => {
     };
     registerJyotishExtension(fakePi as any);
     const context = {
-      sessionManager: { getBranch: () => branch },
+      sessionManager: { getBranch: () => branch, getLeafId: () => "active-leaf" },
       ui: { notify() {} },
     };
     expect(probeResearchRuntimeCapabilities(fakePi as any, context.sessionManager)).toBe(true);
@@ -492,5 +629,132 @@ describe("ResearchRuntime", () => {
     );
     expect(gated.message.content).toEqual([{ type: "text", text: FAIL_CLOSED_TEXT }]);
     expect(appended).toHaveLength(2);
+  });
+
+  test("failed startup capability probe hard-disables mutations and final prose", async () => {
+    const handlers = new Map<string, Array<(event: any, context: any) => any>>();
+    const fakePi = {
+      on(event: string, handler: (event: any, context: any) => any) {
+        handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+      },
+      registerTool() {},
+      appendEntry() {},
+    };
+    registerJyotishExtension(fakePi as any);
+    const context = {
+      sessionManager: { getBranch: () => [] }, // getLeafId deliberately absent
+      ui: { notify() {} },
+    };
+    await handlers.get("session_start")?.[0]?.({ type: "session_start" }, context);
+    const mutation = await handlers.get("tool_call")?.[0]?.(
+      {
+        type: "tool_call",
+        toolCallId: "disabled-create",
+        toolName: "jyotish_create_research_run",
+        input: { operation_id: createOp, expected_revision: 0 },
+      },
+      context,
+    );
+    expect(mutation?.block).toBe(true);
+    const gated = await handlers.get("message_end")?.[0]?.(
+      {
+        type: "message_end",
+        message: { role: "assistant", content: [{ type: "text", text: "unsafe fallback" }] },
+      },
+      context,
+    );
+    expect(gated.message.content).toEqual([{ type: "text", text: FAIL_CLOSED_TEXT }]);
+  });
+
+  test("create commit with events fetch failure returns unresolved lifecycle details", async () => {
+    const realFetch = globalThis.fetch;
+    const tools = new Map<string, any>();
+    const handlers = new Map<string, Array<(event: any, context: any) => any>>();
+    const branch: unknown[] = [];
+    const fakePi = {
+      on(event: string, handler: (event: any, context: any) => any) {
+        handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+      },
+      registerTool(tool: { name: string }) {
+        tools.set(tool.name, tool);
+      },
+      appendEntry(customType: string, data: unknown) {
+        branch.push({ type: "custom", customType, data });
+      },
+    };
+    const context = {
+      sessionManager: { getBranch: () => branch, getLeafId: () => "create-leaf" },
+      ui: { notify() {} },
+    };
+    registerJyotishExtension(fakePi as any);
+    await handlers.get("session_start")?.[0]?.({ type: "session_start" }, context);
+    await handlers.get("message_start")?.[0]?.(
+      { type: "message_start", message: { role: "assistant", content: [] } },
+      context,
+    );
+    await handlers.get("tool_call")?.[0]?.(
+      {
+        type: "tool_call",
+        toolCallId: "create-call",
+        toolName: "jyotish_create_research_run",
+        input: { operation_id: createOp, expected_revision: 0 },
+      },
+      context,
+    );
+    try {
+      globalThis.fetch = mock(async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.endsWith("/v2/research-runs")) {
+          return new Response(JSON.stringify({ run_id: runId, status: "created" }), {
+            status: 201,
+          });
+        }
+        return new Response(JSON.stringify({ problem: "events unavailable" }), {
+          status: 503,
+        });
+      }) as typeof fetch;
+      const result = await tools.get("jyotish_create_research_run").execute(
+        "create-call",
+        {
+          operation_id: createOp,
+          expected_revision: 0,
+          question: "Career?",
+          birth_profile: {},
+          model_version: "test",
+          planner_version: "test",
+          corpus_version: "test",
+          contract_version: "2.0",
+        },
+      );
+      expect(result.details).toEqual({
+        run_id: runId,
+        operation_id: createOp,
+        backend_seq: 0,
+        event_hash: "0".repeat(64),
+        status: "unresolved",
+      });
+      await handlers.get("tool_result")?.[0]?.(
+        {
+          type: "tool_result",
+          toolCallId: "create-call",
+          toolName: "jyotish_create_research_run",
+          input: {},
+          content: result.content,
+          details: result.details,
+          isError: false,
+        },
+        context,
+      );
+      const gated = await handlers.get("message_end")?.[0]?.(
+        {
+          type: "message_end",
+          message: { role: "assistant", content: [{ type: "text", text: "created" }] },
+        },
+        context,
+      );
+      expect(gated.message.content).toEqual([{ type: "text", text: FAIL_CLOSED_TEXT }]);
+    } finally {
+      globalThis.fetch = realFetch;
+    }
   });
 });
