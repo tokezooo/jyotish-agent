@@ -81,6 +81,18 @@ Interpretive surface (all citation-enforced): D1/D2/D3/D7/D9/D10/D12 + per-plane
 ### Phase 10: narrow geometric yogas (DONE)
 - `src/jyotish_agent/yogas.py`: 3 unambiguous positional yogas — Gajakesari (Jupiter in a kendra from the Moon), Chandra-Mangala (Moon+Mars same rasi), Budha-Aditya (Sun+Mercury same rasi). D1 only. Each emits `present` + the exact `definition` + `basis` geometry. No orbs/strength/combustion/cancellation (stated). Citation atom `yogas.<Name>.present`. Broad yoga coverage stays deferred.
 
+### Milestone 3: Strength, Points, Time (DONE 2026-07-11, /autoplan-reviewed)
+
+Opt-in fact modules via `config.modules` (default empty; unknown or unimplemented -> 422):
+
+- Phase 11 `shadbala`: six-fold strength, 7 grahas, component labels pinned by classical naisargika constants; atoms `shadbala.<P>.rupas/.strength_ratio/.components.<name>`.
+- Phase 12 `ashtakavarga`: raw BAV/SAV (pre-sodhana, stated), SAV==337 invariant, BAV Lagna row kept, strict bindu validation; atoms `ashtakavarga.sav.<Sign>`, `ashtakavarga.bav.<P>.<Sign>`.
+- Phase 13 `transits`: gochara at noon-anchored reference_date (offset-aware `transits.anchor`), houses from natal Moon AND natal lagna, Gochara×SAV join (`sav_points`) when both modules on; Saturn cross-checked externally (sidereal Pisces, June 2026).
+- Phase 14 `yogas_engine`: two-tier per gate decision — engine scan per configured chart (~284 checks, stdout captured, error count + status field, prediction prose excluded, stable snake_case keys); verified `yogas` tier authoritative, mismatch surfaces as warning; skill mandates hedged phrasing.
+- Phase 15 `varshaphal`: Tajaka annual chart under its honest name (NOT progressions), pravesh-bracketed year selection (solar-return boundaries, noon-anchored), munthi included; year lord dropped — engine's lord_of_the_year has real bugs (mean-year drift + candidate-index return), documented.
+
+Each phase: dev subagent -> adversarial review (Codex; Phase 15 [subagent-only], Codex usage limit) -> fixes -> merge. 183 Python tests (was 115 pre-milestone).
+
 ### Candidate future milestones (not started)
 - Extend the prose check beyond literal "<Planet> in <Sign>" English phrasing (aspects/dashas, paraphrase, other languages). Harness-forced check/screen gates need Pi support. External-reference parity (vs astro.com/JHora). More vargas/yogas only with the same verification bar.
 
