@@ -107,6 +107,31 @@ def test_client_assigned_run_id_survives_restart_and_exact_replay(tmp_path: Path
     assert fetched.json() == replayed.json() == created.json()
 
 
+def test_client_assigned_run_id_collision_is_409_and_preserves_original_ledger(
+    tmp_path: Path,
+):
+    client = _client(tmp_path)
+    run_id = f"rr_{uuid.uuid4()}"
+    original_body = {**_body(), "run_id": run_id}
+    original = client.post("/v2/research-runs", json=original_body)
+    assert original.status_code == 201, original.text
+
+    collision_body = {
+        **original_body,
+        "operation_id": _operation_id(),
+    }
+    collision = client.post("/v2/research-runs", json=collision_body)
+    assert collision.status_code == 409
+    assert collision.headers["content-type"].startswith("application/problem+json")
+
+    fetched = client.get(f"/v2/research-runs/{run_id}")
+    events = client.get(f"/v2/research-runs/{run_id}/events")
+    assert fetched.status_code == events.status_code == 200
+    assert fetched.json() == original.json()
+    assert len(events.json()["events"]) == 1
+    assert events.json()["events"][0]["operation_id"] == original_body["operation_id"]
+
+
 def test_numeric_and_explicit_fixed_offsets_have_same_normalized_hash(tmp_path: Path):
     client = _client(tmp_path)
     numeric = client.post("/v2/research-runs", json=_body()).json()

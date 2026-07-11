@@ -633,9 +633,19 @@ export class ResearchRuntime {
       ) {
         return { block: true, reason: "Create requires run_id, operation_id, and expected_revision=0." };
       }
-      if (active) {
+      const exactUnresolvedRetry =
+        active?.status === "unresolved" &&
+        active.backend_seq === 0 &&
+        active.event_hash === ZERO_EVENT_HASH &&
+        active.run_id === input.run_id &&
+        active.operation_id === input.operation_id;
+      if (active && !exactUnresolvedRetry) {
         return { block: true, reason: "This Pi branch already has an active or unresolved research run." };
       }
+      // A restored pre-execution reservation is superseded by this exact retry.
+      // Changed identities remain blocked above, so no unrelated pending mutation
+      // can be discarded here.
+      if (exactUnresolvedRetry) this.pending.delete(input.operation_id);
       const reservation: ResearchMirror = {
         run_id: input.run_id,
         operation_id: input.operation_id,

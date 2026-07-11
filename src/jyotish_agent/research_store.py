@@ -329,6 +329,13 @@ class ResearchStore:
                 connection.commit()
                 return json.loads(existing_operation["result_json"])
 
+            existing_run = connection.execute(
+                "SELECT 1 FROM research_runs WHERE run_id = ?",
+                (run_data["run_id"],),
+            ).fetchone()
+            if existing_run is not None:
+                raise OptimisticConflict("run_id was already created by another operation")
+
             connection.execute(
                 """INSERT INTO research_runs (
                     run_id, revision, status, question, birth_profile_json,

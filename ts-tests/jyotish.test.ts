@@ -406,6 +406,101 @@ describe("ResearchRuntime", () => {
     ).toEqual([{ type: "text", text: FAIL_CLOSED_TEXT }]);
   });
 
+  test.each([
+    ["backend uncommitted", true, undefined],
+    [
+      "backend commit ambiguous",
+      false,
+      {
+        run_id: runId,
+        operation_id: createOp,
+        backend_seq: 0,
+        event_hash: "0".repeat(64),
+        status: "unresolved",
+      },
+    ],
+  ])("retries the exact unresolved create on a new leaf after %s", (_case, isError, details) => {
+    const runtime = new ResearchRuntime();
+    const appended: unknown[] = [];
+    runtime.beginAssistantMessage("create-leaf-1");
+    expect(
+      runtime.reserve(
+        "create-call-1",
+        "jyotish_create_research_run",
+        { run_id: runId, operation_id: createOp, expected_revision: 0 },
+        (entry) => appended.push(entry),
+      ),
+    ).toBeUndefined();
+    runtime.settle("create-call-1", isError, details, () => {});
+
+    runtime.beginAssistantMessage("create-leaf-2");
+    expect(
+      runtime.reserve(
+        "create-call-2",
+        "jyotish_create_research_run",
+        { run_id: runId, operation_id: createOp, expected_revision: 0 },
+        (entry) => appended.push(entry),
+      ),
+    ).toBeUndefined();
+    expect(appended).toHaveLength(2);
+
+    runtime.settle("create-call-2", true, undefined, () => {});
+    runtime.beginAssistantMessage("create-leaf-3");
+    expect(
+      runtime.reserve(
+        "changed-operation",
+        "jyotish_create_research_run",
+        { run_id: runId, operation_id: screenOp, expected_revision: 0 },
+        () => {},
+      )?.block,
+    ).toBe(true);
+
+    const otherRunId = "rr_44444444-4444-4444-8444-444444444444";
+    expect(
+      runtime.reserve(
+        "changed-run",
+        "jyotish_create_research_run",
+        { run_id: otherRunId, operation_id: createOp, expected_revision: 0 },
+        () => {},
+      )?.block,
+    ).toBe(true);
+  });
+
+  test("an exact create retry supersedes its restored durable reservation", () => {
+    const reserved = {
+      run_id: runId,
+      operation_id: createOp,
+      backend_seq: 0,
+      event_hash: "0".repeat(64),
+      status: "reserved",
+    };
+    const runtime = new ResearchRuntime();
+    runtime.restore([{ type: "custom", customType: RESEARCH_MIRROR_TYPE, data: reserved }]);
+    runtime.beginAssistantMessage("retry-after-restart");
+    expect(
+      runtime.reserve(
+        "retry-call",
+        "jyotish_create_research_run",
+        { run_id: runId, operation_id: createOp, expected_revision: 0 },
+        () => {},
+      ),
+    ).toBeUndefined();
+    runtime.settle(
+      "retry-call",
+      false,
+      {
+        run_id: runId,
+        operation_id: createOp,
+        backend_seq: 1,
+        event_hash: hash1,
+        status: "created",
+      },
+      () => {},
+    );
+    expect(runtime.snapshot()?.status).toBe("created");
+    expect(runtime.snapshot()?.needs_reconciliation).toBe(false);
+  });
+
   test("restores only branch mirrors and identifies incomplete event pairs", () => {
     const runtime = new ResearchRuntime();
     runtime.restore([
