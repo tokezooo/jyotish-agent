@@ -17,3 +17,4 @@ tests/fixtures/golden_chennai_1990_swiss_modules.json
 # record of the headless calculation dependency set. Do not ignore it.
 .gstack/
 .worktrees/
+.superpowers/
