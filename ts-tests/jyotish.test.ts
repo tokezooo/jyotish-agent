@@ -4,10 +4,15 @@ import { Value } from "typebox/value";
 
 import {
   BirthProfileSchema,
+  FAIL_CLOSED_TEXT,
+  RESEARCH_MIRROR_TYPE,
+  ResearchRuntime,
   formatProblem,
   postJson,
+  probeResearchRuntimeCapabilities,
   summarizeChart,
 } from "../.pi/extensions/jyotish";
+import registerJyotishExtension from "../.pi/extensions/jyotish";
 
 describe("formatProblem", () => {
   test("renders problem/cause/fix triad", () => {
@@ -194,5 +199,298 @@ describe("summarizeChart module facts", () => {
       facts: { yogas_engine: { status: "partial", charts: { d1: [{ name: "X" }] } } },
     });
     expect(partial).toContain("[status: partial]");
+  });
+});
+
+describe("ResearchRuntime", () => {
+  const runId = "rr_11111111-1111-4111-8111-111111111111";
+  const createOp = "op_11111111-1111-4111-8111-111111111111";
+  const screenOp = "op_22222222-2222-4222-8222-222222222222";
+  const calculateOp = "op_33333333-3333-4333-8333-333333333333";
+  const hash1 = "a".repeat(64);
+  const hash2 = "b".repeat(64);
+
+  const mirror = (status: string, operationId: string, seq = 1, eventHash = hash1) => ({
+    type: "custom",
+    customType: RESEARCH_MIRROR_TYPE,
+    data: {
+      run_id: runId,
+      operation_id: operationId,
+      backend_seq: seq,
+      event_hash: eventHash,
+      status,
+    },
+  });
+
+  test("reserves one sibling state transition and permits retry after failure", () => {
+    const runtime = new ResearchRuntime();
+    runtime.restore([mirror("created", screenOp)]);
+    const appended: unknown[] = [];
+    runtime.beginAssistantMessage();
+
+    expect(
+      runtime.reserve(
+        "call-screen",
+        "jyotish_screen_research_run",
+        { run_id: runId, operation_id: screenOp, expected_revision: 1 },
+        (entry) => appended.push(entry),
+      ),
+    ).toBeUndefined();
+    expect(
+      runtime.reserve(
+        "call-calculate",
+        "jyotish_calculate_research_run",
+        { run_id: runId, operation_id: calculateOp, expected_revision: 1 },
+        (entry) => appended.push(entry),
+      )?.block,
+    ).toBe(true);
+
+    runtime.settle("call-screen", true, undefined, (entry) => appended.push(entry));
+    runtime.beginAssistantMessage();
+    expect(
+      runtime.reserve(
+        "call-retry",
+        "jyotish_screen_research_run",
+        { run_id: runId, operation_id: screenOp, expected_revision: 1 },
+        (entry) => appended.push(entry),
+      ),
+    ).toBeUndefined();
+    expect(appended).toHaveLength(3); // reserved, failed, reserved retry
+  });
+
+  test("restores only branch mirrors and identifies incomplete event pairs", () => {
+    const runtime = new ResearchRuntime();
+    runtime.restore([
+      { type: "compaction", summary: "kept" },
+      mirror("created", screenOp),
+      mirror("reserved", calculateOp),
+      { type: "custom", customType: "another-extension", data: { status: "calculated" } },
+    ]);
+    expect(runtime.snapshot()).toEqual({
+      run_id: runId,
+      operation_id: screenOp,
+      backend_seq: 1,
+      event_hash: hash1,
+      status: "created",
+      needs_reconciliation: true,
+    });
+  });
+
+  test("reconciles a backend commit after Pi crashed before tool_result", () => {
+    const runtime = new ResearchRuntime();
+    runtime.restore([mirror("screened_safe", screenOp, 2), mirror("reserved", calculateOp, 2)]);
+    const appended: unknown[] = [];
+    runtime.reconcile(
+      {
+        run_id: runId,
+        status: "calculated",
+        revision: 3,
+      },
+      [
+        { seq: 2, operation_id: screenOp, event_hash: hash1 },
+        { seq: 3, operation_id: calculateOp, event_hash: hash2 },
+      ],
+      (entry) => appended.push(entry),
+    );
+    expect(runtime.snapshot()).toEqual({
+      run_id: runId,
+      operation_id: calculateOp,
+      backend_seq: 3,
+      event_hash: hash2,
+      status: "calculated",
+      needs_reconciliation: false,
+    });
+    expect(appended).toHaveLength(1);
+  });
+
+  test("reconciliation closes a reservation that never reached the backend", () => {
+    const branch: unknown[] = [
+      mirror("screened_safe", screenOp, 2),
+      mirror("reserved", calculateOp, 2),
+    ];
+    const runtime = new ResearchRuntime();
+    runtime.restore(branch);
+    runtime.reconcile(
+      { run_id: runId, status: "screened_safe", revision: 2 },
+      [{ seq: 2, operation_id: screenOp, event_hash: hash1 }],
+      (entry) => branch.push({ type: "custom", customType: RESEARCH_MIRROR_TYPE, data: entry }),
+    );
+
+    const restored = new ResearchRuntime();
+    restored.restore(branch);
+    expect(restored.snapshot()?.status).toBe("screened_safe");
+    expect(restored.snapshot()?.needs_reconciliation).toBe(false);
+  });
+
+  test("allows exact duplicate operation replay but blocks unsafe calculation", () => {
+    const runtime = new ResearchRuntime();
+    runtime.restore([
+      mirror("created", createOp),
+      mirror("reserved", screenOp),
+      mirror("refused_unsafe", screenOp, 2, hash2),
+    ]);
+    const appended: unknown[] = [];
+    runtime.beginAssistantMessage();
+    expect(
+      runtime.reserve(
+        "duplicate-screen",
+        "jyotish_screen_research_run",
+        { run_id: runId, operation_id: screenOp, expected_revision: 1 },
+        (entry) => appended.push(entry),
+      ),
+    ).toBeUndefined();
+    runtime.settle(
+      "duplicate-screen",
+      false,
+      {
+        run_id: runId,
+        operation_id: screenOp,
+        backend_seq: 2,
+        event_hash: hash2,
+        status: "refused_unsafe",
+      },
+      (entry) => appended.push(entry),
+    );
+    runtime.beginAssistantMessage();
+    expect(
+      runtime.reserve(
+        "new-calculate",
+        "jyotish_calculate_research_run",
+        { run_id: runId, operation_id: calculateOp, expected_revision: 2 },
+        () => {},
+      )?.reason,
+    ).toContain("unsafe");
+  });
+
+  test("fails closed for terminal assistant prose until validated", () => {
+    const runtime = new ResearchRuntime();
+    runtime.restore([mirror("calculated", calculateOp, 3, hash2)]);
+    const message = {
+      role: "assistant",
+      content: [{ type: "text", text: "Here is an unvalidated reading." }],
+    };
+    const replacement = runtime.gateFinalMessage(message);
+    expect(replacement?.content).toEqual([{ type: "text", text: FAIL_CLOSED_TEXT }]);
+
+    runtime.restore([mirror("validated", calculateOp, 4, hash2)]);
+    expect(runtime.gateFinalMessage(message)).toBeUndefined();
+    expect(
+      runtime.gateFinalMessage({
+        role: "assistant",
+        content: [{ type: "toolCall", id: "x", name: "tool", arguments: {} }],
+      }),
+    ).toBeUndefined();
+  });
+
+  test("unsafe final prose is replaced by the canonical backend refusal", () => {
+    const runtime = new ResearchRuntime();
+    runtime.restore([mirror("created", createOp)]);
+    runtime.beginAssistantMessage();
+    runtime.reserve(
+      "unsafe-screen",
+      "jyotish_screen_research_run",
+      { run_id: runId, operation_id: screenOp, expected_revision: 1 },
+      () => {},
+    );
+    runtime.settle(
+      "unsafe-screen",
+      false,
+      {
+        run_id: runId,
+        operation_id: screenOp,
+        backend_seq: 2,
+        event_hash: hash2,
+        status: "refused_unsafe",
+        redirect: "I can't make deterministic harm predictions. Use qualified support.",
+      },
+      () => {},
+    );
+    const replacement = runtime.gateFinalMessage({
+      role: "assistant",
+      content: [{ type: "text", text: "invented refusal" }],
+    });
+    expect(replacement?.content).toEqual([
+      {
+        type: "text",
+        text: "I can't make deterministic harm predictions. Use qualified support.",
+      },
+    ]);
+  });
+
+  test("startup probe and registered hooks exercise replacement semantics without a version check", async () => {
+    const handlers = new Map<string, Array<(event: any, context: any) => any>>();
+    const branch: unknown[] = [mirror("created", createOp)];
+    const appended: unknown[] = [];
+    const tools: string[] = [];
+    const fakePi = {
+      on(event: string, handler: (event: any, context: any) => any) {
+        handlers.set(event, [...(handlers.get(event) ?? []), handler]);
+      },
+      registerTool(tool: { name: string }) {
+        tools.push(tool.name);
+      },
+      appendEntry(customType: string, data: unknown) {
+        const entry = { type: "custom", customType, data };
+        branch.push(entry);
+        appended.push(entry);
+      },
+    };
+    registerJyotishExtension(fakePi as any);
+    const context = {
+      sessionManager: { getBranch: () => branch },
+      ui: { notify() {} },
+    };
+    expect(probeResearchRuntimeCapabilities(fakePi as any, context.sessionManager)).toBe(true);
+    expect(probeResearchRuntimeCapabilities(fakePi as any, {})).toBe(false);
+    expect(handlers.has("before_agent_start")).toBe(true);
+    expect(handlers.has("tool_call")).toBe(true);
+    expect(handlers.has("tool_result")).toBe(true);
+    expect(handlers.has("message_end")).toBe(true);
+    expect(tools).toContain("jyotish_create_research_run");
+    expect(tools).toContain("jyotish_screen_research_run");
+    expect(tools).toContain("jyotish_calculate_research_run");
+
+    await handlers.get("session_start")?.[0]?.({ type: "session_start" }, context);
+    await handlers.get("message_start")?.[0]?.(
+      { type: "message_start", message: { role: "assistant", content: [] } },
+      context,
+    );
+    const reserved = await handlers.get("tool_call")?.[0]?.(
+      {
+        type: "tool_call",
+        toolCallId: "screen-call",
+        toolName: "jyotish_screen_research_run",
+        input: { run_id: runId, operation_id: screenOp, expected_revision: 1 },
+      },
+      context,
+    );
+    expect(reserved).toBeUndefined();
+    await handlers.get("tool_result")?.[0]?.(
+      {
+        type: "tool_result",
+        toolCallId: "screen-call",
+        toolName: "jyotish_screen_research_run",
+        input: {},
+        content: [],
+        isError: false,
+        details: {
+          run_id: runId,
+          operation_id: screenOp,
+          backend_seq: 2,
+          event_hash: hash2,
+          status: "screened_safe",
+        },
+      },
+      context,
+    );
+    const gated = await handlers.get("message_end")?.[0]?.(
+      {
+        type: "message_end",
+        message: { role: "assistant", content: [{ type: "text", text: "draft" }] },
+      },
+      context,
+    );
+    expect(gated.message.content).toEqual([{ type: "text", text: FAIL_CLOSED_TEXT }]);
+    expect(appended).toHaveLength(2);
   });
 });

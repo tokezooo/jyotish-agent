@@ -312,6 +312,32 @@ interface PostResult {
   body: unknown;
 }
 
+export async function getJson(path: string, signal?: AbortSignal): Promise<PostResult> {
+  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
+  try {
+    const res = await fetch(`${apiBase()}${path}`, { signal: combined });
+    let body: unknown = null;
+    try {
+      body = await res.json();
+    } catch {
+      body = null;
+    }
+    return { ok: res.ok, status: res.status, body };
+  } catch (err) {
+    return {
+      ok: false,
+      status: 0,
+      body: {
+        title: "Jyotish service unreachable",
+        problem: `Could not reach the calculation service at ${apiBase()}.`,
+        cause: oneLine(String(err)),
+        fix: "Start it: `uv run uvicorn jyotish_agent.api:app`, or set $JYOTISH_API_URL.",
+      },
+    };
+  }
+}
+
 export async function postJson(
   path: string,
   payload: unknown,
@@ -349,10 +375,353 @@ export async function postJson(
   }
 }
 
+// --- authoritative research workflow runtime --------------------------------
+
+export const RESEARCH_MIRROR_TYPE = "jyotish-research-runtime-v2";
+export const FAIL_CLOSED_TEXT =
+  "Jyotish research answer blocked: no backend-validated final answer is available.";
+
+const STATE_ADVANCING_TOOLS = new Set([
+  "jyotish_screen_research_run",
+  "jyotish_calculate_research_run",
+]);
+
+interface ResearchMirror {
+  run_id: string;
+  operation_id: string;
+  backend_seq: number;
+  event_hash: string;
+  status: string;
+}
+
+interface RuntimeSnapshot extends ResearchMirror {
+  needs_reconciliation: boolean;
+}
+
+interface Reservation {
+  toolCallId: string;
+  toolName: string;
+  mirror: ResearchMirror;
+  prior: ResearchMirror;
+}
+
+type AppendMirror = (entry: ResearchMirror) => void;
+
+function isMirror(value: unknown): value is ResearchMirror {
+  if (typeof value !== "object" || value === null) return false;
+  const item = value as Record<string, unknown>;
+  return (
+    typeof item.run_id === "string" &&
+    item.run_id.startsWith("rr_") &&
+    typeof item.operation_id === "string" &&
+    item.operation_id.startsWith("op_") &&
+    Number.isInteger(item.backend_seq) &&
+    (item.backend_seq as number) >= 1 &&
+    typeof item.event_hash === "string" &&
+    item.event_hash.length === 64 &&
+    typeof item.status === "string"
+  );
+}
+
+function asMirror(value: unknown): ResearchMirror | undefined {
+  if (!isMirror(value)) return undefined;
+  return {
+    run_id: value.run_id,
+    operation_id: value.operation_id,
+    backend_seq: value.backend_seq,
+    event_hash: value.event_hash,
+    status: value.status,
+  };
+}
+
+function operationInput(input: Record<string, unknown>): {
+  runId: string;
+  operationId: string;
+  expectedRevision: number;
+} | null {
+  if (
+    typeof input.run_id !== "string" ||
+    typeof input.operation_id !== "string" ||
+    !Number.isInteger(input.expected_revision)
+  ) {
+    return null;
+  }
+  return {
+    runId: input.run_id,
+    operationId: input.operation_id,
+    expectedRevision: input.expected_revision as number,
+  };
+}
+
+/** Pure state machine used by Pi hooks. SQLite remains authoritative. */
+export class ResearchRuntime {
+  private current?: ResearchMirror;
+  private pending = new Map<string, Reservation>();
+  private completedOperations = new Set<string>();
+  private messageReservation?: string;
+  private incomplete = false;
+  private refusalText?: string;
+
+  restore(entries: readonly unknown[]): void {
+    this.current = undefined;
+    this.pending.clear();
+    this.completedOperations.clear();
+    this.messageReservation = undefined;
+    this.incomplete = false;
+    this.refusalText = undefined;
+    for (const raw of entries) {
+      if (typeof raw !== "object" || raw === null) continue;
+      const entry = raw as Record<string, unknown>;
+      if (entry.type !== "custom" || entry.customType !== RESEARCH_MIRROR_TYPE) continue;
+      if (!isMirror(entry.data)) {
+        this.incomplete = true;
+        continue;
+      }
+      const mirror = entry.data;
+      if (mirror.status === "reserved") {
+        if (!this.current || this.current.run_id !== mirror.run_id) {
+          this.incomplete = true;
+          continue;
+        }
+        this.pending.set(mirror.operation_id, {
+          toolCallId: `restored:${mirror.operation_id}`,
+          toolName: "restored",
+          mirror,
+          prior: this.current,
+        });
+        continue;
+      }
+      if (mirror.status === "operation_failed") {
+        this.pending.delete(mirror.operation_id);
+        continue;
+      }
+      if (
+        this.current &&
+        !this.pending.has(mirror.operation_id) &&
+        !this.completedOperations.has(mirror.operation_id)
+      ) {
+        this.incomplete = true;
+      }
+      this.pending.delete(mirror.operation_id);
+      this.completedOperations.add(mirror.operation_id);
+      this.current = mirror;
+    }
+    if (this.pending.size > 0) this.incomplete = true;
+  }
+
+  snapshot(): RuntimeSnapshot | undefined {
+    if (!this.current) return undefined;
+    return { ...this.current, needs_reconciliation: this.incomplete || this.pending.size > 0 };
+  }
+
+  beginAssistantMessage(): void {
+    this.messageReservation = undefined;
+  }
+
+  reserve(
+    toolCallId: string,
+    toolName: string,
+    input: Record<string, unknown>,
+    append: AppendMirror,
+  ): { block: true; reason: string } | undefined {
+    if (!STATE_ADVANCING_TOOLS.has(toolName)) return undefined;
+    if (this.messageReservation) {
+      return { block: true, reason: "Only one state-advancing Jyotish tool is allowed per assistant message." };
+    }
+    const parsed = operationInput(input);
+    if (!parsed) return { block: true, reason: "run_id, operation_id, and expected_revision are required." };
+    if (!this.current || this.current.run_id !== parsed.runId) {
+      return { block: true, reason: "The Pi branch has no matching authoritative research run." };
+    }
+    const duplicate = this.completedOperations.has(parsed.operationId);
+    if (!duplicate) {
+      if (this.incomplete || this.pending.size > 0) {
+        return { block: true, reason: "Research state is incomplete; reconcile with the backend before advancing." };
+      }
+      if (parsed.expectedRevision !== this.current.backend_seq) {
+        return { block: true, reason: "expected_revision is stale; refresh authoritative backend state." };
+      }
+      if (toolName === "jyotish_screen_research_run" && this.current.status !== "created") {
+        return { block: true, reason: "Screening is valid only for a newly created run." };
+      }
+      if (toolName === "jyotish_calculate_research_run") {
+        if (this.current.status === "refused_unsafe") {
+          return { block: true, reason: "The unsafe refusal branch is terminal; calculation is blocked." };
+        }
+        if (this.current.status !== "screened_safe") {
+          return { block: true, reason: "Calculation requires a safely screened run." };
+        }
+      }
+    }
+    const reservation: ResearchMirror = {
+      run_id: parsed.runId,
+      operation_id: parsed.operationId,
+      backend_seq: this.current.backend_seq,
+      event_hash: this.current.event_hash,
+      status: "reserved",
+    };
+    this.pending.set(parsed.operationId, {
+      toolCallId,
+      toolName,
+      mirror: reservation,
+      prior: this.current,
+    });
+    this.messageReservation = toolCallId;
+    append(reservation);
+    return undefined;
+  }
+
+  settle(
+    toolCallId: string,
+    isError: boolean,
+    details: unknown,
+    append: AppendMirror,
+  ): void {
+    const reservation = [...this.pending.values()].find((item) => item.toolCallId === toolCallId);
+    if (!reservation) return;
+    const result = asMirror(details);
+    if (isError || !result || result.operation_id !== reservation.mirror.operation_id) {
+      append({ ...reservation.prior, operation_id: reservation.mirror.operation_id, status: "operation_failed" });
+    } else {
+      this.current = result;
+      if (
+        result.status === "refused_unsafe" &&
+        typeof (details as Record<string, unknown>).redirect === "string"
+      ) {
+        this.refusalText = (details as Record<string, unknown>).redirect as string;
+      }
+      this.completedOperations.add(result.operation_id);
+      append(result);
+    }
+    this.pending.delete(reservation.mirror.operation_id);
+    this.messageReservation = undefined;
+    this.incomplete = false;
+  }
+
+  seed(details: unknown, append: AppendMirror): void {
+    const mirror = asMirror(details);
+    if (!mirror) return;
+    this.current = mirror;
+    this.completedOperations.add(mirror.operation_id);
+    this.incomplete = false;
+    append(mirror);
+  }
+
+  reconcile(
+    run: { run_id?: unknown; status?: unknown; revision?: unknown },
+    events: readonly unknown[],
+    append: AppendMirror,
+  ): void {
+    if (typeof run.run_id !== "string" || typeof run.status !== "string") return;
+    const validEvents = events.filter(
+      (value): value is {
+        seq: number;
+        operation_id: string;
+        event_hash: string;
+        payload?: unknown;
+      } => {
+        if (typeof value !== "object" || value === null) return false;
+        const event = value as Record<string, unknown>;
+        return (
+          Number.isInteger(event.seq) &&
+          typeof event.operation_id === "string" &&
+          typeof event.event_hash === "string" &&
+          event.event_hash.length === 64
+        );
+      },
+    );
+    const latest = validEvents.at(-1);
+    if (!latest) return;
+    const mirror: ResearchMirror = {
+      run_id: run.run_id,
+      operation_id: latest.operation_id,
+      backend_seq: latest.seq,
+      event_hash: latest.event_hash,
+      status: run.status,
+    };
+    if (mirror.status === "refused_unsafe") {
+      const payload = latest.payload;
+      if (typeof payload === "object" && payload !== null) {
+        const result = (payload as Record<string, unknown>).result;
+        if (
+          typeof result === "object" &&
+          result !== null &&
+          typeof (result as Record<string, unknown>).redirect === "string"
+        ) {
+          this.refusalText = (result as Record<string, unknown>).redirect as string;
+        }
+      }
+    }
+    const reservations = [...this.pending.values()];
+    const matchingReservation = reservations.some(
+      (reservation) => reservation.mirror.operation_id === latest.operation_id,
+    );
+    for (const reservation of reservations) {
+      if (reservation.mirror.operation_id !== latest.operation_id) {
+        append({
+          run_id: mirror.run_id,
+          operation_id: reservation.mirror.operation_id,
+          backend_seq: mirror.backend_seq,
+          event_hash: mirror.event_hash,
+          status: "operation_failed",
+        });
+      }
+    }
+    const backendChanged =
+      this.current?.backend_seq !== mirror.backend_seq ||
+      this.current.event_hash !== mirror.event_hash ||
+      this.current.status !== mirror.status;
+    if (matchingReservation || backendChanged || (this.incomplete && reservations.length === 0)) {
+      append(mirror);
+    }
+    this.current = mirror;
+    this.pending.clear();
+    this.completedOperations.add(mirror.operation_id);
+    this.incomplete = false;
+  }
+
+  stateContext(): string | undefined {
+    const state = this.snapshot();
+    if (!state) return undefined;
+    return `Research backend: run_id=${state.run_id} status=${state.status} backend_seq=${state.backend_seq} event_hash=${state.event_hash}`;
+  }
+
+  gateFinalMessage<T extends { role: string; content?: unknown }>(message: T): T | undefined {
+    if (message.role !== "assistant" || !this.current || this.current.status === "validated") return undefined;
+    if (!Array.isArray(message.content)) return undefined;
+    const content = message.content as Array<{ type?: string; text?: string }>;
+    if (content.some((item) => item.type === "toolCall")) return undefined;
+    if (!content.some((item) => item.type === "text" && item.text?.trim())) return undefined;
+    const text =
+      this.current.status === "refused_unsafe" && this.refusalText
+        ? this.refusalText
+        : FAIL_CLOSED_TEXT;
+    return { ...message, content: [{ type: "text", text }] } as T;
+  }
+}
+
+export function probeResearchRuntimeCapabilities(
+  pi: Pick<ExtensionAPI, "appendEntry">,
+  sessionManager: { getBranch?: unknown },
+): boolean {
+  return typeof pi.appendEntry === "function" && typeof sessionManager.getBranch === "function";
+}
+
 // --- extension --------------------------------------------------------------
 
 export default function (pi: ExtensionAPI) {
+  const researchRuntime = new ResearchRuntime();
+  const appendMirror = (entry: ResearchMirror) => pi.appendEntry(RESEARCH_MIRROR_TYPE, entry);
+
+  const restoreResearchState = (ctx: { sessionManager: { getBranch(): unknown[] } }) => {
+    researchRuntime.restore(ctx.sessionManager.getBranch());
+  };
+
   pi.on("session_start", async (_event, ctx) => {
+    restoreResearchState(ctx);
+    if (!probeResearchRuntimeCapabilities(pi, ctx.sessionManager)) {
+      ctx.ui.notify("Jyotish research runtime disabled: required Pi hook semantics are unavailable.", "error");
+    }
     const base = apiBase();
     if (!isLoopback(base) && new URL(base).protocol !== "https:") {
       ctx.ui.notify(
@@ -361,6 +730,163 @@ export default function (pi: ExtensionAPI) {
         "warning",
       );
     }
+  });
+
+  pi.on("session_tree", async (_event, ctx) => restoreResearchState(ctx));
+
+  pi.on("message_start", async (event) => {
+    if (event.message.role === "assistant") researchRuntime.beginAssistantMessage();
+  });
+
+  pi.on("before_agent_start", async (_event, ctx) => {
+    restoreResearchState(ctx);
+    const snapshot = researchRuntime.snapshot();
+    if (snapshot) {
+      const [runResult, eventsResult] = await Promise.all([
+        getJson(`/v2/research-runs/${encodeURIComponent(snapshot.run_id)}`),
+        getJson(`/v2/research-runs/${encodeURIComponent(snapshot.run_id)}/events`),
+      ]);
+      if (runResult.ok && eventsResult.ok) {
+        const events = eventsResult.body as { events?: unknown[] };
+        researchRuntime.reconcile(
+          runResult.body as { run_id?: unknown; status?: unknown; revision?: unknown },
+          events.events ?? [],
+          appendMirror,
+        );
+      }
+    }
+    const content = researchRuntime.stateContext();
+    if (!content) return undefined;
+    return { message: { customType: "jyotish-backend-state", content, display: false } };
+  });
+
+  pi.on("tool_call", async (event) =>
+    researchRuntime.reserve(event.toolCallId, event.toolName, event.input, appendMirror),
+  );
+
+  pi.on("tool_result", async (event) => {
+    if (event.toolName === "jyotish_create_research_run" && !event.isError) {
+      researchRuntime.seed(event.details, appendMirror);
+      return;
+    }
+    researchRuntime.settle(event.toolCallId, event.isError, event.details, appendMirror);
+  });
+
+  pi.on("message_end", async (event) => {
+    const replacement = researchRuntime.gateFinalMessage(event.message);
+    return replacement ? { message: replacement } : undefined;
+  });
+
+  const OperationSchema = Type.Object(
+    {
+      run_id: Type.String({
+        pattern: "^rr_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      }),
+      operation_id: Type.String({
+        pattern: "^op_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+      }),
+      expected_revision: Type.Integer({ minimum: 1 }),
+    },
+    NO_EXTRA,
+  );
+
+  pi.registerTool({
+    name: "jyotish_create_research_run",
+    label: "Create research run",
+    description:
+      "Create the authoritative local ResearchRun before screening or calculation. " +
+      "Use a fresh op_ UUID4 and expected_revision=0.",
+    parameters: Type.Object(
+      {
+        operation_id: Type.String({
+          pattern: "^op_[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+        }),
+        expected_revision: Type.Literal(0),
+        question: Type.String({ minLength: 1, maxLength: 10_000 }),
+        birth_profile: BirthProfileSchema,
+        calculation_config: Type.Optional(ConfigSchema),
+        model_version: Type.String({ minLength: 1 }),
+        planner_version: Type.String({ minLength: 1 }),
+        corpus_version: Type.String({ minLength: 1 }),
+        contract_version: Type.String({ minLength: 1 }),
+      },
+      NO_EXTRA,
+    ),
+    async execute(_toolCallId, params, signal) {
+      const { ok, status, body } = await postJson("/v2/research-runs", params, signal);
+      if (!ok) {
+        return { content: [{ type: "text", text: formatProblem(status, body) }], details: {} };
+      }
+      const run = body as { run_id?: string; status?: string };
+      const eventsResult = run.run_id
+        ? await getJson(`/v2/research-runs/${encodeURIComponent(run.run_id)}/events`, signal)
+        : { ok: false, status: 0, body: null };
+      const events = eventsResult.body as { events?: Array<{ seq?: number; event_hash?: string }> } | null;
+      const latest = events?.events?.at(-1);
+      const details = {
+        run_id: run.run_id,
+        operation_id: params.operation_id,
+        backend_seq: latest?.seq,
+        event_hash: latest?.event_hash,
+        status: run.status,
+      };
+      return {
+        content: [{ type: "text", text: JSON.stringify(body, null, 2) }],
+        details,
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "jyotish_screen_research_run",
+    label: "Screen research run",
+    description:
+      "Advance a created ResearchRun through the authoritative safety screen. " +
+      "Unsafe results are terminal and must not be calculated.",
+    parameters: OperationSchema,
+    async execute(_toolCallId, params, signal) {
+      const { run_id, ...payload } = params;
+      const { ok, status, body } = await postJson(
+        `/v2/research-runs/${encodeURIComponent(run_id)}/screen`,
+        payload,
+        signal,
+      );
+      if (!ok) {
+        return { content: [{ type: "text", text: formatProblem(status, body) }], details: {} };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(body, null, 2) }],
+        details: body as Record<string, unknown>,
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "jyotish_calculate_research_run",
+    label: "Calculate research run",
+    description:
+      "Calculate a safely screened ResearchRun and persist immutable typed computed evidence.",
+    parameters: OperationSchema,
+    async execute(_toolCallId, params, signal, onUpdate) {
+      onUpdate?.({ content: [{ type: "text", text: "Computing research evidence…" }], details: {} });
+      const { run_id, ...payload } = params;
+      const { ok, status, body } = await postJson(
+        `/v2/research-runs/${encodeURIComponent(run_id)}/calculate`,
+        payload,
+        signal,
+      );
+      if (!ok) {
+        return { content: [{ type: "text", text: formatProblem(status, body) }], details: {} };
+      }
+      const response = body as ChartResponse;
+      return {
+        content: [
+          { type: "text", text: `Summary (rounded; cite the JSON below):\n${summarizeChart(response)}` },
+          { type: "text", text: JSON.stringify(body, null, 2) },
+        ],
+        details: body as Record<string, unknown>,
+      };
+    },
   });
 
   pi.registerTool({

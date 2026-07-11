@@ -95,6 +95,19 @@ class CreateResearchRunRequest(BaseModel):
         return value
 
 
+class ResearchOperationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    operation_id: str
+    expected_revision: int = Field(ge=1)
+
+    @field_validator("operation_id")
+    @classmethod
+    def valid_operation_id(cls, value: str) -> str:
+        if not _ID_RE.fullmatch(value):
+            raise ValueError("operation_id must be an op_ prefixed UUID4")
+        return value
+
+
 class TimezoneResolution(BaseModel):
     model_config = ConfigDict(extra="forbid")
     original_civil_datetime: str
@@ -145,3 +158,28 @@ class ResearchEventResponse(BaseModel):
 class ResearchEventsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     events: list[ResearchEventResponse]
+
+
+class ResearchOperationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_id: str
+    operation_id: str
+    revision: int
+    backend_seq: int
+    event_hash: str
+    status: str
+
+
+class ResearchScreenResponse(ResearchOperationResponse):
+    safe: bool
+    category: str | None
+    redirect: str | None
+
+
+class ResearchCalculationResponse(ResearchOperationResponse):
+    normalized_input: dict
+    calculation_config: dict
+    facts: dict
+    provenance: dict
+    warnings: list[str]
+    evidence_ids: list[str]

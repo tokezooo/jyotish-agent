@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 DATABASE_NAME = "research.sqlite3"
 
 
@@ -179,7 +179,14 @@ CREATE TABLE source_fragments (
 );
 """
 
-_MIGRATIONS: dict[int, str] = {1: _MIGRATION_1}
+_MIGRATION_2 = """
+CREATE TRIGGER evidence_items_no_update
+BEFORE UPDATE ON evidence_items BEGIN SELECT RAISE(ABORT, 'evidence_items are append-only'); END;
+CREATE TRIGGER evidence_items_no_delete
+BEFORE DELETE ON evidence_items BEGIN SELECT RAISE(ABORT, 'evidence_items are append-only'); END;
+"""
+
+_MIGRATIONS: dict[int, str] = {1: _MIGRATION_1, 2: _MIGRATION_2}
 
 
 def _event_envelope(event: Mapping[str, Any]) -> dict[str, Any]:
@@ -387,20 +394,25 @@ class ResearchStore:
         payload: Mapping[str, Any],
         producer: str,
         producer_version: str,
+        request_payload: Mapping[str, Any] | None = None,
+        next_status: str | None = None,
+        evidence_items: Iterable[Mapping[str, Any]] = (),
     ) -> tuple[dict[str, Any], int]:
         payload_json = canonical_json(payload)
-        request_hash = sha256_text(
-            canonical_json(
-                {
-                    "run_id": run_id,
-                    "expected_revision": expected_revision,
-                    "event_type": event_type,
-                    "payload": json.loads(payload_json),
-                    "producer": producer,
-                    "producer_version": producer_version,
-                }
-            )
+        semantic_payload = (
+            json.loads(payload_json)
+            if request_payload is None
+            else json.loads(canonical_json(request_payload))
         )
+        request_hash = self._operation_request_hash(
+            run_id=run_id,
+            expected_revision=expected_revision,
+            event_type=event_type,
+            payload=semantic_payload,
+            producer=producer,
+            producer_version=producer_version,
+        )
+        evidence_rows = [dict(item) for item in evidence_items]
         connection = self._ready_connection()
         try:
             connection.execute("BEGIN IMMEDIATE")
@@ -416,7 +428,7 @@ class ResearchStore:
                 return result["event"], result["revision"]
 
             row = connection.execute(
-                "SELECT revision, updated_at FROM research_runs WHERE run_id=?", (run_id,)
+                "SELECT revision, status, updated_at FROM research_runs WHERE run_id=?", (run_id,)
             ).fetchone()
             if row is None:
                 raise RunNotFound(run_id)
@@ -447,11 +459,27 @@ class ResearchStore:
                 created_at=now,
                 previous_event_hash=previous["event_hash"],
             )
+            for item in evidence_rows:
+                evidence_payload = canonical_json(item["payload"])
+                connection.execute(
+                    """INSERT INTO evidence_items (
+                        evidence_id, run_id, evidence_type, payload_json,
+                        payload_hash, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?)""",
+                    (
+                        item["evidence_id"],
+                        run_id,
+                        item["evidence_type"],
+                        evidence_payload,
+                        sha256_text(evidence_payload),
+                        now,
+                    ),
+                )
             next_revision = expected_revision + 1
             changed = connection.execute(
-                """UPDATE research_runs SET revision=?, updated_at=?
+                """UPDATE research_runs SET revision=?, status=?, updated_at=?
                    WHERE run_id=? AND revision=?""",
-                (next_revision, now, run_id, expected_revision),
+                (next_revision, next_status or row["status"], now, run_id, expected_revision),
             ).rowcount
             if changed != 1:
                 raise OptimisticConflict("research run changed concurrently")
@@ -466,6 +494,66 @@ class ResearchStore:
         except Exception:
             connection.rollback()
             raise
+        finally:
+            connection.close()
+
+    @staticmethod
+    def _operation_request_hash(
+        *,
+        run_id: str,
+        expected_revision: int,
+        event_type: str,
+        payload: Mapping[str, Any],
+        producer: str,
+        producer_version: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "run_id": run_id,
+                    "expected_revision": expected_revision,
+                    "event_type": event_type,
+                    "payload": payload,
+                    "producer": producer,
+                    "producer_version": producer_version,
+                }
+            )
+        )
+
+    def get_operation_result(
+        self,
+        *,
+        operation_id: str,
+        run_id: str,
+        expected_revision: int,
+        event_type: str,
+        request_payload: Mapping[str, Any],
+        producer: str,
+        producer_version: str,
+    ) -> tuple[dict[str, Any], int] | None:
+        """Return an exact prior result, or reject reuse with changed semantics."""
+        request_hash = self._operation_request_hash(
+            run_id=run_id,
+            expected_revision=expected_revision,
+            event_type=event_type,
+            payload=json.loads(canonical_json(request_payload)),
+            producer=producer,
+            producer_version=producer_version,
+        )
+        connection = self._ready_connection()
+        try:
+            row = connection.execute(
+                "SELECT request_hash, status, result_json FROM operations WHERE operation_id=?",
+                (operation_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            if row["request_hash"] != request_hash:
+                raise OptimisticConflict("operation_id was already used with another request")
+            if row["status"] != "completed" or row["result_json"] is None:
+                raise OptimisticConflict("operation is not complete and requires reconciliation")
+            result = json.loads(row["result_json"])
+            return result["event"], result["revision"]
         finally:
             connection.close()
 
@@ -542,6 +630,22 @@ class ResearchStore:
         finally:
             connection.close()
 
+    def list_evidence(self, run_id: str) -> list[dict[str, Any]]:
+        connection = self._ready_connection()
+        try:
+            rows = connection.execute(
+                "SELECT * FROM evidence_items WHERE run_id=? ORDER BY created_at, evidence_id",
+                (run_id,),
+            ).fetchall()
+            result = []
+            for row in rows:
+                item = dict(row)
+                item["payload"] = json.loads(item.pop("payload_json"))
+                result.append(item)
+            return result
+        finally:
+            connection.close()
+
     def rebuild_run(self, run_id: str) -> dict[str, Any]:
         events = self.list_events(run_id)
         if not events:
@@ -557,6 +661,9 @@ class ResearchStore:
             # projection metadata. Typed reducers can extend this in later tasks.
             rebuilt["revision"] += 1
             rebuilt["updated_at"] = event["created_at"]
+            event_payload = json.loads(event["payload_json"])
+            if isinstance(event_payload.get("status"), str):
+                rebuilt["status"] = event_payload["status"]
         return rebuilt
 
     def seed_source_for_testing(

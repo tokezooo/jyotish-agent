@@ -34,10 +34,13 @@ from .models import (
 from .pyjhora_facade import compute_chart
 from .research_models import (
     CreateResearchRunRequest,
+    ResearchCalculationResponse,
     ResearchEventsResponse,
+    ResearchOperationRequest,
     ResearchRunResponse,
+    ResearchScreenResponse,
 )
-from .research_service import ResearchService, UnsupportedTimezoneMode
+from .research_service import InvalidRunTransition, ResearchService, UnsupportedTimezoneMode
 from .research_store import (
     OptimisticConflict,
     ResearchStore,
@@ -155,6 +158,50 @@ async def get_research_events(
             "No persisted research run has that ID.",
             "Check the rr_ run ID and retry.",
         )
+
+
+@app.post(
+    "/v2/research-runs/{run_id}/screen", response_model=ResearchScreenResponse
+)
+async def screen_research_run(
+    run_id: str, req: ResearchOperationRequest, request: Request
+) -> ResearchScreenResponse | JSONResponse:
+    try:
+        return _research_service(request).screen_run(run_id, req)
+    except RunNotFound:
+        return _research_problem(
+            404, "Research run not found", "No persisted research run has that ID.",
+            "Check the rr_ run ID and retry.",
+        )
+    except (OptimisticConflict, InvalidRunTransition):
+        return _research_problem(
+            409, "Research operation conflict",
+            "The operation is stale, duplicated with changed input, or invalid in this state.",
+            "Refresh the run, use its current revision, and keep one operation ID per request.",
+        )
+
+
+@app.post(
+    "/v2/research-runs/{run_id}/calculate", response_model=ResearchCalculationResponse
+)
+async def calculate_research_run(
+    run_id: str, req: ResearchOperationRequest, request: Request
+) -> ResearchCalculationResponse | JSONResponse:
+    try:
+        return _research_service(request).calculate_run(run_id, req)
+    except RunNotFound:
+        return _research_problem(
+            404, "Research run not found", "No persisted research run has that ID.",
+            "Check the rr_ run ID and retry.",
+        )
+    except (OptimisticConflict, InvalidRunTransition):
+        return _research_problem(
+            409, "Research operation conflict",
+            "Calculation is stale or invalid for the run's current state.",
+            "Screen the run safely first, then retry with the current revision and a fresh operation ID.",
+        )
+    except ConfigError as exc:
+        raise CalculationError(str(exc)) from exc
 
 
 @app.post("/birth-profiles/validate", response_model=ValidateResponse)

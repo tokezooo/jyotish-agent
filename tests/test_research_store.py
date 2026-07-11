@@ -230,13 +230,15 @@ def test_failed_non_initial_migration_keeps_version_and_backup(tmp_path: Path, m
 
     store = ResearchStore(tmp_path / "data")
     store.initialize()
-    monkeypatch.setattr(store_module, "SCHEMA_VERSION", 2)
+    current_version = store_module.SCHEMA_VERSION
+    target_version = current_version + 1
+    monkeypatch.setattr(store_module, "SCHEMA_VERSION", target_version)
     monkeypatch.setattr(
         store_module,
         "_MIGRATIONS",
         {
-            1: store_module._MIGRATION_1,
-            2: """
+            **store_module._MIGRATIONS,
+            target_version: """
             CREATE TABLE must_rollback_upgrade (value TEXT);
             INSERT INTO missing_table VALUES ('force failure');
             """,
@@ -251,8 +253,8 @@ def test_failed_non_initial_migration_keeps_version_and_backup(tmp_path: Path, m
             "SELECT name FROM sqlite_master "
             "WHERE type='table' AND name='must_rollback_upgrade'"
         ).fetchone()
-    backups = list(store.data_root.glob("research.sqlite3.v1.*.bak"))
-    assert version == 1
+    backups = list(store.data_root.glob(f"research.sqlite3.v{current_version}.*.bak"))
+    assert version == current_version
     assert partial is None
     assert len(backups) == 1
     assert backups[0].stat().st_mode & 0o777 == 0o600
