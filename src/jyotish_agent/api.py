@@ -15,6 +15,7 @@ import logging
 import time
 
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from . import ENGINE_VERSION
 from .config import ConfigError
@@ -31,6 +32,18 @@ from .models import (
     ValidateResponse,
 )
 from .pyjhora_facade import compute_chart
+from .research_models import (
+    CreateResearchRunRequest,
+    ResearchEventsResponse,
+    ResearchRunResponse,
+)
+from .research_service import ResearchService, UnsupportedTimezoneMode
+from .research_store import (
+    OptimisticConflict,
+    ResearchStore,
+    RunNotFound,
+    default_data_root,
+)
 from .signing import cache_facts, get_cached_facts, verify_facts
 from .validation import normalized_profile, profile_warnings
 
@@ -42,6 +55,29 @@ app = FastAPI(
     description="Deterministic Vedic-astrology calculations behind typed tools.",
 )
 register_error_handlers(app)
+
+
+def _research_service(request: Request) -> ResearchService:
+    configured = getattr(request.app.state, "research_service", None)
+    if configured is not None:
+        return configured
+    return ResearchService(ResearchStore(default_data_root()))
+
+
+def _research_problem(status: int, title: str, problem: str, fix: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status,
+        media_type="application/problem+json",
+        content={
+            "type": f"https://jyotish-agent.local/problems/research-run-{status}",
+            "title": title,
+            "status": status,
+            "detail": problem,
+            "problem": problem,
+            "cause": title,
+            "fix": fix,
+        },
+    )
 
 
 @app.middleware("http")
@@ -67,6 +103,58 @@ async def _access_log(request: Request, call_next):
 @app.get("/health")
 async def health() -> dict:
     return {"status": "ok", "engine_version": ENGINE_VERSION}
+
+
+@app.post("/v2/research-runs", response_model=ResearchRunResponse, status_code=201)
+async def create_research_run(
+    req: CreateResearchRunRequest, request: Request
+) -> ResearchRunResponse | JSONResponse:
+    try:
+        return _research_service(request).create_run(req)
+    except OptimisticConflict:
+        return _research_problem(
+            409,
+            "Research operation conflict",
+            "The operation ID or expected revision conflicts with persisted state.",
+            "Use a new op_ UUID4 for a changed request and the current revision.",
+        )
+    except UnsupportedTimezoneMode:
+        return _research_problem(
+            422,
+            "Timezone mode is not executable yet",
+            "This version cannot resolve the requested timezone mode.",
+            "Use fixed_offset_legacy (or a numeric UTC offset) for Task 1.",
+        )
+
+
+@app.get("/v2/research-runs/{run_id}", response_model=ResearchRunResponse)
+async def get_research_run(
+    run_id: str, request: Request
+) -> ResearchRunResponse | JSONResponse:
+    try:
+        return _research_service(request).get_run(run_id)
+    except RunNotFound:
+        return _research_problem(
+            404,
+            "Research run not found",
+            "No persisted research run has that ID.",
+            "Check the rr_ run ID and retry.",
+        )
+
+
+@app.get("/v2/research-runs/{run_id}/events", response_model=ResearchEventsResponse)
+async def get_research_events(
+    run_id: str, request: Request
+) -> ResearchEventsResponse | JSONResponse:
+    try:
+        return _research_service(request).get_events(run_id)
+    except RunNotFound:
+        return _research_problem(
+            404,
+            "Research run not found",
+            "No persisted research run has that ID.",
+            "Check the rr_ run ID and retry.",
+        )
 
 
 @app.post("/birth-profiles/validate", response_model=ValidateResponse)
