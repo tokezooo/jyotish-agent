@@ -1,0 +1,1275 @@
+{
+  "calculation_config": {
+    "ayanamsa": "LAHIRI",
+    "charts": [
+      "D1",
+      "D9"
+    ],
+    "modules": [
+      "ashtakavarga",
+      "shadbala",
+      "transits",
+      "varshaphal",
+      "yogas_engine"
+    ],
+    "node_aspects": "standard",
+    "rahu_ketu": "true_nodes",
+    "reference_date": [
+      2026,
+      6,
+      7
+    ]
+  },
+  "facts": {
+    "ascendant": {
+      "degrees": 25.460176,
+      "sign": "Pisces",
+      "sign_index": 11
+    },
+    "ashtakavarga": {
+      "bav": {
+        "Jupiter": {
+          "Aquarius": 5,
+          "Aries": 4,
+          "Cancer": 3,
+          "Capricorn": 4,
+          "Gemini": 7,
+          "Leo": 5,
+          "Libra": 4,
+          "Pisces": 4,
+          "Sagittarius": 5,
+          "Scorpio": 5,
+          "Taurus": 4,
+          "Virgo": 6
+        },
+        "Lagna": {
+          "Aquarius": 5,
+          "Aries": 5,
+          "Cancer": 2,
+          "Capricorn": 5,
+          "Gemini": 2,
+          "Leo": 4,
+          "Libra": 4,
+          "Pisces": 4,
+          "Sagittarius": 4,
+          "Scorpio": 5,
+          "Taurus": 4,
+          "Virgo": 5
+        },
+        "Mars": {
+          "Aquarius": 2,
+          "Aries": 3,
+          "Cancer": 2,
+          "Capricorn": 1,
+          "Gemini": 4,
+          "Leo": 4,
+          "Libra": 2,
+          "Pisces": 4,
+          "Sagittarius": 5,
+          "Scorpio": 4,
+          "Taurus": 5,
+          "Virgo": 3
+        },
+        "Mercury": {
+          "Aquarius": 2,
+          "Aries": 4,
+          "Cancer": 3,
+          "Capricorn": 5,
+          "Gemini": 4,
+          "Leo": 5,
+          "Libra": 4,
+          "Pisces": 5,
+          "Sagittarius": 5,
+          "Scorpio": 6,
+          "Taurus": 6,
+          "Virgo": 5
+        },
+        "Moon": {
+          "Aquarius": 3,
+          "Aries": 6,
+          "Cancer": 5,
+          "Capricorn": 4,
+          "Gemini": 2,
+          "Leo": 4,
+          "Libra": 5,
+          "Pisces": 4,
+          "Sagittarius": 4,
+          "Scorpio": 3,
+          "Taurus": 5,
+          "Virgo": 4
+        },
+        "Saturn": {
+          "Aquarius": 1,
+          "Aries": 4,
+          "Cancer": 2,
+          "Capricorn": 3,
+          "Gemini": 4,
+          "Leo": 3,
+          "Libra": 5,
+          "Pisces": 3,
+          "Sagittarius": 5,
+          "Scorpio": 3,
+          "Taurus": 3,
+          "Virgo": 3
+        },
+        "Sun": {
+          "Aquarius": 3,
+          "Aries": 2,
+          "Cancer": 5,
+          "Capricorn": 3,
+          "Gemini": 6,
+          "Leo": 4,
+          "Libra": 4,
+          "Pisces": 3,
+          "Sagittarius": 7,
+          "Scorpio": 4,
+          "Taurus": 3,
+          "Virgo": 4
+        },
+        "Venus": {
+          "Aquarius": 5,
+          "Aries": 6,
+          "Cancer": 4,
+          "Capricorn": 5,
+          "Gemini": 3,
+          "Leo": 2,
+          "Libra": 7,
+          "Pisces": 6,
+          "Sagittarius": 1,
+          "Scorpio": 4,
+          "Taurus": 4,
+          "Virgo": 5
+        }
+      },
+      "sav": {
+        "Aquarius": 21,
+        "Aries": 29,
+        "Cancer": 24,
+        "Capricorn": 25,
+        "Gemini": 30,
+        "Leo": 27,
+        "Libra": 31,
+        "Pisces": 29,
+        "Sagittarius": 32,
+        "Scorpio": 29,
+        "Taurus": 30,
+        "Virgo": 30
+      }
+    },
+    "aspects": {
+      "Jupiter": {
+        "aspected_houses": [
+          8,
+          10,
+          12
+        ],
+        "aspected_sign_indices": [
+          6,
+          8,
+          10
+        ],
+        "aspected_signs": [
+          "Libra",
+          "Sagittarius",
+          "Aquarius"
+        ],
+        "aspects_planets": [
+          "Moon",
+          "Saturn",
+          "Sun"
+        ]
+      },
+      "Ketu": {
+        "aspected_houses": [
+          11
+        ],
+        "aspected_sign_indices": [
+          9
+        ],
+        "aspected_signs": [
+          "Capricorn"
+        ],
+        "aspects_planets": [
+          "Mercury",
+          "Rahu",
+          "Venus"
+        ]
+      },
+      "Mars": {
+        "aspected_houses": [
+          3,
+          4,
+          12
+        ],
+        "aspected_sign_indices": [
+          1,
+          2,
+          10
+        ],
+        "aspected_signs": [
+          "Taurus",
+          "Gemini",
+          "Aquarius"
+        ],
+        "aspects_planets": [
+          "Jupiter",
+          "Moon"
+        ]
+      },
+      "Mercury": {
+        "aspected_houses": [
+          5
+        ],
+        "aspected_sign_indices": [
+          3
+        ],
+        "aspected_signs": [
+          "Cancer"
+        ],
+        "aspects_planets": [
+          "Ketu"
+        ]
+      },
+      "Moon": {
+        "aspected_houses": [
+          6
+        ],
+        "aspected_sign_indices": [
+          4
+        ],
+        "aspected_signs": [
+          "Leo"
+        ],
+        "aspects_planets": []
+      },
+      "Rahu": {
+        "aspected_houses": [
+          5
+        ],
+        "aspected_sign_indices": [
+          3
+        ],
+        "aspected_signs": [
+          "Cancer"
+        ],
+        "aspects_planets": [
+          "Ketu"
+        ]
+      },
+      "Saturn": {
+        "aspected_houses": [
+          4,
+          7,
+          12
+        ],
+        "aspected_sign_indices": [
+          2,
+          5,
+          10
+        ],
+        "aspected_signs": [
+          "Gemini",
+          "Virgo",
+          "Aquarius"
+        ],
+        "aspects_planets": [
+          "Jupiter",
+          "Moon"
+        ]
+      },
+      "Sun": {
+        "aspected_houses": [
+          4
+        ],
+        "aspected_sign_indices": [
+          2
+        ],
+        "aspected_signs": [
+          "Gemini"
+        ],
+        "aspects_planets": [
+          "Jupiter"
+        ]
+      },
+      "Venus": {
+        "aspected_houses": [
+          5
+        ],
+        "aspected_sign_indices": [
+          3
+        ],
+        "aspected_signs": [
+          "Cancer"
+        ],
+        "aspects_planets": [
+          "Ketu"
+        ]
+      }
+    },
+    "bhava": {
+      "d1": [
+        {
+          "house": 1,
+          "lord": "Jupiter",
+          "lord_index": 4,
+          "sign": "Pisces",
+          "sign_index": 11
+        },
+        {
+          "house": 2,
+          "lord": "Mars",
+          "lord_index": 2,
+          "sign": "Aries",
+          "sign_index": 0
+        },
+        {
+          "house": 3,
+          "lord": "Venus",
+          "lord_index": 5,
+          "sign": "Taurus",
+          "sign_index": 1
+        },
+        {
+          "house": 4,
+          "lord": "Mercury",
+          "lord_index": 3,
+          "sign": "Gemini",
+          "sign_index": 2
+        },
+        {
+          "house": 5,
+          "lord": "Moon",
+          "lord_index": 1,
+          "sign": "Cancer",
+          "sign_index": 3
+        },
+        {
+          "house": 6,
+          "lord": "Sun",
+          "lord_index": 0,
+          "sign": "Leo",
+          "sign_index": 4
+        },
+        {
+          "house": 7,
+          "lord": "Mercury",
+          "lord_index": 3,
+          "sign": "Virgo",
+          "sign_index": 5
+        },
+        {
+          "house": 8,
+          "lord": "Venus",
+          "lord_index": 5,
+          "sign": "Libra",
+          "sign_index": 6
+        },
+        {
+          "house": 9,
+          "lord": "Mars",
+          "lord_index": 2,
+          "sign": "Scorpio",
+          "sign_index": 7
+        },
+        {
+          "house": 10,
+          "lord": "Jupiter",
+          "lord_index": 4,
+          "sign": "Sagittarius",
+          "sign_index": 8
+        },
+        {
+          "house": 11,
+          "lord": "Saturn",
+          "lord_index": 6,
+          "sign": "Capricorn",
+          "sign_index": 9
+        },
+        {
+          "house": 12,
+          "lord": "Saturn",
+          "lord_index": 6,
+          "sign": "Aquarius",
+          "sign_index": 10
+        }
+      ],
+      "d9": [
+        {
+          "house": 1,
+          "lord": "Saturn",
+          "lord_index": 6,
+          "sign": "Aquarius",
+          "sign_index": 10
+        },
+        {
+          "house": 2,
+          "lord": "Jupiter",
+          "lord_index": 4,
+          "sign": "Pisces",
+          "sign_index": 11
+        },
+        {
+          "house": 3,
+          "lord": "Mars",
+          "lord_index": 2,
+          "sign": "Aries",
+          "sign_index": 0
+        },
+        {
+          "house": 4,
+          "lord": "Venus",
+          "lord_index": 5,
+          "sign": "Taurus",
+          "sign_index": 1
+        },
+        {
+          "house": 5,
+          "lord": "Mercury",
+          "lord_index": 3,
+          "sign": "Gemini",
+          "sign_index": 2
+        },
+        {
+          "house": 6,
+          "lord": "Moon",
+          "lord_index": 1,
+          "sign": "Cancer",
+          "sign_index": 3
+        },
+        {
+          "house": 7,
+          "lord": "Sun",
+          "lord_index": 0,
+          "sign": "Leo",
+          "sign_index": 4
+        },
+        {
+          "house": 8,
+          "lord": "Mercury",
+          "lord_index": 3,
+          "sign": "Virgo",
+          "sign_index": 5
+        },
+        {
+          "house": 9,
+          "lord": "Venus",
+          "lord_index": 5,
+          "sign": "Libra",
+          "sign_index": 6
+        },
+        {
+          "house": 10,
+          "lord": "Mars",
+          "lord_index": 2,
+          "sign": "Scorpio",
+          "sign_index": 7
+        },
+        {
+          "house": 11,
+          "lord": "Jupiter",
+          "lord_index": 4,
+          "sign": "Sagittarius",
+          "sign_index": 8
+        },
+        {
+          "house": 12,
+          "lord": "Saturn",
+          "lord_index": 6,
+          "sign": "Capricorn",
+          "sign_index": 9
+        }
+      ]
+    },
+    "d1": [
+      {
+        "degrees": 16.886946,
+        "house": 10,
+        "planet": "Sun",
+        "planet_index": 0,
+        "sign": "Sagittarius",
+        "sign_index": 8
+      },
+      {
+        "degrees": 6.745215,
+        "house": 12,
+        "planet": "Moon",
+        "planet_index": 1,
+        "sign": "Aquarius",
+        "sign_index": 10
+      },
+      {
+        "degrees": 16.14216,
+        "house": 9,
+        "planet": "Mars",
+        "planet_index": 2,
+        "sign": "Scorpio",
+        "sign_index": 7
+      },
+      {
+        "degrees": 2.00804,
+        "house": 11,
+        "planet": "Mercury",
+        "planet_index": 3,
+        "sign": "Capricorn",
+        "sign_index": 9
+      },
+      {
+        "degrees": 11.452804,
+        "house": 4,
+        "planet": "Jupiter",
+        "planet_index": 4,
+        "sign": "Gemini",
+        "sign_index": 2
+      },
+      {
+        "degrees": 12.527142,
+        "house": 11,
+        "planet": "Venus",
+        "planet_index": 5,
+        "sign": "Capricorn",
+        "sign_index": 9
+      },
+      {
+        "degrees": 21.919669,
+        "house": 10,
+        "planet": "Saturn",
+        "planet_index": 6,
+        "sign": "Sagittarius",
+        "sign_index": 8
+      },
+      {
+        "degrees": 23.143389,
+        "house": 11,
+        "planet": "Rahu",
+        "planet_index": 7,
+        "sign": "Capricorn",
+        "sign_index": 9
+      },
+      {
+        "degrees": 23.143389,
+        "house": 5,
+        "planet": "Ketu",
+        "planet_index": 8,
+        "sign": "Cancer",
+        "sign_index": 3
+      }
+    ],
+    "d9": [
+      {
+        "degrees": 1.982518,
+        "house": 8,
+        "planet": "Sun",
+        "planet_index": 0,
+        "sign": "Virgo",
+        "sign_index": 5
+      },
+      {
+        "degrees": 0.706933,
+        "house": 11,
+        "planet": "Moon",
+        "planet_index": 1,
+        "sign": "Sagittarius",
+        "sign_index": 8
+      },
+      {
+        "degrees": 25.279439,
+        "house": 10,
+        "planet": "Mars",
+        "planet_index": 2,
+        "sign": "Scorpio",
+        "sign_index": 7
+      },
+      {
+        "degrees": 18.07236,
+        "house": 12,
+        "planet": "Mercury",
+        "planet_index": 3,
+        "sign": "Capricorn",
+        "sign_index": 9
+      },
+      {
+        "degrees": 13.075239,
+        "house": 12,
+        "planet": "Jupiter",
+        "planet_index": 4,
+        "sign": "Capricorn",
+        "sign_index": 9
+      },
+      {
+        "degrees": 22.744281,
+        "house": 3,
+        "planet": "Venus",
+        "planet_index": 5,
+        "sign": "Aries",
+        "sign_index": 0
+      },
+      {
+        "degrees": 17.277017,
+        "house": 9,
+        "planet": "Saturn",
+        "planet_index": 6,
+        "sign": "Libra",
+        "sign_index": 6
+      },
+      {
+        "degrees": 28.290497,
+        "house": 6,
+        "planet": "Rahu",
+        "planet_index": 7,
+        "sign": "Cancer",
+        "sign_index": 3
+      },
+      {
+        "degrees": 28.290497,
+        "house": 12,
+        "planet": "Ketu",
+        "planet_index": 8,
+        "sign": "Capricorn",
+        "sign_index": 9
+      }
+    ],
+    "houses": [
+      {
+        "house": 1,
+        "lord": "Jupiter",
+        "lord_index": 4,
+        "sign": "Pisces",
+        "sign_index": 11
+      },
+      {
+        "house": 2,
+        "lord": "Mars",
+        "lord_index": 2,
+        "sign": "Aries",
+        "sign_index": 0
+      },
+      {
+        "house": 3,
+        "lord": "Venus",
+        "lord_index": 5,
+        "sign": "Taurus",
+        "sign_index": 1
+      },
+      {
+        "house": 4,
+        "lord": "Mercury",
+        "lord_index": 3,
+        "sign": "Gemini",
+        "sign_index": 2
+      },
+      {
+        "house": 5,
+        "lord": "Moon",
+        "lord_index": 1,
+        "sign": "Cancer",
+        "sign_index": 3
+      },
+      {
+        "house": 6,
+        "lord": "Sun",
+        "lord_index": 0,
+        "sign": "Leo",
+        "sign_index": 4
+      },
+      {
+        "house": 7,
+        "lord": "Mercury",
+        "lord_index": 3,
+        "sign": "Virgo",
+        "sign_index": 5
+      },
+      {
+        "house": 8,
+        "lord": "Venus",
+        "lord_index": 5,
+        "sign": "Libra",
+        "sign_index": 6
+      },
+      {
+        "house": 9,
+        "lord": "Mars",
+        "lord_index": 2,
+        "sign": "Scorpio",
+        "sign_index": 7
+      },
+      {
+        "house": 10,
+        "lord": "Jupiter",
+        "lord_index": 4,
+        "sign": "Sagittarius",
+        "sign_index": 8
+      },
+      {
+        "house": 11,
+        "lord": "Saturn",
+        "lord_index": 6,
+        "sign": "Capricorn",
+        "sign_index": 9
+      },
+      {
+        "house": 12,
+        "lord": "Saturn",
+        "lord_index": 6,
+        "sign": "Aquarius",
+        "sign_index": 10
+      }
+    ],
+    "lagnas": {
+      "d1": {
+        "degrees": 25.460176,
+        "sign": "Pisces",
+        "sign_index": 11
+      },
+      "d9": {
+        "degrees": 19.141581,
+        "sign": "Aquarius",
+        "sign_index": 10
+      }
+    },
+    "panchanga": {
+      "karana": {
+        "index": 9,
+        "name": "Bava"
+      },
+      "nakshatra": {
+        "index": 24,
+        "name": "Shatabhisha",
+        "pada": 1
+      },
+      "tithi": {
+        "index": 5,
+        "name": "Shukla Panchami"
+      },
+      "weekday": {
+        "index": 1,
+        "name": "Monday"
+      },
+      "yoga": {
+        "index": 16,
+        "name": "Siddhi"
+      }
+    },
+    "shadbala": {
+      "Jupiter": {
+        "components": {
+          "cheshta": 62.34,
+          "dig": 34.67,
+          "drik": -22.58,
+          "kaala": 254.98,
+          "naisargika": 34.29,
+          "sthana": 181.53
+        },
+        "rupas": 9.09,
+        "strength_ratio": 1.4
+      },
+      "Mars": {
+        "components": {
+          "cheshta": 12.01,
+          "dig": 48.39,
+          "drik": 4.92,
+          "kaala": 46.8,
+          "naisargika": 17.14,
+          "sthana": 186.05
+        },
+        "rupas": 5.26,
+        "strength_ratio": 1.05
+      },
+      "Mercury": {
+        "components": {
+          "cheshta": 69.67,
+          "dig": 32.18,
+          "drik": 10.45,
+          "kaala": 133.5,
+          "naisargika": 25.71,
+          "sthana": 136.83
+        },
+        "rupas": 6.81,
+        "strength_ratio": 0.97
+      },
+      "Moon": {
+        "components": {
+          "cheshta": 0.0,
+          "dig": 15.26,
+          "drik": -4.55,
+          "kaala": 169.17,
+          "naisargika": 51.43,
+          "sthana": 136.25
+        },
+        "rupas": 6.13,
+        "strength_ratio": 1.02
+      },
+      "Saturn": {
+        "components": {
+          "cheshta": 1.63,
+          "dig": 31.18,
+          "drik": 12.97,
+          "kaala": 103.7,
+          "naisargika": 8.57,
+          "sthana": 211.86
+        },
+        "rupas": 6.17,
+        "strength_ratio": 1.23
+      },
+      "Sun": {
+        "components": {
+          "cheshta": 0.0,
+          "dig": 58.64,
+          "drik": 14.23,
+          "kaala": 163.01,
+          "naisargika": 60.0,
+          "sthana": 194.8
+        },
+        "rupas": 8.18,
+        "strength_ratio": 1.64
+      },
+      "Venus": {
+        "components": {
+          "cheshta": 66.5,
+          "dig": 7.19,
+          "drik": 7.82,
+          "kaala": 81.19,
+          "naisargika": 42.86,
+          "sthana": 173.93
+        },
+        "rupas": 6.32,
+        "strength_ratio": 1.15
+      }
+    },
+    "transits": {
+      "anchor": "2026-06-07T12:00:00+05:30",
+      "natal_moon_sign": "Aquarius",
+      "planets": {
+        "Jupiter": {
+          "degrees": 1.051916,
+          "house_from_lagna": 5,
+          "house_from_moon": 6,
+          "sav_points": 24,
+          "sign": "Cancer",
+          "sign_index": 3
+        },
+        "Ketu": {
+          "degrees": 8.694059,
+          "house_from_lagna": 6,
+          "house_from_moon": 7,
+          "sav_points": 27,
+          "sign": "Leo",
+          "sign_index": 4
+        },
+        "Mars": {
+          "degrees": 20.170389,
+          "house_from_lagna": 2,
+          "house_from_moon": 3,
+          "sav_points": 29,
+          "sign": "Aries",
+          "sign_index": 0
+        },
+        "Mercury": {
+          "degrees": 14.773148,
+          "house_from_lagna": 4,
+          "house_from_moon": 5,
+          "sav_points": 30,
+          "sign": "Gemini",
+          "sign_index": 2
+        },
+        "Moon": {
+          "degrees": 8.792482,
+          "house_from_lagna": 12,
+          "house_from_moon": 1,
+          "sav_points": 21,
+          "sign": "Aquarius",
+          "sign_index": 10
+        },
+        "Rahu": {
+          "degrees": 8.694059,
+          "house_from_lagna": 12,
+          "house_from_moon": 1,
+          "sav_points": 21,
+          "sign": "Aquarius",
+          "sign_index": 10
+        },
+        "Saturn": {
+          "degrees": 18.526712,
+          "house_from_lagna": 1,
+          "house_from_moon": 2,
+          "sav_points": 29,
+          "sign": "Pisces",
+          "sign_index": 11
+        },
+        "Sun": {
+          "degrees": 22.320328,
+          "house_from_lagna": 3,
+          "house_from_moon": 4,
+          "sav_points": 30,
+          "sign": "Taurus",
+          "sign_index": 1
+        },
+        "Venus": {
+          "degrees": 28.556639,
+          "house_from_lagna": 4,
+          "house_from_moon": 5,
+          "sav_points": 30,
+          "sign": "Gemini",
+          "sign_index": 2
+        }
+      }
+    },
+    "varshaphal": {
+      "age_year": 37,
+      "lagna": {
+        "degrees": 20.374079,
+        "sign": "Gemini",
+        "sign_index": 2
+      },
+      "munthi": {
+        "sign": "Pisces",
+        "sign_index": 11
+      },
+      "planets": {
+        "Jupiter": {
+          "degrees": 27.063994,
+          "sign": "Gemini",
+          "sign_index": 2
+        },
+        "Ketu": {
+          "degrees": 16.654491,
+          "sign": "Leo",
+          "sign_index": 4
+        },
+        "Mars": {
+          "degrees": 18.879017,
+          "sign": "Sagittarius",
+          "sign_index": 8
+        },
+        "Mercury": {
+          "degrees": 5.242913,
+          "sign": "Sagittarius",
+          "sign_index": 8
+        },
+        "Moon": {
+          "degrees": 20.372925,
+          "sign": "Taurus",
+          "sign_index": 1
+        },
+        "Rahu": {
+          "degrees": 16.654491,
+          "sign": "Aquarius",
+          "sign_index": 10
+        },
+        "Saturn": {
+          "degrees": 1.979533,
+          "sign": "Pisces",
+          "sign_index": 11
+        },
+        "Sun": {
+          "degrees": 16.886946,
+          "sign": "Sagittarius",
+          "sign_index": 8
+        },
+        "Venus": {
+          "degrees": 15.657121,
+          "sign": "Sagittarius",
+          "sign_index": 8
+        }
+      },
+      "pravesh": "2026-01-01T18:05:20"
+    },
+    "vimshottari": {
+      "antara": {
+        "end": "2026-07-03T21:00:23",
+        "lord": "Rahu",
+        "lord_index": 7,
+        "start": "2026-01-20T01:15:38"
+      },
+      "bhukti": {
+        "end": "2026-11-27T09:13:29",
+        "lord": "Saturn",
+        "lord_index": 6,
+        "start": "2023-11-24T13:35:10"
+      },
+      "mahadasha": {
+        "end": "2042-11-24T11:18:15",
+        "lord": "Saturn",
+        "lord_index": 6,
+        "start": "2023-11-24T13:35:10"
+      }
+    },
+    "yogas": {
+      "Budha-Aditya": {
+        "basis": {
+          "mercury_sign": 9,
+          "sun_sign": 8
+        },
+        "definition": "Sun and Mercury in the same rasi (same-sign conjunction).",
+        "present": false
+      },
+      "Chandra-Mangala": {
+        "basis": {
+          "mars_sign": 7,
+          "moon_sign": 10
+        },
+        "definition": "Moon and Mars in the same rasi (same-sign conjunction).",
+        "present": false
+      },
+      "Gajakesari": {
+        "basis": {
+          "jupiter_house_from_moon": 5
+        },
+        "definition": "Jupiter in a kendra (1/4/7/10) from the Moon, whole-sign.",
+        "present": false
+      }
+    },
+    "yogas_engine": {
+      "charts": {
+        "d1": [
+          {
+            "key": "vesi_yoga",
+            "name": "Vesai Yoga"
+          },
+          {
+            "key": "vosi_yoga",
+            "name": "Vosi Yoga"
+          },
+          {
+            "key": "ubhayachara_yoga",
+            "name": "Ubhayachara Yoga"
+          },
+          {
+            "key": "anaphaa_yoga",
+            "name": "Anaphaa Yoga"
+          },
+          {
+            "key": "paasa_yoga",
+            "name": "Paasa Yoga"
+          },
+          {
+            "key": "vanchana_chora_bheethi_yoga",
+            "name": "Vanchana Chora Bheethi Yoga"
+          },
+          {
+            "key": "kahala_yoga",
+            "name": "Kahala Yoga"
+          },
+          {
+            "key": "dharidhra_yoga_149",
+            "name": "Dharidhra Yoga"
+          },
+          {
+            "key": "sareera_soukhya_yoga",
+            "name": "Sareera Soukhya Yoga"
+          },
+          {
+            "key": "rogagrastha_yoga",
+            "name": "Rogagrastha Yoga"
+          },
+          {
+            "key": "krisanga_yoga_112",
+            "name": "Krisanga Yoga"
+          },
+          {
+            "key": "sada_sanchara_yoga",
+            "name": "Sada Sanchara Yoga"
+          },
+          {
+            "key": "bhratruvriddhi_yoga",
+            "name": "Bhratruvriddhi Yoga"
+          },
+          {
+            "key": "bandhu_pujya_yoga_194",
+            "name": "Bandhu Pujya Yoga"
+          },
+          {
+            "key": "bandhubhisthyaktha_yoga",
+            "name": "Bandhu Bhisthyaktha Yoga"
+          },
+          {
+            "key": "matrunasa_yoga_198",
+            "name": "Maathru Naasa yoga"
+          },
+          {
+            "key": "nishkapata_yoga_205",
+            "name": "Nishkapata Yoga"
+          },
+          {
+            "key": "nishkapata_yoga_206",
+            "name": "Nishkapata Yoga"
+          },
+          {
+            "key": "vahana_yoga_209",
+            "name": "Vaahana Yoga"
+          },
+          {
+            "key": "anapathya_yoga",
+            "name": "Anapathya Yoga"
+          },
+          {
+            "key": "aputhra_yoga",
+            "name": "Aputhra Yoga"
+          },
+          {
+            "key": "buddhimaturya_yoga",
+            "name": "Buddhimaturya Yoga"
+          },
+          {
+            "key": "satkalatra_yoga",
+            "name": "Sathkalatra Yoga"
+          },
+          {
+            "key": "bhaga_chumbana_yoga",
+            "name": "Bhaga Chumbana yoga"
+          },
+          {
+            "key": "apakeerthi_yoga",
+            "name": "Apakeerthi Yoga"
+          },
+          {
+            "key": "vrana_yoga",
+            "name": "Vrana Yoga"
+          }
+        ],
+        "d9": [
+          {
+            "key": "vesi_yoga",
+            "name": "Vesai Yoga"
+          },
+          {
+            "key": "sunaphaa_yoga",
+            "name": "Sunaphaa Yoga"
+          },
+          {
+            "key": "anaphaa_yoga",
+            "name": "Anaphaa Yoga"
+          },
+          {
+            "key": "duradhara_yoga",
+            "name": "Duradhara Yoga"
+          },
+          {
+            "key": "ruchaka_yoga",
+            "name": "Ruchaka Yoga"
+          },
+          {
+            "key": "daama_yoga",
+            "name": "Daama Yoga"
+          },
+          {
+            "key": "kaahala_yoga",
+            "name": "Kaahala Yoga"
+          },
+          {
+            "key": "bheri_yoga",
+            "name": "Bheri Yoga"
+          },
+          {
+            "key": "mridanga_yoga",
+            "name": "Mridanga Yoga"
+          },
+          {
+            "key": "kahala_yoga",
+            "name": "Kahala Yoga"
+          },
+          {
+            "key": "dama_yoga",
+            "name": "Dama Yoga"
+          },
+          {
+            "key": "dhur_yoga",
+            "name": "Dhur Yoga"
+          },
+          {
+            "key": "dharidhra_yoga",
+            "name": "Dharidhra Yoga"
+          },
+          {
+            "key": "dehapushti_yoga",
+            "name": "Dehapushti Yoga"
+          },
+          {
+            "key": "sada_sanchara_yoga",
+            "name": "Sada Sanchara Yoga"
+          },
+          {
+            "key": "swaveeryaddhana_yoga",
+            "name": "Swaveeryaddhana Yoga"
+          },
+          {
+            "key": "anthya_vayasi_dhana_yoga",
+            "name": "Anthya Vayasi Dhana Yoga"
+          },
+          {
+            "key": "bhratruvriddhi_yoga",
+            "name": "Bhratruvriddhi Yoga"
+          },
+          {
+            "key": "bandhubhisthyaktha_yoga",
+            "name": "Bandhu Bhisthyaktha Yoga"
+          },
+          {
+            "key": "matrunasa_yoga_198",
+            "name": "Maathru Naasa yoga"
+          },
+          {
+            "key": "nishkapata_yoga_205",
+            "name": "Nishkapata Yoga"
+          },
+          {
+            "key": "matru_sneha_yoga",
+            "name": "Maathru Sneha Yoga"
+          },
+          {
+            "key": "vahana_yoga_209",
+            "name": "Vaahana Yoga"
+          },
+          {
+            "key": "aputhra_yoga",
+            "name": "Aputhra Yoga"
+          },
+          {
+            "key": "kaalanirdesat_puthranaasa_yoga_230",
+            "name": "Kaalanirdesat Puthranaasa Yoga"
+          },
+          {
+            "key": "buddhimaturya_yoga",
+            "name": "Buddhimaturya Yoga"
+          },
+          {
+            "key": "satkalatra_yoga",
+            "name": "Sathkalatra Yoga"
+          },
+          {
+            "key": "mathibhramana_yoga_variation",
+            "name": "Mathibhramana Yoga"
+          }
+        ]
+      },
+      "engine_errors": 0,
+      "mismatches": [],
+      "status": "ok"
+    }
+  },
+  "normalized_input": {
+    "date": [
+      1990,
+      1,
+      1
+    ],
+    "latitude": 13.0827,
+    "longitude": 80.2707,
+    "name": "Chennai Test",
+    "reference_date": [
+      2026,
+      6,
+      7
+    ],
+    "time": [
+      12,
+      30,
+      0
+    ],
+    "timezone": 5.5
+  },
+  "provenance": {
+    "engine": "PyJHora",
+    "engine_version": "4.8.6",
+    "ephemeris_mode": "moshier"
+  }
+}

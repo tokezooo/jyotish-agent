@@ -11,6 +11,7 @@ node_modules/
 # The Swiss golden fixture is generated locally (depends on .se1 + pyswisseph
 # version); the Swiss path is verified by a tolerance-based parity test instead.
 tests/fixtures/golden_chennai_1990_swiss.json
+tests/fixtures/golden_chennai_1990_swiss_modules.json
 
 # uv.lock IS committed: PyJHora declares no runtime deps, so the lock is the only
 # record of the headless calculation dependency set. Do not ignore it.

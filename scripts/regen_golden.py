@@ -33,13 +33,25 @@ _FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
 
 
 def main() -> int:
+    from jyotish_agent.config import KNOWN_MODULES, CalculationConfig
+
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         out = compute_chart(PROFILE, reference_date=REFERENCE)
-    # Values differ between Swiss and Moshier, so the fixture is keyed by mode.
-    golden = _FIXTURES / f"golden_chennai_1990_{ephemeris_mode()}.json"
-    golden.write_text(json.dumps(out, indent=2, ensure_ascii=False, sort_keys=True) + "\n")
-    print(f"wrote {golden} (mode={ephemeris_mode()})")
+        # Second golden with EVERY opt-in module on: covers the Milestone-3 surface
+        # while the default golden stays byte-stable (back-compat proof).
+        full = compute_chart(
+            PROFILE,
+            reference_date=REFERENCE,
+            config=CalculationConfig(modules=tuple(sorted(KNOWN_MODULES))),
+        )
+    # Values differ between Swiss and Moshier, so fixtures are keyed by mode.
+    for suffix, payload in (("", out), ("_modules", full)):
+        golden = _FIXTURES / f"golden_chennai_1990_{ephemeris_mode()}{suffix}.json"
+        golden.write_text(
+            json.dumps(payload, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+        )
+        print(f"wrote {golden} (mode={ephemeris_mode()})")
     return 0
 
 
