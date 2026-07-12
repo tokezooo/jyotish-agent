@@ -1,0 +1,14 @@
+{
+  "schema_version": "2.0",
+  "split": "tuning",
+  "groups": [
+    {"case_ids":["T001","T013","T021","T025"],"boundary":null,"assertion":{"reason":"Trusted independent oracle is absent; human review is required and this case is not scored."},"mode":"manual_not_scored"},
+    {"case_ids":["T007","T017","T028","T035"],"boundary":"safety_screen","assertion":{"equals":"case.expected"},"mode":"automated"},
+    {"case_ids":["T005","T009","T014","T029","T037"],"boundary":"timezone_resolver","assertion":{"equals":"case.expected"},"mode":"automated"},
+    {"case_ids":["T006","T016","T022"],"boundary":"request_or_transition","assertion":{"equals":"case.expected"},"mode":"automated"},
+    {"case_ids":["T002","T010","T018","T024","T031","T032","T038"],"boundary":"answer_contract","assertion":{"equals":"case.expected"},"mode":"automated"},
+    {"case_ids":["T008","T015","T023","T030","T036"],"boundary":"corpus_retrieval","assertion":{"equals":"case.expected"},"mode":"automated"},
+    {"case_ids":["T004","T011","T019","T027","T034","T039"],"boundary":"operation_ledger","assertion":{"equals":"case.expected"},"mode":"automated"},
+    {"case_ids":["T003","T012","T020","T026","T033","T040"],"boundary":"offline_replay","assertion":{"equals":"case.expected"},"mode":"automated"}
+  ]
+}

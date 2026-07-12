@@ -13,8 +13,10 @@ tuning code, prompts, policies, or thresholds.
 
 1. Read `eval/ADJUDICATION.md` and `eval/fixtures/profiles.json` from the repository
    root. Confirm the profiles contain no real personal data.
-2. Validate checksums and execute every fixed tuning spec through the repository
-   runner (the runner deduplicates shared deterministic commands):
+2. Validate the tuning-only checksum manifest and execute every fixed tuning spec
+   through its case-specific production-boundary probe. The runner materializes the
+   exact profile and prompt and compares the observed structured outcome with that
+   case's expected outcome:
 
    ```bash
    uv run python -m jyotish_agent.evaluation tuning

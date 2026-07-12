@@ -33,9 +33,18 @@ def prune_private_artifacts(
 ) -> int:
     if isinstance(retention_seconds, bool) or retention_seconds < 0:
         raise ValueError("retention_seconds must be non-negative")
-    root = Path(data_root) / "artifacts"
+    data_root = Path(data_root)
+    root = data_root / "artifacts"
+    # ``exists`` and ``iterdir`` follow a directory symlink.  Reject it before
+    # either operation so retention can never traverse outside the private root.
+    if root.is_symlink():
+        raise ValueError("artifact private root is a symlink")
     if not root.exists():
         return 0
+    try:
+        root.resolve(strict=True).relative_to(data_root.resolve(strict=True))
+    except (FileNotFoundError, ValueError) as exc:
+        raise ValueError("artifact private root escapes data root") from exc
     cutoff = (time.time() if now is None else now) - retention_seconds
     removed = 0
     for child in root.iterdir():

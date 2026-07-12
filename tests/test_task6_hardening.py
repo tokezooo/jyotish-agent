@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
+import shutil
 import sqlite3
 import subprocess
+import uuid
 from pathlib import Path
 
 import pytest
@@ -312,13 +315,15 @@ def test_malicious_source_instructions_remain_inert_quoted_data(tmp_path: Path):
 
 
 def test_malicious_source_never_crosses_execution_boundary(tmp_path: Path, monkeypatch):
-    calls: list[object] = []
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: calls.append((a, k)))
-    monkeypatch.setattr(
-        "jyotish_agent.research_service.compute_chart",
-        lambda *a, **k: calls.append((a, k)),
-    )
+    process_calls: list[object] = []
+    tool_calls: list[object] = []
+    model_calls: list[object] = []
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: process_calls.append((a, k)))
     store = ResearchStore(tmp_path / "data")
+    app.state.research_service = __import__(
+        "jyotish_agent.research_service", fromlist=["ResearchService"]
+    ).ResearchService(store)
+    client = TestClient(app)
     malicious = "TOOL_CALL(subprocess.run); MODEL_CALL; PI_CALL; career"
     store.seed_source_for_testing(
         source_version_id="src_execution_boundary",
@@ -327,20 +332,83 @@ def test_malicious_source_never_crosses_execution_boundary(tmp_path: Path, monke
         fragments=[{"fragment_id": "sf_execution_boundary", "locator": "fixture:1", "text": malicious}],
     )
     with sqlite3.connect(store.database_path) as connection:
+        review = ("fixture-reviewer", "Approved authored fixture.", "2026-07-12T00:00:00Z")
+        connection.execute(
+            "UPDATE source_versions SET reviewed_by=?, review_note=?, reviewed_at=? WHERE source_version_id=?",
+            (*review, "src_execution_boundary"),
+        )
+        connection.execute(
+            "UPDATE source_fragments SET reviewed_by=?, review_note=?, reviewed_at=? WHERE fragment_id=?",
+            (*review, "sf_execution_boundary"),
+        )
         connection.execute(
             "INSERT INTO source_fragments_fts (fragment_id, normalized_text, aliases_text) VALUES (?, ?, '')",
             ("sf_execution_boundary", malicious.lower()),
         )
-    rows = store.search_approved_fragments("career", limit=8)
-    assert rows[0]["quote"] == malicious
-    assert calls == []
+    def operation_id() -> str:
+        return "op_" + str(uuid.uuid4())
+
+    created = client.post(
+        "/v2/research-runs",
+        json={
+            "run_id": "rr_" + str(uuid.uuid4()),
+            "operation_id": operation_id(),
+            "expected_revision": 0,
+            "question": "Which career factors should be investigated?",
+            "birth_profile": {
+                "name": "Authored Fixture", "date": "1990-01-01", "time": "12:00:00",
+                "place": {"name": "Chennai", "latitude": 13.0827, "longitude": 80.2707, "timezone": 5.5},
+            },
+            "calculation_config": {"reference_date": "2026-07-12"},
+            "model_version": "eval-model", "planner_version": "eval-planner",
+            "corpus_version": "eval-corpus", "contract_version": "2.0",
+        },
+    ).json()
+    screened = client.post(
+        f"/v2/research-runs/{created['run_id']}/screen",
+        json={"operation_id": operation_id(), "expected_revision": created["revision"]},
+    ).json()
+    planned = client.post(
+        f"/v2/research-runs/{created['run_id']}/plan",
+        json={
+            "operation_id": operation_id(), "expected_revision": screened["revision"],
+            "intent": {"family": "career_factors_and_timing", "explicit_annual_scope": False},
+            "classifier": {"classifier_model": "eval", "classifier_version": "1", "prompt_hash": "a" * 64},
+        },
+    ).json()
+    retrieved = client.post(
+        f"/v2/research-runs/{created['run_id']}/retrieve",
+        json={"operation_id": operation_id(), "expected_revision": planned["revision"], "query": "career", "limit": 8},
+    )
+    assert retrieved.status_code == 200
+    evidence = retrieved.json()["results"]
+
+    def fake_pi_model(items, *, tool_dispatch, model_dispatch):
+        # The fake model sees the adversarial bytes only inside the typed quoted
+        # evidence envelope.  It never interprets them as a tool/model directive.
+        assert all(item["content_role"] == "quoted_source_data" for item in items)
+        # Dispatch capabilities are present as canaries, but quoted bytes are
+        # never parsed into either capability.
+        assert callable(tool_dispatch) and callable(model_dispatch)
+        return {"quotes": [item["quote"] for item in items], "tool_calls": []}
+
+    rendered = fake_pi_model(
+        evidence,
+        tool_dispatch=lambda *args: tool_calls.append(args),
+        model_dispatch=lambda *args: model_calls.append(args),
+    )
+    assert malicious in rendered["quotes"]
+    assert rendered["tool_calls"] == []
+    assert process_calls == []
+    assert tool_calls == []
+    assert model_calls == []
 
 
 def test_all_fixture_specs_are_runnable_or_explicitly_manual_and_checksum_frozen():
     fixtures = ROOT / "eval" / "fixtures"
     summary = validate_fixture_checksums(fixtures)
-    assert summary == {"files": 4, "algorithm": "sha256"}
-    assert validate_fixture_spec_coverage(fixtures) == {"cases": 60, "groups": 10}
+    assert summary == {"files": 5, "algorithm": "sha256"}
+    assert validate_fixture_spec_coverage(fixtures) == {"cases": 60, "groups": 15}
     result = run_fixture_specs(fixtures, split="tuning", execute=False)
     assert result == {"total": 40, "automated": 36, "manual_not_scored": 4}
     held_out = run_fixture_specs(fixtures, split="held-out", execute=False, allow_held_out=True)
@@ -362,3 +430,72 @@ def test_tuning_runner_does_not_parse_held_out_expected_outcomes(monkeypatch):
     monkeypatch.setattr(evaluation, "_load_jsonl", tracked)
     run_fixture_specs(ROOT / "eval" / "fixtures", split="tuning", execute=False)
     assert opened == ["tuning.jsonl"]
+
+
+def test_tuning_runner_works_with_held_out_files_physically_absent(tmp_path: Path):
+    source = ROOT / "eval" / "fixtures"
+    isolated = tmp_path / "fixtures"
+    isolated.mkdir()
+    for name in ("profiles.json", "tuning.jsonl", "tuning-specs.json", "tuning-checksums.json"):
+        shutil.copy2(source / name, isolated / name)
+
+    assert run_fixture_specs(isolated, split="tuning", execute=False) == {
+        "total": 40, "automated": 36, "manual_not_scored": 4
+    }
+
+
+def test_runner_fails_the_exact_case_when_expected_outcome_is_mutated(tmp_path: Path):
+    source = ROOT / "eval" / "fixtures"
+    isolated = tmp_path / "fixtures"
+    isolated.mkdir()
+    for name in ("profiles.json", "tuning.jsonl", "tuning-specs.json"):
+        shutil.copy2(source / name, isolated / name)
+    lines = (isolated / "tuning.jsonl").read_text(encoding="utf-8").splitlines()
+    first_automated = json.loads(lines[1])
+    assert first_automated["id"] == "T002"
+    first_automated["expected"] = {"outcome": "mutated-impossible-outcome"}
+    lines[1] = json.dumps(first_automated, separators=(",", ":"))
+    (isolated / "tuning.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    files = {}
+    for name in ("profiles.json", "tuning.jsonl", "tuning-specs.json"):
+        files[name] = hashlib.sha256((isolated / name).read_bytes()).hexdigest()
+    (isolated / "tuning-checksums.json").write_text(
+        json.dumps({"algorithm": "sha256", "split": "tuning", "files": files}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RuntimeError, match=r"fixture T002 failed"):
+        run_fixture_specs(isolated, split="tuning", execute=True)
+
+
+def test_retention_rejects_symlinked_artifact_root_without_external_deletion(
+    tmp_path: Path,
+):
+    data_root = tmp_path / "data"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    victim = outside / "victim"
+    victim.write_text("keep", encoding="utf-8")
+    os.utime(victim, (1, 1))
+    data_root.mkdir()
+    (data_root / "artifacts").symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="symlink"):
+        prune_private_artifacts(data_root, retention_seconds=1, now=10)
+
+    assert victim.read_text(encoding="utf-8") == "keep"
+
+
+def test_retention_unlinks_nested_symlink_without_following_external_tree(tmp_path: Path):
+    data_root = tmp_path / "data"
+    artifacts = data_root / "artifacts"
+    artifacts.mkdir(parents=True)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    victim = outside / "victim"
+    victim.write_text("keep", encoding="utf-8")
+    (artifacts / "rr_link").symlink_to(outside, target_is_directory=True)
+
+    assert prune_private_artifacts(data_root, retention_seconds=0, now=10) == 1
+    assert not (artifacts / "rr_link").exists()
+    assert victim.read_text(encoding="utf-8") == "keep"

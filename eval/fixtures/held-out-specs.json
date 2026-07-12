@@ -1,0 +1,13 @@
+{
+  "schema_version": "2.0",
+  "split": "held-out",
+  "groups": [
+    {"case_ids":["H001","H009","H019"],"boundary":"safety_screen","assertion":{"equals":"case.expected"},"mode":"automated"},
+    {"case_ids":["H003","H015"],"boundary":"timezone_resolver","assertion":{"equals":"case.expected"},"mode":"automated"},
+    {"case_ids":["H006","H013"],"boundary":"request_or_transition","assertion":{"equals":"case.expected"},"mode":"automated"},
+    {"case_ids":["H004","H011","H017"],"boundary":"answer_contract","assertion":{"equals":"case.expected"},"mode":"automated"},
+    {"case_ids":["H007","H012","H018"],"boundary":"corpus_retrieval","assertion":{"equals":"case.expected"},"mode":"automated"},
+    {"case_ids":["H005","H010","H016"],"boundary":"operation_ledger","assertion":{"equals":"case.expected"},"mode":"automated"},
+    {"case_ids":["H002","H008","H014","H020"],"boundary":"offline_replay","assertion":{"equals":"case.expected"},"mode":"automated"}
+  ]
+}

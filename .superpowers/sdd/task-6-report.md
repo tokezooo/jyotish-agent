@@ -108,19 +108,24 @@ The Task 6 review findings were closed in a follow-up commit based on `1605267`:
   reaches the real replay error. A separately coordinated memo-byte/hash mutation
   reaches the real memo mismatch. Both branches are exercised through service/API
   tests and the subprocess CLI replay path.
-- `eval/fixtures/specs.json` maps all 60 case IDs to fixed setup/action/assertion
-  groups: 56 automated cases and four honest oracle placeholders marked
-  `manual_not_scored`. The checked-in SHA-256 manifest covers profiles, tuning,
-  held-out, and specs. The tuning runner parses only tuning cases; held-out parsing
-  and execution require explicit maintainer/final-review gates.
+- Physically separate `tuning-specs.json` / `held-out-specs.json` and checksum
+  manifests map all 60 IDs to case-specific production boundaries: 56 automated
+  cases and four honest oracle placeholders marked `manual_not_scored`. Every
+  automated probe consumes its exact profile, prompt, and expected outcome; a
+  mutation regression proves the exact case fails. Tuning succeeds even when all
+  held-out case/spec/manifest files are physically absent.
 - The eval skill now invokes `python -m jyotish_agent.evaluation tuning`; held-out
   uses the separate `--allow-held-out` command. Both runner modes completed.
 - Validated CLI memos are atomically written to the actual private artifact path
   `artifacts/<rr_id>/answer.md` with `0700` directories and `0600` files. A bounded
   seven-day default retention sweep runs after ask, with an explicit
   `jyotish artifacts prune --retention-seconds ...` operator entrypoint.
-- The malicious-source regression installs Pi/tool/model/subprocess canaries and
-  proves retrieval returns the authored bytes without any execution-side effect.
+- The malicious-source regression now crosses create → screen → plan → corpus
+  retrieval → structured `quoted_source_data` → fake-Pi rendering with
+  tool/model/subprocess canaries and proves no source-derived side effect.
+- Retention rejects a symlinked artifact root before `exists`/`iterdir`, anchors the
+  resolved root under `data_root`, and unlinks nested symlinks without following
+  them. The exact external-victim deletion reproduction is now a regression test.
 - The temporary-HOME smoke now uses exactly one data root and one server lifecycle
   in doctor → validated fake-Pi ask → inspect JSON → offline replay/hash → shutdown
   order. README now says six phases and documents artifact retention and the runner.
@@ -130,14 +135,15 @@ The Task 6 review findings were closed in a follow-up commit based on `1605267`:
 - Focused Python (`test_task6_hardening`, AnswerContract v2, CLI, corpus migration):
   **75 passed**.
 - Exact black-box plus both CLI replay registry branches: **3 passed in 8.62s**.
-- Full Python: **335 passed, 2 skipped in 123.08s** (only Swiss-ephemeris tests).
+- Full Python after the second review remediation: **339 passed, 2 skipped in
+  93.54s** (only Swiss-ephemeris tests).
 - Tuning runner: **36 automated passed, 4 manual_not_scored, 40 total**.
 - Explicit held-out runner: **20 automated passed, 20 total**.
 - Bun: **44 passed, 0 failed, 137 assertions**.
 - TypeScript `tsc --noEmit`: **passed**.
 - `compileall`: **passed**.
 - Both repository-local skills: **valid**.
-- SHA-256 manifest: **all four files OK**; 60 cases across 10 spec groups.
+- Split SHA-256 manifests: **all five unique files OK**; 60 cases across 15 groups.
 - `git diff --check`: **passed**.
 
 External limitations are unchanged: no live Pi/Gemini call without credentials and
