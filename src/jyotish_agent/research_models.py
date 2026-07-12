@@ -244,6 +244,56 @@ class CorpusReviewRequest(CorpusOperationRequest):
     note: str = Field(min_length=1, max_length=2_000)
 
 
+class CorpusSourceResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    operation_id: str
+    source_version_id: str
+    work_id: str
+    title: str
+    source_class: SourceClass
+    language: str
+    edition: str
+    provenance_url: str
+    rights_note: str
+    manifest_checksum: str
+    manifest_checksum_original: str | None = None
+    manifest_reconciliation_note: str | None = None
+    approval_status: ReviewStatus
+    revision: int = Field(ge=1)
+    reviewed_by: str | None
+    review_note: str | None
+    reviewed_at: str | None
+    created_at: str
+    updated_at: str
+
+
+class CorpusFragmentResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    operation_id: str | None = None
+    fragment_id: str
+    source_version_id: str
+    ordinal: int = Field(ge=1)
+    locator: str
+    text: str
+    transliteration_aliases: list[str]
+    checksum: str
+    approval_status: ReviewStatus
+    revision: int = Field(ge=1)
+    reviewed_by: str | None
+    review_note: str | None
+    reviewed_at: str | None
+    created_at: str
+    updated_at: str
+
+
+class CorpusFragmentsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    operation_id: str
+    source_version_id: str
+    revision: int = Field(ge=1)
+    fragments: list[CorpusFragmentResponse]
+
+
 class RetrievedCorpusFragment(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     content_role: Literal["quoted_source_data"] = "quoted_source_data"

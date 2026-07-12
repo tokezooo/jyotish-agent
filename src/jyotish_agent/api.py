@@ -34,8 +34,11 @@ from .models import (
 from .pyjhora_facade import compute_chart
 from .research_models import (
     CorpusFragmentsIngestRequest,
+    CorpusFragmentsResponse,
+    CorpusFragmentResponse,
     CorpusReviewRequest,
     CorpusSourceIngest,
+    CorpusSourceResponse,
     CreateResearchRunRequest,
     PlanResearchRunRequest,
     ResearchCalculationResponse,
@@ -231,7 +234,9 @@ async def retrieve_research_run(
         )
 
 
-@app.post("/v2/corpus/source-versions", status_code=201, response_model=None)
+@app.post(
+    "/v2/corpus/source-versions", status_code=201, response_model=CorpusSourceResponse
+)
 async def ingest_corpus_source(
     req: CorpusSourceIngest, request: Request
 ) -> dict | JSONResponse:
@@ -248,7 +253,7 @@ async def ingest_corpus_source(
 @app.post(
     "/v2/corpus/source-versions/{source_version_id}/fragments",
     status_code=201,
-    response_model=None,
+    response_model=CorpusFragmentsResponse,
 )
 async def ingest_corpus_fragments(
     source_version_id: str, req: CorpusFragmentsIngestRequest, request: Request
@@ -264,7 +269,8 @@ async def ingest_corpus_fragments(
 
 
 @app.post(
-    "/v2/corpus/source-versions/{source_version_id}/review", response_model=None
+    "/v2/corpus/source-versions/{source_version_id}/review",
+    response_model=CorpusSourceResponse,
 )
 async def review_corpus_source(
     source_version_id: str, req: CorpusReviewRequest, request: Request
@@ -279,7 +285,10 @@ async def review_corpus_source(
         )
 
 
-@app.post("/v2/corpus/fragments/{fragment_id}/review", response_model=None)
+@app.post(
+    "/v2/corpus/fragments/{fragment_id}/review",
+    response_model=CorpusFragmentResponse,
+)
 async def review_corpus_fragment(
     fragment_id: str, req: CorpusReviewRequest, request: Request
 ) -> dict | JSONResponse:

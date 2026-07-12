@@ -74,6 +74,20 @@ def default_data_root() -> Path:
     return base / "jyotish-agent"
 
 
+def _migration_statements(script: str) -> Iterable[str]:
+    """Yield complete SQLite statements so DDL and Python backfill share one txn."""
+    buffer = ""
+    for line in script.splitlines(keepends=True):
+        buffer += line
+        if sqlite3.complete_statement(buffer):
+            statement = buffer.strip()
+            if statement:
+                yield statement
+            buffer = ""
+    if buffer.strip():
+        raise ResearchStoreError("migration contains an incomplete SQL statement")
+
+
 _MIGRATION_1 = """
 CREATE TABLE research_runs (
     run_id TEXT PRIMARY KEY,
@@ -276,12 +290,19 @@ CREATE TABLE question_plans (
 _MIGRATION_6 = """
 ALTER TABLE source_versions ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE source_versions ADD COLUMN updated_at TEXT;
+ALTER TABLE source_versions ADD COLUMN manifest_checksum_original TEXT;
+ALTER TABLE source_versions ADD COLUMN manifest_reconciliation_note TEXT;
 UPDATE source_versions SET updated_at=created_at WHERE updated_at IS NULL;
 
 ALTER TABLE source_fragments ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
 ALTER TABLE source_fragments ADD COLUMN aliases_json TEXT NOT NULL DEFAULT '[]';
 ALTER TABLE source_fragments ADD COLUMN created_at TEXT;
 ALTER TABLE source_fragments ADD COLUMN updated_at TEXT;
+UPDATE source_fragments
+SET aliases_json=CASE
+    WHEN aliases_text='' THEN '[]'
+    ELSE json_array(aliases_text)
+END;
 UPDATE source_fragments
 SET created_at=(SELECT created_at FROM source_versions s
                 WHERE s.source_version_id=source_fragments.source_version_id),
@@ -414,14 +435,13 @@ class ResearchStore:
                         f"missing migration for schema version {target_version}"
                     )
                 try:
-                    # ``executescript`` commits any pending transaction first, so
-                    # the transaction envelope must be part of the script itself.
-                    connection.executescript(
-                        "BEGIN IMMEDIATE;\n"
-                        f"{script}\n"
-                        f"PRAGMA user_version = {target_version};\n"
-                        "COMMIT;"
-                    )
+                    connection.execute("BEGIN IMMEDIATE")
+                    for statement in _migration_statements(script):
+                        connection.execute(statement)
+                    if target_version == 6:
+                        self._backfill_v6(connection)
+                    connection.execute(f"PRAGMA user_version = {target_version}")
+                    connection.commit()
                 except Exception:
                     if connection.in_transaction:
                         connection.rollback()
@@ -457,6 +477,367 @@ class ResearchStore:
     def _ready_connection(self) -> sqlite3.Connection:
         self.initialize()
         return self._connect()
+
+    def _backfill_v6(self, connection: sqlite3.Connection) -> None:
+        """Reconstruct v5 corpus actions before committing schema version 6."""
+        from .corpus import canonical_manifest_checksum, load_builtin_manifest
+
+        builtin = {
+            item["source_version_id"]: item
+            for item in load_builtin_manifest()["sources"]
+        }
+
+        def record_operation(
+            *,
+            operation_id: str,
+            resource_type: str,
+            resource_id: str,
+            operation_type: str,
+            expected_revision: int,
+            payload: Mapping[str, Any],
+            result: Mapping[str, Any],
+            timestamp: str,
+        ) -> None:
+            request_hash = self._corpus_operation_hash(
+                resource_type=resource_type,
+                resource_id=resource_id,
+                operation_type=operation_type,
+                expected_revision=expected_revision,
+                payload=payload,
+            )
+            connection.execute(
+                """INSERT INTO corpus_operations (
+                    operation_id, resource_type, resource_id, operation_type,
+                    expected_revision, request_hash, status, result_json,
+                    created_at, completed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, 'completed', ?, ?, ?)""",
+                (
+                    operation_id, resource_type, resource_id, operation_type,
+                    expected_revision, request_hash, canonical_json(result),
+                    timestamp, timestamp,
+                ),
+            )
+
+        def review_id(seed: str) -> str:
+            return "cr_" + stable_operation_id(seed)[3:]
+
+        source_rows = connection.execute(
+            "SELECT * FROM source_versions ORDER BY source_version_id"
+        ).fetchall()
+        for initial_source in source_rows:
+            source_id = initial_source["source_version_id"]
+            old_checksum = initial_source["manifest_checksum"]
+            initial_fragments = connection.execute(
+                """SELECT * FROM source_fragments WHERE source_version_id=?
+                   ORDER BY ordinal, fragment_id""",
+                (source_id,),
+            ).fetchall()
+            manifest_entry = builtin.get(source_id)
+            is_builtin = bool(
+                manifest_entry
+                and old_checksum == manifest_entry["manifest_checksum"]
+                and [row["fragment_id"] for row in initial_fragments]
+                == [item["fragment_id"] for item in manifest_entry["fragments"]]
+            )
+            if is_builtin and manifest_entry is not None:
+                aliases_by_id = {
+                    item["fragment_id"]: item["transliteration_aliases"]
+                    for item in manifest_entry["fragments"]
+                }
+                for fragment_id, aliases in aliases_by_id.items():
+                    connection.execute(
+                        "UPDATE source_fragments SET aliases_json=? WHERE fragment_id=?",
+                        (canonical_json(aliases), fragment_id),
+                    )
+
+            source_status = initial_source["approval_status"]
+            source_revision = 1 + int(bool(initial_fragments)) + int(
+                source_status != "pending"
+            )
+            source_updated_at = initial_source["reviewed_at"] or initial_source["created_at"]
+            for fragment in initial_fragments:
+                fragment_revision = 1 + int(fragment["approval_status"] != "pending")
+                connection.execute(
+                    """UPDATE source_fragments
+                       SET revision=?, created_at=?, updated_at=?
+                       WHERE fragment_id=?""",
+                    (
+                        fragment_revision,
+                        initial_source["created_at"],
+                        fragment["reviewed_at"] or initial_source["created_at"],
+                        fragment["fragment_id"],
+                    ),
+                )
+
+            migrated_fragments = [
+                self._fragment_projection(row)
+                for row in connection.execute(
+                    """SELECT * FROM source_fragments WHERE source_version_id=?
+                       ORDER BY ordinal, fragment_id""",
+                    (source_id,),
+                ).fetchall()
+            ]
+            actual_checksum = canonical_manifest_checksum(
+                dict(initial_source), migrated_fragments
+            )
+            is_builtin = bool(
+                is_builtin
+                and manifest_entry is not None
+                and actual_checksum == manifest_entry["manifest_checksum"]
+            )
+            reconciliation_note = None
+            if actual_checksum != old_checksum:
+                reconciliation_note = (
+                    "Migrated from v5: aliases_text is preserved as one alias because "
+                    "the original alias-list boundaries are unrecoverable; the canonical "
+                    "manifest checksum was recomputed for explicit review."
+                )
+            connection.execute(
+                """UPDATE source_versions
+                   SET revision=?, updated_at=?, manifest_checksum_original=?,
+                       manifest_checksum=?, checksum=?, manifest_reconciliation_note=?
+                   WHERE source_version_id=?""",
+                (
+                    source_revision, source_updated_at, old_checksum, actual_checksum,
+                    actual_checksum, reconciliation_note, source_id,
+                ),
+            )
+            source = connection.execute(
+                "SELECT * FROM source_versions WHERE source_version_id=?", (source_id,)
+            ).fetchone()
+            fragments = [
+                self._fragment_projection(row)
+                for row in connection.execute(
+                    """SELECT * FROM source_fragments WHERE source_version_id=?
+                       ORDER BY ordinal, fragment_id""",
+                    (source_id,),
+                ).fetchall()
+            ]
+
+            if is_builtin and manifest_entry is not None:
+                source_payload = {
+                    key: value
+                    for key, value in manifest_entry.items()
+                    if key not in {"fragments", "review"}
+                }
+                create_op = stable_operation_id(f"builtin:{source_id}:source")
+                pending_source = self._source_projection(source)
+                pending_source.update(
+                    {
+                        "approval_status": "pending",
+                        "revision": 1,
+                        "reviewed_by": None,
+                        "review_note": None,
+                        "reviewed_at": None,
+                        "updated_at": source["created_at"],
+                        "manifest_checksum_original": None,
+                        "manifest_reconciliation_note": None,
+                    }
+                )
+                record_operation(
+                    operation_id=create_op,
+                    resource_type="source_version",
+                    resource_id=source_id,
+                    operation_type="corpus.source_version.ingest",
+                    expected_revision=0,
+                    payload=source_payload,
+                    result={"operation_id": create_op, **pending_source},
+                    timestamp=source["created_at"],
+                )
+                if manifest_entry["fragments"]:
+                    fragment_op = stable_operation_id(f"builtin:{source_id}:fragments")
+                    pending_fragments = []
+                    for fragment in fragments:
+                        pending = dict(fragment)
+                        pending.update(
+                            {
+                                "approval_status": "pending",
+                                "revision": 1,
+                                "reviewed_by": None,
+                                "review_note": None,
+                                "reviewed_at": None,
+                                "updated_at": fragment["created_at"],
+                            }
+                        )
+                        pending_fragments.append(pending)
+                    record_operation(
+                        operation_id=fragment_op,
+                        resource_type="source_version",
+                        resource_id=source_id,
+                        operation_type="corpus.source_fragments.ingest",
+                        expected_revision=1,
+                        payload={"fragments": manifest_entry["fragments"]},
+                        result={
+                            "operation_id": fragment_op,
+                            "source_version_id": source_id,
+                            "revision": 2,
+                            "fragments": pending_fragments,
+                        },
+                        timestamp=source["created_at"],
+                    )
+                review = manifest_entry["review"]
+                source_review_op = stable_operation_id(
+                    f"builtin:{source_id}:source-review"
+                )
+                record_operation(
+                    operation_id=source_review_op,
+                    resource_type="source_version",
+                    resource_id=source_id,
+                    operation_type="corpus.review",
+                    expected_revision=2 if fragments else 1,
+                    payload={
+                        "status": review["status"],
+                        "reviewer": review["reviewer"],
+                        "note": review["note"],
+                    },
+                    result={
+                        "operation_id": source_review_op,
+                        **self._source_projection(source),
+                    },
+                    timestamp=source["reviewed_at"] or source["created_at"],
+                )
+                connection.execute(
+                    """INSERT INTO corpus_review_history (
+                        review_id, operation_id, resource_type, resource_id,
+                        from_status, to_status, reviewer, review_note, reviewed_at
+                    ) VALUES (?, ?, 'source_version', ?, 'pending', ?, ?, ?, ?)""",
+                    (
+                        review_id(f"builtin:{source_id}:source-review"),
+                        source_review_op, source_id, source_status,
+                        source["reviewed_by"], source["review_note"],
+                        source["reviewed_at"] or source["created_at"],
+                    ),
+                )
+                for fragment in fragments:
+                    fragment_op = stable_operation_id(
+                        f"builtin:{fragment['fragment_id']}:fragment-review"
+                    )
+                    record_operation(
+                        operation_id=fragment_op,
+                        resource_type="source_fragment",
+                        resource_id=fragment["fragment_id"],
+                        operation_type="corpus.review",
+                        expected_revision=1,
+                        payload={
+                            "status": review["status"],
+                            "reviewer": review["reviewer"],
+                            "note": review["note"],
+                        },
+                        result={"operation_id": fragment_op, **fragment},
+                        timestamp=fragment["reviewed_at"] or fragment["created_at"],
+                    )
+                    connection.execute(
+                        """INSERT INTO corpus_review_history (
+                            review_id, operation_id, resource_type, resource_id,
+                            from_status, to_status, reviewer, review_note, reviewed_at
+                        ) VALUES (?, ?, 'source_fragment', ?, 'pending', ?, ?, ?, ?)""",
+                        (
+                            review_id(
+                                f"builtin:{fragment['fragment_id']}:fragment-review"
+                            ),
+                            fragment_op, fragment["fragment_id"],
+                            fragment["approval_status"], fragment["reviewed_by"],
+                            fragment["review_note"],
+                            fragment["reviewed_at"] or fragment["created_at"],
+                        ),
+                    )
+                continue
+
+            # Legacy non-builtin calls had no operation IDs. Preserve each inferred
+            # action as an explicit migrated snapshot rather than pretending it can replay.
+            create_op = stable_operation_id(f"migrated-v5:{source_id}:source")
+            record_operation(
+                operation_id=create_op,
+                resource_type="source_version",
+                resource_id=source_id,
+                operation_type="corpus.migrated_v5.source",
+                expected_revision=0,
+                payload={"legacy_schema": 5},
+                result={"operation_id": create_op, **self._source_projection(source)},
+                timestamp=source["created_at"],
+            )
+            if fragments:
+                fragment_op = stable_operation_id(f"migrated-v5:{source_id}:fragments")
+                record_operation(
+                    operation_id=fragment_op,
+                    resource_type="source_version",
+                    resource_id=source_id,
+                    operation_type="corpus.migrated_v5.fragments",
+                    expected_revision=1,
+                    payload={"legacy_schema": 5, "fragment_count": len(fragments)},
+                    result={
+                        "operation_id": fragment_op,
+                        "source_version_id": source_id,
+                        "revision": 2,
+                        "fragments": fragments,
+                    },
+                    timestamp=source["created_at"],
+                )
+            if source_status != "pending":
+                source_review_op = stable_operation_id(
+                    f"migrated-v5:{source_id}:source-review"
+                )
+                record_operation(
+                    operation_id=source_review_op,
+                    resource_type="source_version",
+                    resource_id=source_id,
+                    operation_type="corpus.migrated_v5.review",
+                    expected_revision=source_revision - 1,
+                    payload={"legacy_schema": 5, "status": source_status},
+                    result={
+                        "operation_id": source_review_op,
+                        **self._source_projection(source),
+                    },
+                    timestamp=source["reviewed_at"] or source["created_at"],
+                )
+                connection.execute(
+                    """INSERT INTO corpus_review_history (
+                        review_id, operation_id, resource_type, resource_id,
+                        from_status, to_status, reviewer, review_note, reviewed_at
+                    ) VALUES (?, ?, 'source_version', ?, 'pending', ?, ?, ?, ?)""",
+                    (
+                        review_id(f"migrated-v5:{source_id}:source-review"),
+                        source_review_op, source_id, source_status,
+                        source["reviewed_by"] or "unknown-v5-reviewer",
+                        source["review_note"] or "Migrated v5 review decision.",
+                        source["reviewed_at"] or source["created_at"],
+                    ),
+                )
+            for fragment in fragments:
+                if fragment["approval_status"] == "pending":
+                    continue
+                fragment_op = stable_operation_id(
+                    f"migrated-v5:{fragment['fragment_id']}:fragment-review"
+                )
+                record_operation(
+                    operation_id=fragment_op,
+                    resource_type="source_fragment",
+                    resource_id=fragment["fragment_id"],
+                    operation_type="corpus.migrated_v5.review",
+                    expected_revision=1,
+                    payload={
+                        "legacy_schema": 5,
+                        "status": fragment["approval_status"],
+                    },
+                    result={"operation_id": fragment_op, **fragment},
+                    timestamp=fragment["reviewed_at"] or fragment["created_at"],
+                )
+                connection.execute(
+                    """INSERT INTO corpus_review_history (
+                        review_id, operation_id, resource_type, resource_id,
+                        from_status, to_status, reviewer, review_note, reviewed_at
+                    ) VALUES (?, ?, 'source_fragment', ?, 'pending', ?, ?, ?, ?)""",
+                    (
+                        review_id(
+                            f"migrated-v5:{fragment['fragment_id']}:fragment-review"
+                        ),
+                        fragment_op, fragment["fragment_id"],
+                        fragment["approval_status"],
+                        fragment["reviewed_by"] or "unknown-v5-reviewer",
+                        fragment["review_note"] or "Migrated v5 review decision.",
+                        fragment["reviewed_at"] or fragment["created_at"],
+                    ),
+                )
 
     def create_run(
         self,
@@ -1047,6 +1428,7 @@ class ResearchStore:
             for key in (
                 "source_version_id", "work_id", "title", "source_class", "language",
                 "edition", "provenance_url", "rights_note", "manifest_checksum",
+                "manifest_checksum_original", "manifest_reconciliation_note",
                 "approval_status", "revision", "reviewed_by", "review_note",
                 "reviewed_at", "created_at", "updated_at",
             )
