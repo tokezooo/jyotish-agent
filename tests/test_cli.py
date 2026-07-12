@@ -153,6 +153,11 @@ if os.environ.get("FAKE_PI_MODE") == "validated":
                 "materiality": "major", "confidence": 1.0,
                 "supports": [calculated["evidence_ids"][0]],
                 "caveats": [], "conflicts": []
+            }, {
+                "claim_type": "synthesis", "claim_id": f"cl_{uuid.uuid4()}",
+                "materiality": "major", "confidence": 0.8,
+                "supports": [claim_id], "caveats": [], "conflicts": [],
+                "text": "The validated evidence supports a focused career review."
             }],
             "limitations": ["Authored test artifact."], "followups": []
         }
@@ -321,6 +326,9 @@ def test_black_box_ask_outputs_only_verified_backend_artifact(tmp_path: Path):
     assert completed.returncode == 0, completed.stderr
     output = json.loads(completed.stdout)
     assert output["answer"].startswith("# Validated fake-Pi memo")
+    assert "The validated evidence supports a focused career review." in output["answer"]
+    assert "## Claims" not in output["answer"]
+    assert "confidence" not in output["answer"]
     assert "ARBITRARY_MODEL_STDOUT" not in output["answer"]
     artifact = tmp_path / "data" / "artifacts" / captured["run_id"] / "answer.md"
     assert artifact.read_text(encoding="utf-8") == output["answer"]
