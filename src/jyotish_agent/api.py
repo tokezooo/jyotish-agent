@@ -33,20 +33,28 @@ from .models import (
 )
 from .pyjhora_facade import compute_chart
 from .research_models import (
+    CorpusFragmentsIngestRequest,
+    CorpusReviewRequest,
+    CorpusSourceIngest,
     CreateResearchRunRequest,
+    PlanResearchRunRequest,
     ResearchCalculationResponse,
     ResearchAnswerResponse,
     ResearchEventsResponse,
     ResearchOperationRequest,
+    ResearchPlanResponse,
+    ResearchRetrievalResponse,
     ResearchRunResponse,
     ResearchScreenResponse,
     SubmitAnswerRequest,
+    RetrieveResearchRunRequest,
 )
 from .research_service import InvalidRunTransition, ResearchService, UnsupportedTimezoneMode
 from .research_store import (
     OptimisticConflict,
     ResearchStore,
     RunNotFound,
+    SourceConflict,
     default_data_root,
 )
 from .signing import cache_facts, get_cached_facts, verify_facts
@@ -180,6 +188,109 @@ async def screen_research_run(
             409, "Research operation conflict",
             "The operation is stale, duplicated with changed input, or invalid in this state.",
             "Refresh the run, use its current revision, and keep one operation ID per request.",
+        )
+
+
+@app.post("/v2/research-runs/{run_id}/plan", response_model=ResearchPlanResponse)
+async def plan_research_run(
+    run_id: str, req: PlanResearchRunRequest, request: Request
+) -> ResearchPlanResponse | JSONResponse:
+    try:
+        return _research_service(request).plan_run(run_id, req)
+    except RunNotFound:
+        return _research_problem(
+            404, "Research run not found", "No persisted research run has that ID.",
+            "Check the rr_ run ID and retry.",
+        )
+    except (OptimisticConflict, InvalidRunTransition):
+        return _research_problem(
+            409, "Research plan conflict",
+            "Planning is stale or invalid for the run's current state.",
+            "Screen safely, then retry with the current revision and a fresh operation ID.",
+        )
+
+
+@app.post(
+    "/v2/research-runs/{run_id}/retrieve", response_model=ResearchRetrievalResponse
+)
+async def retrieve_research_run(
+    run_id: str, req: RetrieveResearchRunRequest, request: Request
+) -> ResearchRetrievalResponse | JSONResponse:
+    try:
+        return _research_service(request).retrieve_run(run_id, req)
+    except RunNotFound:
+        return _research_problem(
+            404, "Research run not found", "No persisted research run has that ID.",
+            "Check the rr_ run ID and retry.",
+        )
+    except (OptimisticConflict, InvalidRunTransition):
+        return _research_problem(
+            409, "Research retrieval conflict",
+            "Retrieval is stale, unsafe, or has no supported plan.",
+            "Create a supported plan, then retry with the current revision and a fresh operation ID.",
+        )
+
+
+@app.post("/v2/corpus/source-versions", status_code=201, response_model=None)
+async def ingest_corpus_source(
+    req: CorpusSourceIngest, request: Request
+) -> dict | JSONResponse:
+    try:
+        return _research_service(request).ingest_source(req)
+    except SourceConflict:
+        return _research_problem(
+            409, "Corpus source conflict",
+            "The source identifier conflicts with persisted provenance.",
+            "Use the exact original manifest or a new source-version identifier.",
+        )
+
+
+@app.post(
+    "/v2/corpus/source-versions/{source_version_id}/fragments",
+    status_code=201,
+    response_model=None,
+)
+async def ingest_corpus_fragments(
+    source_version_id: str, req: CorpusFragmentsIngestRequest, request: Request
+) -> dict | JSONResponse:
+    try:
+        rows = _research_service(request).ingest_fragments(
+            source_version_id, req.fragments
+        )
+        return {"source_version_id": source_version_id, "fragments": rows}
+    except SourceConflict:
+        return _research_problem(
+            409, "Corpus fragment conflict",
+            "A fragment checksum, locator, or identifier conflicts with persisted data.",
+            "Correct the manifest or create a new immutable source version.",
+        )
+
+
+@app.post(
+    "/v2/corpus/source-versions/{source_version_id}/review", response_model=None
+)
+async def review_corpus_source(
+    source_version_id: str, req: CorpusReviewRequest, request: Request
+) -> dict | JSONResponse:
+    try:
+        return _research_service(request).review_source(source_version_id, req)
+    except SourceConflict:
+        return _research_problem(
+            404, "Corpus source not found", "No source version has that ID.",
+            "Check the source-version ID and retry.",
+        )
+
+
+@app.post("/v2/corpus/fragments/{fragment_id}/review", response_model=None)
+async def review_corpus_fragment(
+    fragment_id: str, req: CorpusReviewRequest, request: Request
+) -> dict | JSONResponse:
+    try:
+        return _research_service(request).review_fragment(fragment_id, req)
+    except SourceConflict:
+        return _research_problem(
+            404, "Corpus fragment not found", "No source fragment has that ID.",
+            "Check the fragment ID and retry.",
         )
 
 

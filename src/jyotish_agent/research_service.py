@@ -15,8 +15,16 @@ from .interpretations import iter_fact_atoms, redirect_message, screen_question
 from .models import BirthProfileRequest, CalculationConfigRequest
 from .pyjhora_facade import compute_chart
 from .research_models import (
+    CorpusFragmentIngest,
+    CorpusReviewRequest,
+    CorpusSourceIngest,
     CreateResearchRunRequest,
     FixedOffsetLegacy,
+    PlanResearchRunRequest,
+    ResearchPlanResponse,
+    ResearchRetrievalResponse,
+    RetrievedCorpusFragment,
+    RetrieveResearchRunRequest,
     ResearchCalculationResponse,
     ResearchAnswerResponse,
     ResearchEventsResponse,
@@ -184,7 +192,7 @@ class ResearchService:
             return ResearchCalculationResponse(**prior)
 
         run = self._require_run(run_id)
-        if run["status"] != "screened_safe":
+        if run["status"] not in {"screened_safe", "planned"}:
             raise InvalidRunTransition("calculation requires a safely screened run")
         if run["revision"] != request.expected_revision:
             raise InvalidRunTransition("expected revision does not match current revision")
@@ -230,6 +238,168 @@ class ResearchService:
             producer_version=ENGINE_VERSION,
         )
         return ResearchCalculationResponse(**self._operation_response(event, revision))
+
+    def plan_run(
+        self, run_id: str, request: PlanResearchRunRequest
+    ) -> ResearchPlanResponse:
+        from .planner import build_question_plan, question_plan_bytes
+
+        request_payload = {
+            "intent": request.intent.model_dump(mode="json"),
+            "classifier": request.classifier.model_dump(mode="json"),
+        }
+        prior = self.store.get_operation_result(
+            operation_id=request.operation_id,
+            run_id=run_id,
+            expected_revision=request.expected_revision,
+            event_type="research_run.planned",
+            request_payload=request_payload,
+            producer="jyotish-agent",
+            producer_version=ENGINE_VERSION,
+        )
+        if prior is not None:
+            event, revision = prior
+            return ResearchPlanResponse(**self._operation_response(event, revision))
+
+        run = self._require_run(run_id)
+        if run["status"] != "screened_safe":
+            raise InvalidRunTransition("planning requires a safely screened run")
+        if run["revision"] != request.expected_revision:
+            raise InvalidRunTransition("expected revision does not match current revision")
+
+        plan = build_question_plan(request.intent)
+        plan_hash = sha256_text(question_plan_bytes(plan).decode("utf-8"))
+        status = {
+            "supported": "planned",
+            "needs_clarification": "plan_needs_clarification",
+            "unsupported": "plan_unsupported",
+        }[plan.outcome]
+        result = {
+            "run_id": run_id,
+            "operation_id": request.operation_id,
+            "status": status,
+            "intent": request.intent.model_dump(mode="json"),
+            "classifier": request.classifier.model_dump(mode="json"),
+            "plan": plan.model_dump(mode="json"),
+            "plan_hash": plan_hash,
+        }
+        event, revision = self.store.append_event(
+            run_id,
+            operation_id=request.operation_id,
+            expected_revision=request.expected_revision,
+            event_type="research_run.planned",
+            payload={"status": status, "result": result},
+            request_payload=request_payload,
+            next_status=status,
+            planning_record={
+                "intent": request.intent.model_dump(mode="json"),
+                "classifier_model": request.classifier.classifier_model,
+                "classifier_version": request.classifier.classifier_version,
+                "classifier_prompt_hash": request.classifier.prompt_hash,
+                "plan": plan.model_dump(mode="json"),
+                "plan_hash": plan_hash,
+                "planner_version": run["planner_version"],
+            },
+            producer="jyotish-agent",
+            producer_version=ENGINE_VERSION,
+        )
+        return ResearchPlanResponse(**self._operation_response(event, revision))
+
+    def retrieve_run(
+        self, run_id: str, request: RetrieveResearchRunRequest
+    ) -> ResearchRetrievalResponse:
+        request_payload = {"query": request.query, "limit": request.limit}
+        prior = self.store.get_operation_result(
+            operation_id=request.operation_id,
+            run_id=run_id,
+            expected_revision=request.expected_revision,
+            event_type="research_run.retrieved",
+            request_payload=request_payload,
+            producer="jyotish-agent",
+            producer_version=ENGINE_VERSION,
+        )
+        if prior is not None:
+            event, revision = prior
+            return ResearchRetrievalResponse(**self._operation_response(event, revision))
+        run = self._require_run(run_id)
+        if run["status"] not in {"planned", "calculated"}:
+            raise InvalidRunTransition("retrieval requires a supported plan")
+        if run["revision"] != request.expected_revision:
+            raise InvalidRunTransition("expected revision does not match current revision")
+        found = self.search_corpus(request.query, limit=request.limit)
+        results = []
+        evidence = []
+        for item in found:
+            evidence_id = "evi_" + sha256_text(
+                canonical_json(
+                    {
+                        "run_id": run_id,
+                        "operation_id": request.operation_id,
+                        "fragment_id": item.fragment_id,
+                    }
+                )
+            )[:32]
+            item = item.model_copy(update={"evidence_id": evidence_id})
+            results.append(item)
+            payload = item.model_dump(mode="json")
+            evidence.append(
+                {
+                    "evidence_id": evidence_id,
+                    "evidence_type": "source_fragment",
+                    "payload": payload,
+                }
+            )
+        result = {
+            "run_id": run_id,
+            "operation_id": request.operation_id,
+            "status": run["status"],
+            "query": request.query,
+            "results": [item.model_dump(mode="json") for item in results],
+        }
+        event, revision = self.store.append_event(
+            run_id,
+            operation_id=request.operation_id,
+            expected_revision=request.expected_revision,
+            event_type="research_run.retrieved",
+            payload={"status": run["status"], "result": result},
+            request_payload=request_payload,
+            next_status=run["status"],
+            evidence_items=evidence,
+            producer="jyotish-agent",
+            producer_version=ENGINE_VERSION,
+        )
+        return ResearchRetrievalResponse(**self._operation_response(event, revision))
+
+    def ingest_source(self, source: CorpusSourceIngest) -> dict[str, Any]:
+        return self.store.ingest_source_version(source.model_dump(mode="json"))
+
+    def ingest_fragments(
+        self, source_version_id: str, fragments: list[CorpusFragmentIngest]
+    ) -> list[dict[str, Any]]:
+        return self.store.ingest_source_fragments(
+            source_version_id,
+            [fragment.model_dump(mode="json") for fragment in fragments],
+        )
+
+    def review_source(
+        self, source_version_id: str, review: CorpusReviewRequest
+    ) -> dict[str, Any]:
+        return self.store.review_source_version(
+            source_version_id, review.model_dump(mode="json")
+        )
+
+    def review_fragment(
+        self, fragment_id: str, review: CorpusReviewRequest
+    ) -> dict[str, Any]:
+        return self.store.review_source_fragment(
+            fragment_id, review.model_dump(mode="json")
+        )
+
+    def search_corpus(self, query: str, *, limit: int) -> list[RetrievedCorpusFragment]:
+        return [
+            RetrievedCorpusFragment.model_validate(row)
+            for row in self.store.search_approved_fragments(query, limit=limit)
+        ]
 
     def submit_answer(
         self, run_id: str, request: SubmitAnswerRequest

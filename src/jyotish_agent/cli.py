@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 from pydantic import ValidationError
 
 from .research_models import ResearchBirthProfileRequest
-from .research_store import canonical_json, default_data_root
+from .research_store import ResearchStore, canonical_json, default_data_root
 
 DEFAULT_API_URL = "http://127.0.0.1:8000"
 REQUIRED_V2_BLOCKER = (
@@ -29,7 +29,9 @@ REQUIRED_V2_BLOCKER = (
 PI_TOOLS = (
     "jyotish_create_research_run",
     "jyotish_screen_research_run",
+    "jyotish_plan_research_run",
     "jyotish_calculate_research_run",
+    "jyotish_retrieve_research_run",
     "jyotish_submit_answer",
 )
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -138,8 +140,9 @@ def _private_prompt(
         "birth_profile": profile,
     }
     prompt = (
-        "Use only the Jyotish research tools. Create a v2 run, screen it, calculate "
-        "it, construct AnswerContract 2.0, and submit it. The final response must be "
+        "Use only the Jyotish research tools. Create a v2 run, screen it, plan the "
+        "typed career intent, calculate it, retrieve approved sources, construct "
+        "AnswerContract 2.0, and submit it. The final response must be "
         "the backend canonical Markdown. Use the exact assigned run_id and create "
         "operation_id below; do not substitute another identity.\n\n"
         f"CLI request JSON: {canonical_json(cli_request)}\n"
@@ -295,6 +298,37 @@ def _ask(args: argparse.Namespace) -> int:
         _stop_process(child)
 
 
+def _inspect_run(args: argparse.Namespace) -> int:
+    store = ResearchStore(default_data_root())
+    run = store.get_run(args.run_id)
+    if run is None:
+        raise CliError(f"research run not found: {args.run_id}", 2)
+    events = []
+    for row in store.list_events(args.run_id):
+        event = {key: value for key, value in row.items() if key != "payload_json"}
+        event["payload"] = json.loads(row["payload_json"])
+        events.append(event)
+    body = {
+        "run": run,
+        "intent": store.get_question_intent(args.run_id),
+        "plan": store.get_question_plan(args.run_id),
+        "events": events,
+        "evidence": store.list_evidence(args.run_id),
+        "answers": store.list_answers(args.run_id),
+    }
+    if args.json:
+        print(json.dumps(body, ensure_ascii=False, sort_keys=True))
+    else:
+        print(f"run_id: {run['run_id']}")
+        print(f"status: {run['status']}")
+        print(f"revision: {run['revision']}")
+        print(f"events: {len(events)}")
+        print(f"evidence: {len(body['evidence'])}")
+        if body["plan"] is not None:
+            print(f"plan_hash: {body['plan']['plan_hash']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="jyotish")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -307,6 +341,12 @@ def build_parser() -> argparse.ArgumentParser:
     ask.add_argument("--chart", required=True, help="birth profile JSON path")
     ask.add_argument("--json", action="store_true", help="wrap canonical output in JSON")
     ask.set_defaults(handler=_ask)
+    run = subparsers.add_parser("run", help="inspect persisted research runs")
+    run_subparsers = run.add_subparsers(dest="run_command", required=True)
+    inspect = run_subparsers.add_parser("inspect", help="inspect a persisted run ledger")
+    inspect.add_argument("run_id")
+    inspect.add_argument("--json", action="store_true", help="emit canonical JSON")
+    inspect.set_defaults(handler=_inspect_run)
     return parser
 
 

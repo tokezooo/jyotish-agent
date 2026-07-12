@@ -7,7 +7,7 @@ import re
 import uuid
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 from .models import BirthTimeConfidence, CalculationConfigRequest
 
@@ -119,6 +119,141 @@ class ResearchOperationRequest(BaseModel):
         return value
 
 
+class ResearchOperationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_id: str
+    operation_id: str
+    revision: int
+    backend_seq: int
+    event_hash: str
+    status: str
+
+
+QuestionIntentFamily = Literal[
+    "career_factors_and_timing", "unknown", "composite", "unsupported"
+]
+
+
+class QuestionIntent(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    family: QuestionIntentFamily
+    explicit_annual_scope: bool = False
+
+    @field_validator("explicit_annual_scope")
+    @classmethod
+    def annual_scope_requires_supported_family(cls, value: bool, info):
+        family = info.data.get("family")
+        if value and family != "career_factors_and_timing":
+            raise ValueError("annual scope is valid only for the supported career family")
+        return value
+
+
+class ClassifierMetadata(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
+    classifier_model: str = Field(
+        min_length=1,
+        max_length=200,
+        validation_alias=AliasChoices("classifier_model", "model"),
+    )
+    classifier_version: str = Field(
+        min_length=1,
+        max_length=200,
+        validation_alias=AliasChoices("classifier_version", "version"),
+    )
+    prompt_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class QuestionPlan(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    schema_version: Literal[1] = 1
+    outcome: Literal["supported", "needs_clarification", "unsupported"]
+    family: Literal["career_factors_and_timing"] | None
+    explicit_annual_scope: bool
+    charts: tuple[Literal["D1", "D9", "D10"], ...]
+    modules: tuple[
+        Literal["shadbala", "transits", "ashtakavarga", "varshaphal"], ...
+    ]
+
+
+class PlanResearchRunRequest(ResearchOperationRequest):
+    intent: QuestionIntent
+    classifier: ClassifierMetadata
+
+
+class ResearchPlanResponse(ResearchOperationResponse):
+    intent: QuestionIntent
+    classifier: ClassifierMetadata
+    plan: QuestionPlan
+    plan_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class RetrieveResearchRunRequest(ResearchOperationRequest):
+    query: str = Field(min_length=1, max_length=2_000)
+    limit: int = Field(default=8, ge=1, le=50)
+
+
+SourceClass = Literal[
+    "original_text", "translation", "commentary", "modern_secondary"
+]
+ReviewStatus = Literal["pending", "approved", "rejected", "quarantined"]
+
+
+class CorpusSourceIngest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    source_version_id: str = Field(pattern=r"^sv_[a-z0-9][a-z0-9_.-]{2,127}$")
+    work_id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,99}$")
+    title: str = Field(min_length=1, max_length=500)
+    source_class: SourceClass
+    language: str = Field(min_length=2, max_length=50)
+    edition: str = Field(min_length=1, max_length=1_000)
+    provenance_url: str = Field(min_length=1, max_length=2_000)
+    rights_note: str = Field(min_length=1, max_length=4_000)
+    manifest_checksum: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class CorpusFragmentIngest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    fragment_id: str = Field(pattern=r"^sf_[a-z0-9][a-z0-9_.-]{2,127}$")
+    ordinal: int = Field(ge=1)
+    locator: str = Field(min_length=1, max_length=1_000)
+    text: str = Field(min_length=1, max_length=50_000)
+    transliteration_aliases: list[str] = Field(default_factory=list, max_length=50)
+    checksum: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+class CorpusFragmentsIngestRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    fragments: list[CorpusFragmentIngest] = Field(min_length=1, max_length=500)
+
+
+class CorpusReviewRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: Literal["approved", "rejected", "quarantined"]
+    reviewer: str = Field(min_length=1, max_length=200)
+    note: str = Field(min_length=1, max_length=2_000)
+
+
+class RetrievedCorpusFragment(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    content_role: Literal["quoted_source_data"] = "quoted_source_data"
+    evidence_id: str | None = None
+    fragment_id: str
+    source_version_id: str
+    work_id: str
+    title: str
+    source_class: SourceClass
+    locator: str
+    quote: str
+    checksum: str
+    rights_note: str
+    provenance_url: str
+
+
+class ResearchRetrievalResponse(ResearchOperationResponse):
+    query: str
+    results: list[RetrievedCorpusFragment]
+
+
 class TimezoneResolution(BaseModel):
     model_config = ConfigDict(extra="forbid")
     original_civil_datetime: str
@@ -169,16 +304,6 @@ class ResearchEventResponse(BaseModel):
 class ResearchEventsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     events: list[ResearchEventResponse]
-
-
-class ResearchOperationResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    run_id: str
-    operation_id: str
-    revision: int
-    backend_seq: int
-    event_hash: str
-    status: str
 
 
 class ResearchScreenResponse(ResearchOperationResponse):

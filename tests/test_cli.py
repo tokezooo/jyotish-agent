@@ -55,7 +55,8 @@ assert required <= set(args), args
 allowlist = args[args.index("--tools") + 1].split(",")
 assert set(allowlist) == {
     "jyotish_create_research_run", "jyotish_screen_research_run",
-    "jyotish_calculate_research_run", "jyotish_submit_answer"
+    "jyotish_plan_research_run", "jyotish_calculate_research_run",
+    "jyotish_retrieve_research_run", "jyotish_submit_answer"
 }
 assert os.environ.get("JYOTISH_REQUIRE_V2") == "1"
 prompt_arg = next(item for item in args if item.startswith("@"))
@@ -93,13 +94,25 @@ if os.environ.get("FAKE_PI_MODE") == "validated":
     screened = post(f"/v2/research-runs/{run['run_id']}/screen", {
         "operation_id": f"op_{uuid.uuid4()}", "expected_revision": run["revision"]
     })
+    planned = post(f"/v2/research-runs/{run['run_id']}/plan", {
+        "operation_id": f"op_{uuid.uuid4()}", "expected_revision": screened["revision"],
+        "intent": {"family": "career_factors_and_timing", "explicit_annual_scope": False},
+        "classifier": {
+            "classifier_model": "fake-pi-classifier", "classifier_version": "1",
+            "prompt_hash": "a" * 64
+        }
+    })
     calculated = post(f"/v2/research-runs/{run['run_id']}/calculate", {
-        "operation_id": f"op_{uuid.uuid4()}", "expected_revision": screened["revision"]
+        "operation_id": f"op_{uuid.uuid4()}", "expected_revision": planned["revision"]
+    })
+    retrieved = post(f"/v2/research-runs/{run['run_id']}/retrieve", {
+        "operation_id": f"op_{uuid.uuid4()}", "expected_revision": calculated["revision"],
+        "query": "career timing", "limit": 8
     })
     claim_id = f"cl_{uuid.uuid4()}"
     submitted = post(f"/v2/research-runs/{run['run_id']}/answers", {
         "operation_id": f"op_{uuid.uuid4()}",
-        "expected_revision": calculated["revision"],
+        "expected_revision": retrieved["revision"],
         "answer": {
             "schema_version": "2.0",
             "run_status": "calculated",

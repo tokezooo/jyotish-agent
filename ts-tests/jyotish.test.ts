@@ -857,7 +857,9 @@ describe("ResearchRuntime", () => {
     expect(handlers.has("message_end")).toBe(true);
     expect(tools).toContain("jyotish_create_research_run");
     expect(tools).toContain("jyotish_screen_research_run");
+    expect(tools).toContain("jyotish_plan_research_run");
     expect(tools).toContain("jyotish_calculate_research_run");
+    expect(tools).toContain("jyotish_retrieve_research_run");
     expect(tools).toContain("jyotish_submit_answer");
 
     await handlers.get("session_start")?.[0]?.({ type: "session_start" }, context);

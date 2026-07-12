@@ -1,0 +1,4 @@
+interface:
+  display_name: "Jyotish Corpus Curator"
+  short_description: "Govern reviewed Jyotish source fragments"
+  default_prompt: "Use $jyotish-corpus-curator to prepare a source manifest and fragments for human approval."

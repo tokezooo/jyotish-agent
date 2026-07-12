@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 DATABASE_NAME = "research.sqlite3"
 
 
@@ -33,6 +33,10 @@ class OptimisticConflict(ResearchStoreError):
 
 
 class EventChainError(ResearchStoreError):
+    pass
+
+
+class SourceConflict(ResearchStoreError):
     pass
 
 
@@ -221,11 +225,54 @@ CREATE TRIGGER claim_supports_no_delete
 BEFORE DELETE ON claim_supports BEGIN SELECT RAISE(ABORT, 'claim_supports are append-only'); END;
 """
 
+_MIGRATION_5 = """
+ALTER TABLE source_versions ADD COLUMN work_id TEXT NOT NULL DEFAULT 'legacy';
+ALTER TABLE source_versions ADD COLUMN language TEXT NOT NULL DEFAULT 'und';
+ALTER TABLE source_versions ADD COLUMN edition TEXT NOT NULL DEFAULT 'legacy fixture';
+ALTER TABLE source_versions ADD COLUMN provenance_url TEXT NOT NULL DEFAULT 'local:test-fixture';
+ALTER TABLE source_versions ADD COLUMN manifest_checksum TEXT NOT NULL DEFAULT '';
+ALTER TABLE source_versions ADD COLUMN reviewed_by TEXT;
+ALTER TABLE source_versions ADD COLUMN review_note TEXT;
+ALTER TABLE source_versions ADD COLUMN reviewed_at TEXT;
+
+ALTER TABLE source_fragments ADD COLUMN aliases_text TEXT NOT NULL DEFAULT '';
+ALTER TABLE source_fragments ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'pending';
+ALTER TABLE source_fragments ADD COLUMN reviewed_by TEXT;
+ALTER TABLE source_fragments ADD COLUMN review_note TEXT;
+ALTER TABLE source_fragments ADD COLUMN reviewed_at TEXT;
+
+CREATE VIRTUAL TABLE source_fragments_fts USING fts5(
+    fragment_id UNINDEXED,
+    normalized_text,
+    aliases_text,
+    tokenize='unicode61 remove_diacritics 2'
+);
+
+CREATE TABLE question_intents (
+    run_id TEXT PRIMARY KEY REFERENCES research_runs(run_id) ON DELETE CASCADE,
+    intent_json TEXT NOT NULL,
+    intent_hash TEXT NOT NULL,
+    classifier_model TEXT NOT NULL,
+    classifier_version TEXT NOT NULL,
+    classifier_prompt_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE question_plans (
+    run_id TEXT PRIMARY KEY REFERENCES research_runs(run_id) ON DELETE CASCADE,
+    plan_json TEXT NOT NULL,
+    plan_hash TEXT NOT NULL,
+    planner_version TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
+"""
+
 _MIGRATIONS: dict[int, str] = {
     1: _MIGRATION_1,
     2: _MIGRATION_2,
     3: _MIGRATION_3,
     4: _MIGRATION_4,
+    5: _MIGRATION_5,
 }
 
 
@@ -448,6 +495,7 @@ class ResearchStore:
         answer_record: Mapping[str, Any] | None = None,
         claim_records: Iterable[Mapping[str, Any]] = (),
         claim_supports: Iterable[Mapping[str, str]] = (),
+        planning_record: Mapping[str, Any] | None = None,
     ) -> tuple[dict[str, Any], int]:
         payload_json = canonical_json(payload)
         semantic_payload = (
@@ -586,6 +634,36 @@ class ResearchStore:
                         int(answer_attempt["valid"]),
                         canonical_json(answer_attempt["violations"]),
                         answer_attempt.get("answer_id"),
+                        now,
+                    ),
+                )
+            if planning_record is not None:
+                intent_json = canonical_json(planning_record["intent"])
+                plan_json = canonical_json(planning_record["plan"])
+                connection.execute(
+                    """INSERT INTO question_intents (
+                        run_id, intent_json, intent_hash, classifier_model,
+                        classifier_version, classifier_prompt_hash, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        run_id,
+                        intent_json,
+                        sha256_text(intent_json),
+                        planning_record["classifier_model"],
+                        planning_record["classifier_version"],
+                        planning_record["classifier_prompt_hash"],
+                        now,
+                    ),
+                )
+                connection.execute(
+                    """INSERT INTO question_plans (
+                        run_id, plan_json, plan_hash, planner_version, created_at
+                    ) VALUES (?, ?, ?, ?, ?)""",
+                    (
+                        run_id,
+                        plan_json,
+                        planning_record["plan_hash"],
+                        planning_record["planner_version"],
                         now,
                     ),
                 )
@@ -794,6 +872,290 @@ class ResearchStore:
         finally:
             connection.close()
 
+    def get_question_intent(self, run_id: str) -> dict[str, Any] | None:
+        connection = self._ready_connection()
+        try:
+            row = connection.execute(
+                "SELECT * FROM question_intents WHERE run_id=?", (run_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            item = dict(row)
+            item["intent"] = json.loads(item.pop("intent_json"))
+            return item
+        finally:
+            connection.close()
+
+    def get_question_plan(self, run_id: str) -> dict[str, Any] | None:
+        connection = self._ready_connection()
+        try:
+            row = connection.execute(
+                "SELECT * FROM question_plans WHERE run_id=?", (run_id,)
+            ).fetchone()
+            if row is None:
+                return None
+            item = dict(row)
+            item["plan"] = json.loads(item.pop("plan_json"))
+            return item
+        finally:
+            connection.close()
+
+    def ingest_source_version(self, source: Mapping[str, Any]) -> dict[str, Any]:
+        """Insert a pending source manifest, or replay the exact same manifest."""
+        source_data = dict(source)
+        now = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+        metadata = {
+            "work_id": source_data["work_id"],
+            "language": source_data["language"],
+            "edition": source_data["edition"],
+            "provenance_url": source_data["provenance_url"],
+        }
+        connection = self._ready_connection()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            existing = connection.execute(
+                "SELECT * FROM source_versions WHERE source_version_id=?",
+                (source_data["source_version_id"],),
+            ).fetchone()
+            if existing is not None:
+                comparable = dict(existing)
+                expected = {
+                    "title": source_data["title"],
+                    "source_class": source_data["source_class"],
+                    "rights_note": source_data["rights_note"],
+                    "work_id": source_data["work_id"],
+                    "language": source_data["language"],
+                    "edition": source_data["edition"],
+                    "provenance_url": source_data["provenance_url"],
+                    "manifest_checksum": source_data["manifest_checksum"],
+                }
+                if any(comparable[key] != value for key, value in expected.items()):
+                    raise SourceConflict("source_version_id conflicts with another manifest")
+                connection.commit()
+                return comparable
+            connection.execute(
+                """INSERT INTO source_versions (
+                    source_version_id, title, source_class, rights_note, checksum,
+                    approval_status, metadata_json, created_at, work_id, language,
+                    edition, provenance_url, manifest_checksum
+                ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    source_data["source_version_id"],
+                    source_data["title"],
+                    source_data["source_class"],
+                    source_data["rights_note"],
+                    source_data["manifest_checksum"],
+                    canonical_json(metadata),
+                    now,
+                    source_data["work_id"],
+                    source_data["language"],
+                    source_data["edition"],
+                    source_data["provenance_url"],
+                    source_data["manifest_checksum"],
+                ),
+            )
+            connection.commit()
+            return dict(
+                connection.execute(
+                    "SELECT * FROM source_versions WHERE source_version_id=?",
+                    (source_data["source_version_id"],),
+                ).fetchone()
+            )
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def ingest_source_fragments(
+        self, source_version_id: str, fragments: Iterable[Mapping[str, Any]]
+    ) -> list[dict[str, Any]]:
+        from .corpus import normalize_search_text
+
+        rows = [dict(fragment) for fragment in fragments]
+        connection = self._ready_connection()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            source = connection.execute(
+                "SELECT 1 FROM source_versions WHERE source_version_id=?",
+                (source_version_id,),
+            ).fetchone()
+            if source is None:
+                raise SourceConflict("source version does not exist")
+            for fragment in rows:
+                if sha256_text(fragment["text"]) != fragment["checksum"]:
+                    raise SourceConflict("fragment checksum does not match exact text")
+                aliases = " ".join(fragment.get("transliteration_aliases", []))
+                existing = connection.execute(
+                    "SELECT * FROM source_fragments WHERE fragment_id=?",
+                    (fragment["fragment_id"],),
+                ).fetchone()
+                if existing is not None:
+                    expected = (
+                        source_version_id,
+                        fragment["ordinal"],
+                        fragment["locator"],
+                        fragment["text"],
+                        fragment["checksum"],
+                        aliases,
+                    )
+                    actual = tuple(
+                        existing[key]
+                        for key in (
+                            "source_version_id", "ordinal", "locator", "text",
+                            "checksum", "aliases_text",
+                        )
+                    )
+                    if actual != expected:
+                        raise SourceConflict("fragment_id conflicts with another fragment")
+                    continue
+                connection.execute(
+                    """INSERT INTO source_fragments (
+                        fragment_id, source_version_id, ordinal, locator, text,
+                        checksum, aliases_text, approval_status
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')""",
+                    (
+                        fragment["fragment_id"], source_version_id, fragment["ordinal"],
+                        fragment["locator"], fragment["text"], fragment["checksum"], aliases,
+                    ),
+                )
+                connection.execute(
+                    """INSERT INTO source_fragments_fts (
+                        fragment_id, normalized_text, aliases_text
+                    ) VALUES (?, ?, ?)""",
+                    (
+                        fragment["fragment_id"],
+                        normalize_search_text(fragment["text"]),
+                        normalize_search_text(aliases),
+                    ),
+                )
+            connection.commit()
+            return rows
+        except sqlite3.IntegrityError as exc:
+            connection.rollback()
+            raise SourceConflict(
+                "fragment ordinal or locator conflicts within the immutable source version"
+            ) from exc
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def review_source_version(
+        self, source_version_id: str, review: Mapping[str, str]
+    ) -> dict[str, Any]:
+        return self._review_record("source_versions", "source_version_id", source_version_id, review)
+
+    def review_source_fragment(
+        self, fragment_id: str, review: Mapping[str, str]
+    ) -> dict[str, Any]:
+        return self._review_record("source_fragments", "fragment_id", fragment_id, review)
+
+    def _review_record(
+        self, table: str, key_name: str, key: str, review: Mapping[str, str]
+    ) -> dict[str, Any]:
+        if table not in {"source_versions", "source_fragments"}:
+            raise ValueError("unsupported review table")
+        now = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
+        connection = self._ready_connection()
+        try:
+            connection.execute("BEGIN IMMEDIATE")
+            changed = connection.execute(
+                f"""UPDATE {table} SET approval_status=?, reviewed_by=?,
+                    review_note=?, reviewed_at=? WHERE {key_name}=?""",
+                (review["status"], review["reviewer"], review["note"], now, key),
+            ).rowcount
+            if changed != 1:
+                raise SourceConflict("review target does not exist")
+            row = connection.execute(
+                f"SELECT * FROM {table} WHERE {key_name}=?", (key,)
+            ).fetchone()
+            connection.commit()
+            return dict(row)
+        except Exception:
+            connection.rollback()
+            raise
+        finally:
+            connection.close()
+
+    def search_approved_fragments(self, query: str, *, limit: int) -> list[dict[str, Any]]:
+        from .corpus import normalize_search_text
+
+        terms = [term for term in normalize_search_text(query).split() if term]
+        if not terms:
+            return []
+        match = " AND ".join(f'"{term.replace(chr(34), chr(34) * 2)}"' for term in terms)
+        connection = self._ready_connection()
+        try:
+            rows = connection.execute(
+                """SELECT f.fragment_id, f.source_version_id, s.work_id, s.title,
+                          s.source_class, f.locator, f.text AS quote, f.checksum,
+                          s.rights_note, s.provenance_url
+                   FROM source_fragments_fts x
+                   JOIN source_fragments f ON f.fragment_id=x.fragment_id
+                   JOIN source_versions s ON s.source_version_id=f.source_version_id
+                   WHERE source_fragments_fts MATCH ?
+                     AND s.approval_status='approved'
+                     AND f.approval_status='approved'
+                   ORDER BY bm25(source_fragments_fts), s.source_version_id, f.ordinal
+                   LIMIT ?""",
+                (match, limit),
+            ).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            connection.close()
+
+    def get_source_version(self, source_version_id: str) -> dict[str, Any] | None:
+        connection = self._ready_connection()
+        try:
+            row = connection.execute(
+                "SELECT * FROM source_versions WHERE source_version_id=?",
+                (source_version_id,),
+            ).fetchone()
+            return dict(row) if row else None
+        finally:
+            connection.close()
+
+    def list_source_versions(self) -> list[dict[str, Any]]:
+        connection = self._ready_connection()
+        try:
+            return [
+                dict(row)
+                for row in connection.execute(
+                    "SELECT * FROM source_versions ORDER BY source_version_id"
+                ).fetchall()
+            ]
+        finally:
+            connection.close()
+
+    def seed_builtin_corpus(self) -> int:
+        """Load the checked-in, human-reviewed manifest explicitly and idempotently."""
+        from .corpus import load_builtin_manifest
+
+        manifest = load_builtin_manifest()
+        inserted = 0
+        for entry in manifest["sources"]:
+            fragments = entry["fragments"]
+            self.ingest_source_version(
+                {
+                    key: value
+                    for key, value in entry.items()
+                    if key not in {"fragments", "review"}
+                }
+            )
+            self.ingest_source_fragments(entry["source_version_id"], fragments)
+            source_review = {
+                "status": entry["review"]["status"],
+                "reviewer": entry["review"]["reviewer"],
+                "note": entry["review"]["note"],
+            }
+            self.review_source_version(entry["source_version_id"], source_review)
+            for fragment in fragments:
+                self.review_source_fragment(fragment["fragment_id"], source_review)
+                inserted += 1
+        return inserted
+
     def rebuild_run(self, run_id: str) -> dict[str, Any]:
         events = self.list_events(run_id)
         if not events:
@@ -846,6 +1208,11 @@ class ResearchStore:
                         fragment["fragment_id"], source_version_id, ordinal,
                         fragment["locator"], text, sha256_text(text),
                     ),
+                )
+                connection.execute(
+                    """UPDATE source_fragments SET approval_status='approved',
+                       aliases_text='' WHERE fragment_id=?""",
+                    (fragment["fragment_id"],),
                 )
             connection.commit()
         except Exception:

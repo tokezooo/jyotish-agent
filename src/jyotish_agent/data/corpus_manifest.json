@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {
+      "source_version_id": "sv_brhat_jataka_1905_en",
+      "work_id": "brhat-jataka",
+      "title": "The Brihat Jataka",
+      "source_class": "translation",
+      "language": "en",
+      "edition": "Varahamihira; English translation by N. Chidambaram Aiyar; Madras, Thompson & Co., 1905",
+      "provenance_url": "https://archive.org/details/brihatjataka00varaiala",
+      "rights_note": "The cited 1905 English edition was published before 1931 and is public domain in the United States. Fragments are checked against the Internet Archive scan/OCR; no later editorial text is included.",
+      "review": {"status": "approved", "reviewer": "project-corpus-review-2026-07-12", "note": "Edition identity, printed locators, fragment text, and public-domain publication date reviewed."},
+      "fragments": [
+        {"fragment_id": "sf_bj1905_1_1", "ordinal": 1, "locator": "printed p.1, chapter I, stanza 1", "text": "May the Sun give us speech, who by his light illumines the Moon.", "transliteration_aliases": ["surya sun chandra moon"]},
+        {"fragment_id": "sf_bj1905_1_2", "ordinal": 2, "locator": "printed p.2, chapter I, stanza 2", "text": "Though various well written works on Astrology exist, I begin to construct this small boat for persons attempting to cross the vast ocean of horoscopy.", "transliteration_aliases": ["jyotisha hora"]},
+        {"fragment_id": "sf_bj1905_1_3", "ordinal": 3, "locator": "printed p.2, chapter I, stanza 3", "text": "According to some, the word hora is a corruption of the word Ahoratri, the first and last syllables being dropped.", "transliteration_aliases": ["hora ahoratra"]},
+        {"fragment_id": "sf_bj1905_1_4", "ordinal": 4, "locator": "printed p.2, chapter I, stanza 4", "text": "The twelve signs of the Zodiac, commencing with the first point of Aries and of Aswini, form a circle.", "transliteration_aliases": ["rasi mesha asvini ashvini"]},
+        {"fragment_id": "sf_bj1905_9_note_1", "ordinal": 5, "locator": "printed p.101, chapter IX, note following Mars ashtakavarga table, paragraph 1", "text": "The Ashtakavarga tables are generally prepared with the number of benefic dots alone marked in them.", "transliteration_aliases": ["astakavarga ashtakavarga bindu career timing transit"]},
+        {"fragment_id": "sf_bj1905_9_note_2", "ordinal": 6, "locator": "printed p.101, chapter IX, note following Mars ashtakavarga table, paragraph 2", "text": "All these numbers represent the benefic dots.", "transliteration_aliases": ["ashtakavarga bindu"]},
+        {"fragment_id": "sf_bj1905_9_note_3", "ordinal": 7, "locator": "printed p.101, chapter IX, note following Mars ashtakavarga table, paragraph 3", "text": "The A. V. tables are useful in the prediction of most of the important events of life.", "transliteration_aliases": ["ashtakavarga events timing transit"]},
+        {"fragment_id": "sf_bj1905_9_tri_1", "ordinal": 8, "locator": "printed p.102, chapter IX, Trikona reductions, rule 1", "text": "If the figures in the triangular signs be not all alike, subtract from each the least of the three figures, keeping the remainders.", "transliteration_aliases": ["trikona ashtakavarga"]},
+        {"fragment_id": "sf_bj1905_9_tri_2", "ordinal": 9, "locator": "printed p.102, chapter IX, Trikona reductions, rule 2", "text": "If there be no figure in one of the three signs, no reduction need be made.", "transliteration_aliases": ["trikona ashtakavarga"]},
+        {"fragment_id": "sf_bj1905_9_tri_4", "ordinal": 10, "locator": "printed p.102, chapter IX, Trikona reductions, rule 4", "text": "If the figures in the three signs be equal, remove them all.", "transliteration_aliases": ["trikona ashtakavarga"]}
+      ]
+    },
+    {
+      "source_version_id": "sv_phaladipika_sanskrit_vss_first",
+      "work_id": "phaladipika",
+      "title": "Phaladeepika, Sanskrit root verses",
+      "source_class": "original_text",
+      "language": "sa-Deva",
+      "edition": "Internet Archive item title: Phaladeepika 1st Ed. by V. Subrahmanya Sastri; publication year is not asserted",
+      "provenance_url": "https://archive.org/details/Phaladeepika1stEd.ByVSubrahmanyaSastri",
+      "rights_note": "Only the pre-modern Sanskrit root text is transcribed; no modern English translation or commentary is included. The root work is public domain. The cited Internet Archive item is provenance for exact printed page and verse locators.",
+      "review": {"status": "approved", "reviewer": "project-corpus-review-2026-07-12", "note": "Limited to Sanskrit root verses; edition date deliberately left unasserted; locators and text reviewed from cited scan/OCR."},
+      "fragments": [
+        {"fragment_id": "sf_pd_varga_17", "ordinal": 1, "locator": "printed p.32, chapter III, verse 17", "text": "स्वांशगता ग्रहा विदधते तत्कारकत्वोदितं तत्रैकोऽपि सुहृद्गृहोच्चगृहगः स्वोच्चेऽर्थयुक्तं फलम् ॥१७॥", "transliteration_aliases": ["svamsagata graha karakatva"]},
+        {"fragment_id": "sf_pd_varga_18", "ordinal": 2, "locator": "printed p.32, chapter III, verse 18", "text": "स्वः प्रदीपः सुखितश्चिकोणे स्वस्थः स्वगेहे मुदितः सुहृद्भे । शान्तस्तु सौम्यग्रहवर्गयुक्तः शक्तो मतोऽसौ स्फुटरश्मिजालः ॥१८॥", "transliteration_aliases": ["sva pradipa trikona saumya graha"]},
+        {"fragment_id": "sf_pd_varga_19", "ordinal": 3, "locator": "printed p.32, chapter III, verse 19", "text": "ग्रहाभिभूतः स निपीडितः स्यात् खलस्तु पापग्रहवर्गयातः । सुदुःखितः शत्रुगृहे ग्रहो नीचेऽतिभीतो विकलोऽस्तयातः ॥१९॥", "transliteration_aliases": ["grahabhibhuta papagraha nica"]},
+        {"fragment_id": "sf_pd_varga_20", "ordinal": 4, "locator": "printed p.33, chapter III, verse 20", "text": "पूर्णप्रदीप्तः परिपूर्णरश्मिः स्वस्थोऽतिशुभः क्रमेण । अनुरूपाणि फलानि तेषाम् ॥२०॥", "transliteration_aliases": ["purnapradipta phala"]},
+        {"fragment_id": "sf_pd_bala_1", "ordinal": 5, "locator": "printed p.33, chapter IV, verse 1", "text": "कालजबलं चेष्टाबलं स्वोच्चजं दिग्वीर्यं त्वयनोद्भवं दिविषदां स्थानोद्भवं च क्रमात् ॥१॥", "transliteration_aliases": ["kalaja bala cestabala digbala sthanabala shadbala career strength"]},
+        {"fragment_id": "sf_pd_bala_2", "ordinal": 6, "locator": "printed p.34, chapter IV, verse 2", "text": "रवाचन्द्रस्य चेष्टाबलमुदगयने भास्वतो वक्रगानां युद्धे चोदक्स्थितानां स्फुटबहुलरुचां स्वोच्चवीर्यं स्वतुङ्गे ॥२॥", "transliteration_aliases": ["ravi chandra cestabala udagayana"]},
+        {"fragment_id": "sf_pd_bala_3", "ordinal": 7, "locator": "printed p.34, chapter IV, verse 3", "text": "स्वोच्चस्वर्क्षसुहृदुदयेषु बलिनः पुंसां स्ववर्गेऽपि वा भोक्तुः स्थानबलं चतुष्टयमुखात् ॥३॥", "transliteration_aliases": ["svocca svarksa sthanabala"]},
+        {"fragment_id": "sf_pd_bala_4", "ordinal": 8, "locator": "printed p.35, chapter IV, verse 4", "text": "चन्द्रं ग्रस्तो रुचिररश्मिपरिस्फुटो नीचारिभांशसहितोऽपि भवेत्स खेटः ॥४॥", "transliteration_aliases": ["candra graha nicamsa"]},
+        {"fragment_id": "sf_pd_bala_5", "ordinal": 9, "locator": "printed p.35, chapter IV, verse 5", "text": "तुङ्गा बलिनोऽखिलाश्च शशिनः श्लाघ्यं हि पक्षोद्भवं भानोर्दिग्बलमाह वक्रगमने ताराग्रहाणां चयम् ॥५॥", "transliteration_aliases": ["tunga bala paksa digbala vakragamana"]},
+        {"fragment_id": "sf_pd_bala_6", "ordinal": 10, "locator": "printed p.36, chapter IV, verse 6", "text": "लग्नं मानुषभेऽर्किभेऽधिकबलं स्यात्तनोः स्वामिबलेन चोपचयगे नाथेऽतिवीर्योत्कटम् ॥६॥", "transliteration_aliases": ["lagna bala upacaya career profession tenth house"]}
+      ]
+    },
+    {
+      "source_version_id": "sv_saravali_1907_sa",
+      "work_id": "saravali",
+      "title": "Saravali, Sanskrit text",
+      "source_class": "original_text",
+      "language": "sa-Deva",
+      "edition": "V. Subrahmanya Sastri, Saravali, 1907, as identified by Internet Archive metadata",
+      "provenance_url": "https://archive.org/details/ksu.h1308.saravali0000vsub",
+      "rights_note": "The 1907 edition and pre-modern Sanskrit root text are public domain in the United States. Only Sanskrit root verses are included; no later translation or commentary is reproduced.",
+      "review": {"status": "approved", "reviewer": "project-corpus-review-2026-07-12", "note": "Edition metadata, Sanskrit-only scope, printed page/chapter/verse locators, and fragment text reviewed."},
+      "fragments": [
+        {"fragment_id": "sf_sv1907_3_26", "ordinal": 1, "locator": "printed p.4, chapter III, verse 26", "text": "तन्वर्थसहजबान्धवपुत्रारिस्त्रीविनाशपुण्यानि । कर्मायव्ययभावा लग्नाच्च भावतश्चिन्त्याः ॥२६॥", "transliteration_aliases": ["tanva artha sahaja bandhu putra ari stri vinas punya karma aya vyaya bhava career profession tenth house"]},
+        {"fragment_id": "sf_sv1907_3_27", "ordinal": 2, "locator": "printed p.4, chapter III, verse 27", "text": "शक्तिधनपौरुषगृहप्रतिभाव्रणकामदेवविवराणि । गुरुमानभवव्ययमिति कथितान्यपराणि नामानि ॥२७॥", "transliteration_aliases": ["sakti dhana paurusa grha guru mana bhava"]},
+        {"fragment_id": "sf_sv1907_3_28", "ordinal": 3, "locator": "printed p.4, chapter III, verse 28", "text": "संज्ञा वेदमाष्टमयोश्चतुरश्रं वै तपश्च नवमस्य । होरास्तदशजलानां चतुष्टयं कण्टकं केन्द्रम् ॥२८॥", "transliteration_aliases": ["astama navama kendra hora"]},
+        {"fragment_id": "sf_sv1907_3_29", "ordinal": 4, "locator": "printed p.4, chapter III, verse 29", "text": "नामानि चतुर्थस्य तु सुखजलपातालबन्धुहिबुकानि । कर्माज्ञामेषूरणगगनाख्यं कीर्त्यते दशमम् ॥२९॥", "transliteration_aliases": ["caturtha sukha karma ajna gagana dasama tenth house career profession"]},
+        {"fragment_id": "sf_sv1907_3_30", "ordinal": 5, "locator": "printed p.4, chapter III, verse 30", "text": "धर्मसुतयोस्त्रिकोणं सुतस्य धीस्त्रिकोणमिति तपसः । द्यूनं जायास्तमयं जामित्रं सप्तमस्याख्या ॥३०॥", "transliteration_aliases": ["dharma suta trikona saptama"]},
+        {"fragment_id": "sf_sv1907_3_31", "ordinal": 6, "locator": "printed p.4, chapter III, verse 31", "text": "षट्कोणं रिपुभवनं तृतीयमथ कीर्तयन्ति दुश्चिक्यं । रिःफं द्वादशभवनं द्वितीयसंज्ञं कुटुम्बं च ॥३१॥", "transliteration_aliases": ["satkona ripu bhavana trtiya dvadasa kutumba"]},
+        {"fragment_id": "sf_sv1907_3_32", "ordinal": 7, "locator": "printed p.5, chapter III, verse 32", "text": "केन्द्रात्परं पणफरमापोक्लिमसंज्ञितं तयोः परतः । बालयुवस्थविरत्वे क्रमेण फलदा ग्रहास्तेषु ॥३२॥", "transliteration_aliases": ["kendra panaphara apoklima graha phala"]},
+        {"fragment_id": "sf_sv1907_3_33", "ordinal": 8, "locator": "printed p.5, chapter III, verse 33", "text": "षट्त्रिभवदशैकादशान्युपचयसंज्ञानि कीर्त्यन्ते । स्वतनुसुखसुतास्तपरिच्छदव्ययसंज्ञितानि चान्यानि ॥३३॥", "transliteration_aliases": ["upacaya third sixth tenth eleventh career"]},
+        {"fragment_id": "sf_sv1907_4_1", "ordinal": 9, "locator": "printed p.5, chapter IV, verse 1", "text": "आत्मा रविः शीतकरस्तु चेतः सत्त्वं धराजः शशिजोऽथ वाणी । ज्ञानं सुखं देवगुरुर्भदं च शुक्रः शनिः कालनरस्य दुःखम् ॥१॥", "transliteration_aliases": ["atma ravi candra mars mercury guru sukra sani"]},
+        {"fragment_id": "sf_sv1907_4_2", "ordinal": 10, "locator": "printed p.5, chapter IV, verse 2", "text": "आत्मादयो गगनगैर्बलिभिर्बलवत्तराः । दुर्बलैर्दुर्बलास्ते तु विपरीतं शनेः फलम् ॥२॥", "transliteration_aliases": ["atma graha bala sani phala shadbala strength"]}
+      ]
+    },
+    {
+      "source_version_id": "sv_bphs_quarantine",
+      "work_id": "bphs",
+      "title": "Brihat Parashara Hora Shastra - no approved edition",
+      "source_class": "original_text",
+      "language": "sa",
+      "edition": "No edition selected; placeholder records the quarantine decision only",
+      "provenance_url": "local:corpus-quarantine/bphs",
+      "rights_note": "Quarantined: edition history, provenance, locators, and reuse rights have not been reviewed. Contains no source text and cannot support claims.",
+      "review": {"status": "quarantined", "reviewer": "project-corpus-review-2026-07-12", "note": "Fail closed until an exact edition, rights note, checksums, and locators receive human review."},
+      "fragments": []
+    }
+  ]
+}
