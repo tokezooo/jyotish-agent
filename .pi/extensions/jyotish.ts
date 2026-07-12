@@ -550,6 +550,7 @@ export class ResearchRuntime {
   private refusalText?: string;
   private validatedMarkdown?: string;
   private capabilityFailure?: string;
+  private supportedPlanKnown = false;
 
   constructor(private readonly requiredV2 = false) {}
 
@@ -564,6 +565,7 @@ export class ResearchRuntime {
     this.incomplete = false;
     this.refusalText = undefined;
     this.validatedMarkdown = undefined;
+    this.supportedPlanKnown = false;
     for (const raw of entries) {
       if (typeof raw !== "object" || raw === null) continue;
       const entry = raw as Record<string, unknown>;
@@ -614,10 +616,14 @@ export class ResearchRuntime {
       ) {
         this.incomplete = true;
       }
+      const settledReservation = this.pending.has(mirror.operation_id);
       this.pending.delete(mirror.operation_id);
       this.completedOperations.add(mirror.operation_id);
       this.current = mirror;
       this.unresolved = undefined;
+      if (mirror.status === "planned" && settledReservation) {
+        this.supportedPlanKnown = true;
+      }
     }
     if (this.pending.size > 0) this.incomplete = true;
   }
@@ -746,8 +752,8 @@ export class ResearchRuntime {
       }
       if (
         toolName === "jyotish_retrieve_research_run" &&
-        this.current.status !== "planned" &&
-        this.current.status !== "calculated"
+        ((this.current.status !== "planned" && this.current.status !== "calculated") ||
+          !this.supportedPlanKnown)
       ) {
         return { block: true, reason: "Retrieval requires a supported deterministic plan." };
       }
@@ -810,6 +816,14 @@ export class ResearchRuntime {
     } else {
       this.current = result;
       const detailRecord = details as Record<string, unknown>;
+      if (reservation.toolName === "jyotish_plan_research_run") {
+        const plan = detailRecord.plan;
+        this.supportedPlanKnown =
+          result.status === "planned" &&
+          typeof plan === "object" &&
+          plan !== null &&
+          (plan as Record<string, unknown>).outcome === "supported";
+      }
       this.validatedMarkdown =
         result.status === "validated" && typeof detailRecord.markdown === "string"
           ? detailRecord.markdown
@@ -854,6 +868,7 @@ export class ResearchRuntime {
         seq: number;
         operation_id: string;
         event_hash: string;
+        event_type?: string;
         payload?: unknown;
       } => {
         if (typeof value !== "object" || value === null) return false;
@@ -868,6 +883,19 @@ export class ResearchRuntime {
     );
     const latest = validEvents.at(-1);
     if (!latest) return;
+    this.supportedPlanKnown = validEvents.some((event) => {
+      if (event.event_type !== "research_run.planned") return false;
+      if (typeof event.payload !== "object" || event.payload === null) return false;
+      const payload = event.payload as Record<string, unknown>;
+      if (payload.status !== "planned") return false;
+      if (typeof payload.result !== "object" || payload.result === null) return false;
+      const plan = (payload.result as Record<string, unknown>).plan;
+      return (
+        typeof plan === "object" &&
+        plan !== null &&
+        (plan as Record<string, unknown>).outcome === "supported"
+      );
+    });
     const mirror: ResearchMirror = {
       run_id: run.run_id,
       operation_id: latest.operation_id,

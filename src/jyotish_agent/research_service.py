@@ -334,7 +334,12 @@ class ResearchService:
             event, revision = prior
             return ResearchRetrievalResponse(**self._operation_response(event, revision))
         run = self._require_run(run_id)
-        if run["status"] not in {"planned", "calculated"}:
+        plan = self.store.get_question_plan(run_id)
+        if (
+            run["status"] not in {"planned", "calculated"}
+            or plan is None
+            or plan["plan"].get("outcome") != "supported"
+        ):
             raise InvalidRunTransition("retrieval requires a supported plan")
         if run["revision"] != request.expected_revision:
             raise InvalidRunTransition("expected revision does not match current revision")

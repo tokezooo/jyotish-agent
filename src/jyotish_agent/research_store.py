@@ -555,16 +555,31 @@ class ResearchStore:
                 source_status != "pending"
             )
             source_updated_at = initial_source["reviewed_at"] or initial_source["created_at"]
+            source_reviewer = initial_source["reviewed_by"]
+            source_review_note = initial_source["review_note"]
+            if source_status != "pending":
+                source_reviewer = source_reviewer or "unknown-v5-reviewer"
+                source_review_note = source_review_note or "Migrated v5 review decision."
             for fragment in initial_fragments:
                 fragment_revision = 1 + int(fragment["approval_status"] != "pending")
+                fragment_reviewer = fragment["reviewed_by"]
+                fragment_review_note = fragment["review_note"]
+                if fragment["approval_status"] != "pending":
+                    fragment_reviewer = fragment_reviewer or "unknown-v5-reviewer"
+                    fragment_review_note = (
+                        fragment_review_note or "Migrated v5 review decision."
+                    )
                 connection.execute(
                     """UPDATE source_fragments
-                       SET revision=?, created_at=?, updated_at=?
+                       SET revision=?, created_at=?, updated_at=?,
+                           reviewed_by=?, review_note=?
                        WHERE fragment_id=?""",
                     (
                         fragment_revision,
                         initial_source["created_at"],
                         fragment["reviewed_at"] or initial_source["created_at"],
+                        fragment_reviewer,
+                        fragment_review_note,
                         fragment["fragment_id"],
                     ),
                 )
@@ -595,11 +610,13 @@ class ResearchStore:
             connection.execute(
                 """UPDATE source_versions
                    SET revision=?, updated_at=?, manifest_checksum_original=?,
-                       manifest_checksum=?, checksum=?, manifest_reconciliation_note=?
+                       manifest_checksum=?, checksum=?, manifest_reconciliation_note=?,
+                       reviewed_by=?, review_note=?
                    WHERE source_version_id=?""",
                 (
                     source_revision, source_updated_at, old_checksum, actual_checksum,
-                    actual_checksum, reconciliation_note, source_id,
+                    actual_checksum, reconciliation_note, source_reviewer,
+                    source_review_note, source_id,
                 ),
             )
             source = connection.execute(
@@ -676,52 +693,84 @@ class ResearchStore:
                         timestamp=source["created_at"],
                     )
                 review = manifest_entry["review"]
-                source_review_op = stable_operation_id(
-                    f"builtin:{source_id}:source-review"
-                )
-                record_operation(
-                    operation_id=source_review_op,
-                    resource_type="source_version",
-                    resource_id=source_id,
-                    operation_type="corpus.review",
-                    expected_revision=2 if fragments else 1,
-                    payload={
-                        "status": review["status"],
-                        "reviewer": review["reviewer"],
-                        "note": review["note"],
-                    },
-                    result={
-                        "operation_id": source_review_op,
-                        **self._source_projection(source),
-                    },
-                    timestamp=source["reviewed_at"] or source["created_at"],
-                )
-                connection.execute(
-                    """INSERT INTO corpus_review_history (
-                        review_id, operation_id, resource_type, resource_id,
-                        from_status, to_status, reviewer, review_note, reviewed_at
-                    ) VALUES (?, ?, 'source_version', ?, 'pending', ?, ?, ?, ?)""",
-                    (
-                        review_id(f"builtin:{source_id}:source-review"),
-                        source_review_op, source_id, source_status,
-                        source["reviewed_by"], source["review_note"],
-                        source["reviewed_at"] or source["created_at"],
-                    ),
-                )
-                for fragment in fragments:
-                    fragment_op = stable_operation_id(
-                        f"builtin:{fragment['fragment_id']}:fragment-review"
+                if source_status != "pending":
+                    reviewer = source["reviewed_by"] or "unknown-v5-reviewer"
+                    note = source["review_note"] or "Migrated v5 review decision."
+                    is_seed_review = (
+                        source_status == review["status"]
+                        and reviewer == review["reviewer"]
+                        and note == review["note"]
                     )
+                    source_review_seed = (
+                        f"builtin:{source_id}:source-review"
+                        if is_seed_review
+                        else f"migrated-v5:{source_id}:source-review"
+                    )
+                    source_review_op = stable_operation_id(source_review_seed)
+                    source_review_payload = {
+                        "status": source_status,
+                        "reviewer": reviewer,
+                        "note": note,
+                    }
+                    record_operation(
+                        operation_id=source_review_op,
+                        resource_type="source_version",
+                        resource_id=source_id,
+                        operation_type=(
+                            "corpus.review"
+                            if is_seed_review
+                            else "corpus.migrated_v5.review"
+                        ),
+                        expected_revision=source_revision - 1,
+                        payload=source_review_payload,
+                        result={
+                            "operation_id": source_review_op,
+                            **self._source_projection(source),
+                        },
+                        timestamp=source["reviewed_at"] or source["created_at"],
+                    )
+                    connection.execute(
+                        """INSERT INTO corpus_review_history (
+                            review_id, operation_id, resource_type, resource_id,
+                            from_status, to_status, reviewer, review_note, reviewed_at
+                        ) VALUES (?, ?, 'source_version', ?, 'pending', ?, ?, ?, ?)""",
+                        (
+                            review_id(source_review_seed), source_review_op, source_id,
+                            source_status, reviewer, note,
+                            source["reviewed_at"] or source["created_at"],
+                        ),
+                    )
+                for fragment in fragments:
+                    fragment_status = fragment["approval_status"]
+                    if fragment_status == "pending":
+                        continue
+                    reviewer = fragment["reviewed_by"] or "unknown-v5-reviewer"
+                    note = fragment["review_note"] or "Migrated v5 review decision."
+                    is_seed_review = (
+                        fragment_status == review["status"]
+                        and reviewer == review["reviewer"]
+                        and note == review["note"]
+                    )
+                    fragment_review_seed = (
+                        f"builtin:{fragment['fragment_id']}:fragment-review"
+                        if is_seed_review
+                        else f"migrated-v5:{fragment['fragment_id']}:fragment-review"
+                    )
+                    fragment_op = stable_operation_id(fragment_review_seed)
                     record_operation(
                         operation_id=fragment_op,
                         resource_type="source_fragment",
                         resource_id=fragment["fragment_id"],
-                        operation_type="corpus.review",
+                        operation_type=(
+                            "corpus.review"
+                            if is_seed_review
+                            else "corpus.migrated_v5.review"
+                        ),
                         expected_revision=1,
                         payload={
-                            "status": review["status"],
-                            "reviewer": review["reviewer"],
-                            "note": review["note"],
+                            "status": fragment_status,
+                            "reviewer": reviewer,
+                            "note": note,
                         },
                         result={"operation_id": fragment_op, **fragment},
                         timestamp=fragment["reviewed_at"] or fragment["created_at"],
@@ -732,12 +781,9 @@ class ResearchStore:
                             from_status, to_status, reviewer, review_note, reviewed_at
                         ) VALUES (?, ?, 'source_fragment', ?, 'pending', ?, ?, ?, ?)""",
                         (
-                            review_id(
-                                f"builtin:{fragment['fragment_id']}:fragment-review"
-                            ),
+                            review_id(fragment_review_seed),
                             fragment_op, fragment["fragment_id"],
-                            fragment["approval_status"], fragment["reviewed_by"],
-                            fragment["review_note"],
+                            fragment_status, reviewer, note,
                             fragment["reviewed_at"] or fragment["created_at"],
                         ),
                     )

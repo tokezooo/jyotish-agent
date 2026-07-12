@@ -140,8 +140,11 @@ def _private_prompt(
         "birth_profile": profile,
     }
     prompt = (
-        "Use only the Jyotish research tools. Create a v2 run, screen it, plan the "
-        "typed career intent, calculate it, retrieve approved sources, construct "
+        "Use only the Jyotish research tools. Create a v2 run, screen it, and neutrally "
+        "classify the user's actual question as career_factors_and_timing, unknown, "
+        "composite, or unsupported. Persist that exact typed intent and deterministic "
+        "plan. Calculate and retrieve approved sources only when the plan outcome is "
+        "supported, then construct "
         "AnswerContract 2.0, and submit it. The final response must be "
         "the backend canonical Markdown. Use the exact assigned run_id and create "
         "operation_id below; do not substitute another identity.\n\n"

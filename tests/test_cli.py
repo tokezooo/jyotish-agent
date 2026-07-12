@@ -151,6 +151,27 @@ def test_ask_rejects_invalid_profile_before_starting_children(tmp_path: Path, ca
     assert "profile JSON must be an object" in capsys.readouterr().err
 
 
+def test_private_prompt_neutrally_classifies_non_career_question(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv("JYOTISH_AGENT_DATA_ROOT", str(tmp_path / "data"))
+    prompt_path = cli._private_prompt(
+        "Will I marry?",
+        {"name": "Non-career fixture"},
+        run_id="rr_11111111-1111-4111-8111-111111111111",
+        create_operation_id="op_11111111-1111-4111-8111-111111111111",
+    )
+    try:
+        prompt = prompt_path.read_text(encoding="utf-8")
+    finally:
+        prompt_path.unlink()
+
+    assert "Will I marry?" in prompt
+    assert "career_factors_and_timing" in prompt
+    assert "unknown" in prompt
+    assert "composite" in prompt
+    assert "unsupported" in prompt
+    assert "typed career intent" not in prompt
+
+
 def _run_black_box(tmp_path: Path, mode: str) -> tuple[subprocess.CompletedProcess, dict, int]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()

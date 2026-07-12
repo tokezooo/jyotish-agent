@@ -39,6 +39,10 @@ def _insert_v5_source(
     reviewer: str | None,
     review_note: str | None,
     reviewed_at: str | None,
+    fragment_approval_status: str | None = None,
+    fragment_reviewer: str | None = None,
+    fragment_review_note: str | None = None,
+    fragment_reviewed_at: str | None = None,
 ) -> None:
     created_at = "2026-07-12T10:00:00Z"
     metadata = {
@@ -61,6 +65,10 @@ def _insert_v5_source(
                 reviewer, review_note, reviewed_at,
             ),
         )
+        fragment_status = fragment_approval_status or approval_status
+        fragment_actor = fragment_reviewer if fragment_approval_status else reviewer
+        fragment_note = fragment_review_note if fragment_approval_status else review_note
+        fragment_timestamp = fragment_reviewed_at if fragment_approval_status else reviewed_at
         for fragment in fragments:
             aliases = " ".join(fragment["transliteration_aliases"])
             connection.execute(
@@ -71,8 +79,8 @@ def _insert_v5_source(
                 (
                     fragment["fragment_id"], source["source_version_id"],
                     fragment["ordinal"], fragment["locator"], fragment["text"],
-                    fragment["checksum"], aliases, approval_status, reviewer,
-                    review_note, reviewed_at,
+                    fragment["checksum"], aliases, fragment_status, fragment_actor,
+                    fragment_note, fragment_timestamp,
                 ),
             )
             connection.execute(
@@ -126,6 +134,98 @@ def test_v5_builtin_upgrade_backfills_replay_and_review_history(tmp_path: Path, 
         assert connection.execute(
             "SELECT COUNT(*) FROM corpus_operations"
         ).fetchone()[0] == operation_count
+
+
+def test_v5_builtin_source_pending_upgrade_can_finish_seed_idempotently(
+    tmp_path: Path, monkeypatch
+):
+    store = _v5_store(tmp_path, monkeypatch)
+    source = load_builtin_manifest()["sources"][0]
+    _insert_v5_source(
+        store,
+        source,
+        source["fragments"],
+        approval_status="pending",
+        reviewer=None,
+        review_note=None,
+        reviewed_at=None,
+    )
+
+    store.initialize()
+    assert store.get_source_version(source["source_version_id"])["approval_status"] == "pending"
+    assert store.seed_builtin_corpus() == 30
+    history = store.list_corpus_review_history()
+    assert len(history) == 34
+    assert store.seed_builtin_corpus() == 30
+    assert store.list_corpus_review_history() == history
+
+
+def test_v5_builtin_fragments_pending_upgrade_can_finish_seed_idempotently(
+    tmp_path: Path, monkeypatch
+):
+    store = _v5_store(tmp_path, monkeypatch)
+    source = load_builtin_manifest()["sources"][0]
+    review = source["review"]
+    _insert_v5_source(
+        store,
+        source,
+        source["fragments"],
+        approval_status=review["status"],
+        reviewer=review["reviewer"],
+        review_note=review["note"],
+        reviewed_at="2026-07-12T11:00:00Z",
+        fragment_approval_status="pending",
+    )
+
+    store.initialize()
+    with sqlite3.connect(store.database_path) as connection:
+        fragment_statuses = {
+            row[0]
+            for row in connection.execute(
+                "SELECT approval_status FROM source_fragments WHERE source_version_id=?",
+                (source["source_version_id"],),
+            )
+        }
+    assert fragment_statuses == {"pending"}
+    assert store.seed_builtin_corpus() == 30
+    history = store.list_corpus_review_history()
+    assert len(history) == 34
+    assert store.seed_builtin_corpus() == 30
+    assert store.list_corpus_review_history() == history
+
+
+def test_v5_terminal_review_with_null_metadata_uses_explicit_fallback(
+    tmp_path: Path, monkeypatch
+):
+    store = _v5_store(tmp_path, monkeypatch)
+    source = load_builtin_manifest()["sources"][0]
+    _insert_v5_source(
+        store,
+        source,
+        source["fragments"],
+        approval_status="approved",
+        reviewer=None,
+        review_note=None,
+        reviewed_at=None,
+    )
+
+    store.initialize()
+    history = store.list_corpus_review_history()
+    assert history
+    assert {row["reviewer"] for row in history} == {"unknown-v5-reviewer"}
+    assert {row["review_note"] for row in history} == {"Migrated v5 review decision."}
+    migrated_source = store.get_source_version(source["source_version_id"])
+    assert migrated_source["reviewed_by"] == "unknown-v5-reviewer"
+    assert migrated_source["review_note"] == "Migrated v5 review decision."
+    with sqlite3.connect(store.database_path) as connection:
+        fragment_reviewers = {
+            row[0]
+            for row in connection.execute(
+                "SELECT reviewed_by FROM source_fragments WHERE source_version_id=?",
+                (source["source_version_id"],),
+            )
+        }
+    assert fragment_reviewers == {"unknown-v5-reviewer"}
 
 
 def test_v5_pending_aliases_are_preserved_and_manifest_reconciled(

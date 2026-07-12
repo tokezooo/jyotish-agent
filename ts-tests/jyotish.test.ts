@@ -243,6 +243,8 @@ describe("ResearchRuntime", () => {
   const createOp = "op_11111111-1111-4111-8111-111111111111";
   const screenOp = "op_22222222-2222-4222-8222-222222222222";
   const calculateOp = "op_33333333-3333-4333-8333-333333333333";
+  const planOp = "op_44444444-4444-4444-8444-444444444444";
+  const retrieveOp = "op_55555555-5555-4555-8555-555555555555";
   const hash1 = "a".repeat(64);
   const hash2 = "b".repeat(64);
 
@@ -580,6 +582,131 @@ describe("ResearchRuntime", () => {
       needs_reconciliation: false,
     });
     expect(appended).toHaveLength(1);
+  });
+
+  test("blocks retrieval from a compacted calculated-only mirror without plan history", () => {
+    const runtime = new ResearchRuntime();
+    runtime.restore([mirror("calculated", calculateOp, 4, hash2)]);
+    runtime.beginAssistantMessage("retrieve-without-plan");
+
+    expect(
+      runtime.reserve(
+        "retrieve-call",
+        "jyotish_retrieve_research_run",
+        { run_id: runId, operation_id: retrieveOp, expected_revision: 4 },
+        () => {},
+      )?.reason,
+    ).toContain("supported deterministic plan");
+  });
+
+  test("restored successful plan sequence authorizes later calculated retrieval", () => {
+    const runtime = new ResearchRuntime();
+    runtime.restore([
+      mirror("created", createOp, 1),
+      mirror("reserved", screenOp, 1),
+      mirror("screened_safe", screenOp, 2),
+      mirror("reserved", planOp, 2),
+      mirror("planned", planOp, 3),
+      mirror("reserved", calculateOp, 3),
+      mirror("calculated", calculateOp, 4, hash2),
+    ]);
+    runtime.beginAssistantMessage("restored-retrieve");
+
+    expect(
+      runtime.reserve(
+        "retrieve-call",
+        "jyotish_retrieve_research_run",
+        { run_id: runId, operation_id: retrieveOp, expected_revision: 4 },
+        () => {},
+      ),
+    ).toBeUndefined();
+  });
+
+  test("successful supported-plan settlement authorizes retrieval", () => {
+    const runtime = new ResearchRuntime();
+    runtime.restore([mirror("screened_safe", screenOp, 2)]);
+    runtime.beginAssistantMessage("plan-leaf");
+    expect(
+      runtime.reserve(
+        "plan-call",
+        "jyotish_plan_research_run",
+        { run_id: runId, operation_id: planOp, expected_revision: 2 },
+        () => {},
+      ),
+    ).toBeUndefined();
+    runtime.settle(
+      "plan-call",
+      false,
+      {
+        run_id: runId,
+        operation_id: planOp,
+        backend_seq: 3,
+        event_hash: hash2,
+        status: "planned",
+        plan: { outcome: "supported" },
+      },
+      () => {},
+    );
+    runtime.beginAssistantMessage("retrieve-leaf");
+
+    expect(
+      runtime.reserve(
+        "retrieve-call",
+        "jyotish_retrieve_research_run",
+        { run_id: runId, operation_id: retrieveOp, expected_revision: 3 },
+        () => {},
+      ),
+    ).toBeUndefined();
+  });
+
+  test("reconciliation requires a supported planned event before calculated retrieval", () => {
+    const runtime = new ResearchRuntime();
+    runtime.restore([mirror("calculated", calculateOp, 4, hash2)]);
+    runtime.reconcile(
+      { run_id: runId, status: "calculated", revision: 4 },
+      [
+        { seq: 1, operation_id: createOp, event_hash: hash1, event_type: "research_run.created" },
+        { seq: 2, operation_id: screenOp, event_hash: hash1, event_type: "research_run.screened" },
+        { seq: 4, operation_id: calculateOp, event_hash: hash2, event_type: "research_run.calculated" },
+      ],
+      () => {},
+    );
+    runtime.beginAssistantMessage("reconciled-without-plan");
+    expect(
+      runtime.reserve(
+        "blocked-retrieve-call",
+        "jyotish_retrieve_research_run",
+        { run_id: runId, operation_id: retrieveOp, expected_revision: 4 },
+        () => {},
+      )?.reason,
+    ).toContain("supported deterministic plan");
+
+    runtime.reconcile(
+      { run_id: runId, status: "calculated", revision: 4 },
+      [
+        { seq: 1, operation_id: createOp, event_hash: hash1, event_type: "research_run.created" },
+        { seq: 2, operation_id: screenOp, event_hash: hash1, event_type: "research_run.screened" },
+        {
+          seq: 3,
+          operation_id: planOp,
+          event_hash: hash1,
+          event_type: "research_run.planned",
+          payload: { status: "planned", result: { plan: { outcome: "supported" } } },
+        },
+        { seq: 4, operation_id: calculateOp, event_hash: hash2, event_type: "research_run.calculated" },
+      ],
+      () => {},
+    );
+    runtime.beginAssistantMessage("reconciled-retrieve");
+
+    expect(
+      runtime.reserve(
+        "retrieve-call",
+        "jyotish_retrieve_research_run",
+        { run_id: runId, operation_id: retrieveOp, expected_revision: 4 },
+        () => {},
+      ),
+    ).toBeUndefined();
   });
 
   test("reconciliation closes a reservation that never reached the backend", () => {
