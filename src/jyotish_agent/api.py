@@ -19,7 +19,7 @@ from fastapi.responses import JSONResponse
 
 from . import ENGINE_VERSION
 from .config import ConfigError
-from .errors import CalculationError, register_error_handlers
+from .errors import CalculationError, register_error_handlers, registry_problem_response
 from .interpretations import redirect_message, screen_question, validate_answer
 from .models import (
     ChartComputeRequest,
@@ -198,11 +198,19 @@ async def replay_research_run(run_id: str, request: Request):
                                  "No persisted research run has that ID.",
                                  "Check the rr_ run ID and retry.")
     except ReplayError as exc:
-        problem = _research_problem(409, "Offline replay failed", exc.error_code,
-                                    "Restore the pinned ledger material/version and retry.")
+        if exc.error_code in {"MISSING_PINNED_VERSION", "MEMO_HASH_MISMATCH"}:
+            return registry_problem_response(
+                exc.error_code, status=409, run_id=run_id, stage="replay",
+                title="Offline replay failed",
+            )
+        problem = _research_problem(
+            409, "Offline replay failed", exc.error_code,
+            "Restore the pinned ledger material/version and retry.",
+        )
         import json as _json
         content = _json.loads(problem.body)
         content["error_code"] = exc.error_code
+        content["run_id"] = run_id
         return JSONResponse(status_code=409, media_type="application/problem+json", content=content)
 
 

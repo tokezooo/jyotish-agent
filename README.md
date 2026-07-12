@@ -12,7 +12,7 @@ The first milestone is deliberately narrow:
 
 ## Current State
 
-All five MVP phases are in place: Python 3.12 project, headless PyJHora deps pinned,
+All six MVP phases are in place: Python 3.12 project, headless PyJHora deps pinned,
 ephemeris/data check, the calculation facade (`compute_chart()` → deterministic
 ascendant, D1, D9, panchanga basics, current Vimshottari period, golden-tested),
 a FastAPI service, a Pi extension exposing the tools, and the fact-citation answer
@@ -100,6 +100,20 @@ uv run uvicorn jyotish_agent.api:app --reload   # http://127.0.0.1:8000 (docs at
 
 Errors are RFC 7807 `application/problem+json` with `problem` / `cause` / `fix`
 fields. Birth data is never logged or echoed into error bodies.
+
+Validated memos are atomically persisted below the private data root as
+`artifacts/<rr_id>/answer.md` (directories `0700`, files `0600`). The default
+retention window is seven days and can be configured with
+`JYOTISH_ARTIFACT_RETENTION_SECONDS`; operators can run
+`uv run jyotish artifacts prune --retention-seconds <seconds>` explicitly.
+
+Run the frozen deterministic tuning specifications and checksum gate with:
+
+```bash
+uv run python -m jyotish_agent.evaluation tuning
+```
+
+Held-out fixtures stay separate and require the runner's explicit final-review gate.
 
 Set `JYOTISH_SIGNING_KEY` to a fixed secret in any multi-process or multi-restart
 deployment so `facts_token`s verify across workers (a random per-process key is used

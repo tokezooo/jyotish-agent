@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 DATABASE_NAME = "research.sqlite3"
 
 
@@ -364,6 +364,27 @@ ALTER TABLE research_runs ADD COLUMN timezone_fold INTEGER NOT NULL DEFAULT 0 CH
 ALTER TABLE research_runs ADD COLUMN timezone_warnings_json TEXT NOT NULL DEFAULT 'null';
 """
 
+_MIGRATION_8 = """
+CREATE TABLE available_versions (
+    run_id TEXT NOT NULL REFERENCES research_runs(run_id) ON DELETE CASCADE,
+    version_type TEXT NOT NULL CHECK (
+        version_type IN ('engine', 'model', 'planner', 'corpus', 'contract')
+    ),
+    version TEXT NOT NULL,
+    PRIMARY KEY (run_id, version_type)
+);
+INSERT INTO available_versions (run_id, version_type, version)
+SELECT run_id, 'engine', engine_version FROM research_runs;
+INSERT INTO available_versions (run_id, version_type, version)
+SELECT run_id, 'model', model_version FROM research_runs;
+INSERT INTO available_versions (run_id, version_type, version)
+SELECT run_id, 'planner', planner_version FROM research_runs;
+INSERT INTO available_versions (run_id, version_type, version)
+SELECT run_id, 'corpus', corpus_version FROM research_runs;
+INSERT INTO available_versions (run_id, version_type, version)
+SELECT run_id, 'contract', contract_version FROM research_runs;
+"""
+
 _MIGRATIONS: dict[int, str] = {
     1: _MIGRATION_1,
     2: _MIGRATION_2,
@@ -372,6 +393,7 @@ _MIGRATIONS: dict[int, str] = {
     5: _MIGRATION_5,
     6: _MIGRATION_6,
     7: _MIGRATION_7,
+    8: _MIGRATION_8,
 }
 
 
@@ -960,6 +982,16 @@ class ResearchStore:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 self._run_values(run_data),
             )
+            connection.executemany(
+                "INSERT INTO available_versions (run_id, version_type, version) VALUES (?, ?, ?)",
+                [
+                    (run_data["run_id"], "engine", run_data["engine_version"]),
+                    (run_data["run_id"], "model", run_data["model_version"]),
+                    (run_data["run_id"], "planner", run_data["planner_version"]),
+                    (run_data["run_id"], "corpus", run_data["corpus_version"]),
+                    (run_data["run_id"], "contract", run_data["contract_version"]),
+                ],
+            )
             connection.execute(
                 """INSERT INTO operations (
                     operation_id, run_id, operation_type, request_hash, status, created_at
@@ -1006,6 +1038,19 @@ class ResearchStore:
             run["corpus_version"], run["contract_version"], run["request_hash"],
             run["created_at"], run["updated_at"],
         )
+
+    def pinned_versions_available(self, run_id: str, expected: Mapping[str, str]) -> bool:
+        """Return whether every immutable run dependency is locally available."""
+        connection = self._ready_connection()
+        try:
+            rows = connection.execute(
+                "SELECT version_type, version FROM available_versions WHERE run_id=?",
+                (run_id,),
+            ).fetchall()
+            actual = {row["version_type"]: row["version"] for row in rows}
+            return actual == dict(expected)
+        finally:
+            connection.close()
 
     def append_event(
         self,

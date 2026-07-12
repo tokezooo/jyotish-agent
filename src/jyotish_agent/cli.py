@@ -19,6 +19,7 @@ from urllib.parse import quote, urlparse
 
 from pydantic import ValidationError
 
+from .hardening import persist_private_artifact, prune_private_artifacts
 from .research_models import ResearchBirthProfileRequest
 from .research_store import ResearchStore, canonical_json, default_data_root
 
@@ -34,6 +35,7 @@ PI_TOOLS = (
     "jyotish_retrieve_research_run",
     "jyotish_submit_answer",
 )
+DEFAULT_ARTIFACT_RETENTION_SECONDS = 7 * 24 * 60 * 60
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
@@ -275,6 +277,13 @@ def _ask(args: argparse.Namespace) -> int:
     run_id = f"rr_{uuid.uuid4()}"
     create_operation_id = f"op_{uuid.uuid4()}"
     try:
+        retention = int(
+            os.environ.get(
+                "JYOTISH_ARTIFACT_RETENTION_SECONDS",
+                str(DEFAULT_ARTIFACT_RETENTION_SECONDS),
+            )
+        )
+        prune_private_artifacts(default_data_root(), retention_seconds=retention)
         if not _health(base):
             child = _start_api(base)
         prompt_path = _private_prompt(
@@ -314,6 +323,10 @@ def _ask(args: argparse.Namespace) -> int:
         answer = _validated_artifact(base, run_id)
         if completed.returncode != 0 or answer is None:
             return _emit_required_v2_blocker(args.json)
+        persist_private_artifact(
+            default_data_root(), run_id=run_id, name="answer.md",
+            data=answer.encode("utf-8"),
+        )
         if args.json:
             print(json.dumps({"answer": answer}, ensure_ascii=False, sort_keys=True))
         else:
@@ -371,6 +384,14 @@ def _replay_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _prune_artifacts(args: argparse.Namespace) -> int:
+    removed = prune_private_artifacts(
+        default_data_root(), retention_seconds=args.retention_seconds
+    )
+    print(json.dumps({"removed": removed}, sort_keys=True) if args.json else f"removed: {removed}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="jyotish")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -393,6 +414,15 @@ def build_parser() -> argparse.ArgumentParser:
     replay.add_argument("run_id")
     replay.add_argument("--json", action="store_true", help="emit canonical JSON")
     replay.set_defaults(handler=_replay_run)
+    artifacts = subparsers.add_parser("artifacts", help="manage private answer artifacts")
+    artifact_subparsers = artifacts.add_subparsers(dest="artifact_command", required=True)
+    prune = artifact_subparsers.add_parser("prune", help="delete artifacts older than the retention window")
+    prune.add_argument(
+        "--retention-seconds", type=int,
+        default=DEFAULT_ARTIFACT_RETENTION_SECONDS,
+    )
+    prune.add_argument("--json", action="store_true")
+    prune.set_defaults(handler=_prune_artifacts)
     return parser
 
 

@@ -168,6 +168,17 @@ class ResearchService:
             "contract_version", "timezone_fingerprint"
         )):
             raise ReplayError("MISSING_PINNED_VERSION")
+        if not self.store.pinned_versions_available(
+            run_id,
+            {
+                "engine": current["engine_version"],
+                "model": current["model_version"],
+                "planner": current["planner_version"],
+                "corpus": current["corpus_version"],
+                "contract": current["contract_version"],
+            },
+        ):
+            raise ReplayError("MISSING_PINNED_VERSION")
         plan = self.store.get_question_plan(run_id)
         intent = self.store.get_question_intent(run_id)
         try:

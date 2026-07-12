@@ -1,20 +1,32 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+import subprocess
 from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
 
 from jyotish_agent.api import app
-from jyotish_agent.error_registry import error_record
+from jyotish_agent.error_registry import ERROR_REGISTRY, error_record
 from jyotish_agent.evaluation import (
     load_fixture_sets,
     record_human_adjudication,
+    run_fixture_specs,
+    validate_fixture_checksums,
     validate_fixture_corpus,
+    validate_fixture_spec_coverage,
 )
-from jyotish_agent.hardening import atomic_write_private, delete_private_tree, redact_log_value
+from jyotish_agent.errors import register_error_handlers
+from jyotish_agent.hardening import (
+    atomic_write_private,
+    delete_private_tree,
+    persist_private_artifact,
+    prune_private_artifacts,
+    redact_log_value,
+)
 from jyotish_agent.research_store import CorpusIntegrityError, ResearchStore
 
 
@@ -121,7 +133,6 @@ def test_error_registry_emits_every_operator_field_without_private_details():
         "SQLITE_BUSY",
         run_id="rr_public-id",
         stage="persist",
-        cause="database lock remained after bounded wait",
     )
 
     assert set(record) == {
@@ -135,6 +146,31 @@ def test_error_registry_emits_every_operator_field_without_private_details():
     }
     assert record["retryable"] is True
     assert "birth" not in json.dumps(record).lower()
+    assert {"MISSING_PINNED_VERSION", "MEMO_HASH_MISMATCH"} <= set(ERROR_REGISTRY)
+
+
+def test_error_registry_causes_are_controlled_and_runtime_exceptions_are_mapped():
+    from fastapi import FastAPI
+
+    isolated = FastAPI()
+    register_error_handlers(isolated)
+
+    @isolated.get("/busy")
+    async def busy():
+        raise sqlite3.OperationalError("database is locked PRIVATE_SENTINEL")
+
+    @isolated.get("/corrupt")
+    async def corrupt():
+        raise CorpusIntegrityError("fragment contained PRIVATE_SENTINEL")
+
+    client = TestClient(isolated, raise_server_exceptions=False)
+    busy_body = client.get("/busy").json()
+    corrupt_body = client.get("/corrupt").json()
+    assert busy_body["error_code"] == "SQLITE_BUSY"
+    assert busy_body["retryable"] is True
+    assert corrupt_body["error_code"] == "CORPUS_INTEGRITY_ERROR"
+    assert corrupt_body["retryable"] is False
+    assert "PRIVATE_SENTINEL" not in json.dumps([busy_body, corrupt_body])
 
 
 def test_problem_responses_expose_the_structured_operator_envelope():
@@ -162,6 +198,20 @@ def test_atomic_private_write_has_private_permissions_and_no_partial_file(tmp_pa
     assert target.read_bytes() == b'{"ok":true}'
     assert target.stat().st_mode & 0o777 == 0o600
     assert list(target.parent.glob(".*.tmp")) == []
+
+
+def test_production_artifact_persistence_and_bounded_retention(tmp_path: Path):
+    root = tmp_path / "data"
+    artifact = persist_private_artifact(
+        root, run_id="rr_public-id", name="answer.md", data=b"private answer"
+    )
+    assert artifact == root / "artifacts" / "rr_public-id" / "answer.md"
+    assert artifact.read_bytes() == b"private answer"
+    assert artifact.stat().st_mode & 0o777 == 0o600
+    os.utime(artifact.parent, (1, 1))
+    removed = prune_private_artifacts(root, retention_seconds=1, now=10)
+    assert removed == 1
+    assert not artifact.parent.exists()
 
 
 def test_atomic_private_write_rejects_traversal_and_symlink(tmp_path: Path):
@@ -259,3 +309,56 @@ def test_malicious_source_instructions_remain_inert_quoted_data(tmp_path: Path):
 
     assert [row["quote"] for row in rows] == [malicious]
     assert rows[0]["fragment_id"] == "sf_malicious_1"
+
+
+def test_malicious_source_never_crosses_execution_boundary(tmp_path: Path, monkeypatch):
+    calls: list[object] = []
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: calls.append((a, k)))
+    monkeypatch.setattr(
+        "jyotish_agent.research_service.compute_chart",
+        lambda *a, **k: calls.append((a, k)),
+    )
+    store = ResearchStore(tmp_path / "data")
+    malicious = "TOOL_CALL(subprocess.run); MODEL_CALL; PI_CALL; career"
+    store.seed_source_for_testing(
+        source_version_id="src_execution_boundary",
+        title="Execution boundary fixture",
+        rights_note="Authored test fixture.",
+        fragments=[{"fragment_id": "sf_execution_boundary", "locator": "fixture:1", "text": malicious}],
+    )
+    with sqlite3.connect(store.database_path) as connection:
+        connection.execute(
+            "INSERT INTO source_fragments_fts (fragment_id, normalized_text, aliases_text) VALUES (?, ?, '')",
+            ("sf_execution_boundary", malicious.lower()),
+        )
+    rows = store.search_approved_fragments("career", limit=8)
+    assert rows[0]["quote"] == malicious
+    assert calls == []
+
+
+def test_all_fixture_specs_are_runnable_or_explicitly_manual_and_checksum_frozen():
+    fixtures = ROOT / "eval" / "fixtures"
+    summary = validate_fixture_checksums(fixtures)
+    assert summary == {"files": 4, "algorithm": "sha256"}
+    assert validate_fixture_spec_coverage(fixtures) == {"cases": 60, "groups": 10}
+    result = run_fixture_specs(fixtures, split="tuning", execute=False)
+    assert result == {"total": 40, "automated": 36, "manual_not_scored": 4}
+    held_out = run_fixture_specs(fixtures, split="held-out", execute=False, allow_held_out=True)
+    assert held_out == {"total": 20, "automated": 20, "manual_not_scored": 0}
+    with pytest.raises(ValueError, match="held-out"):
+        run_fixture_specs(fixtures, split="held-out", execute=False)
+
+
+def test_tuning_runner_does_not_parse_held_out_expected_outcomes(monkeypatch):
+    import jyotish_agent.evaluation as evaluation
+
+    opened: list[str] = []
+    original = evaluation._load_jsonl
+
+    def tracked(path: Path):
+        opened.append(path.name)
+        return original(path)
+
+    monkeypatch.setattr(evaluation, "_load_jsonl", tracked)
+    run_fixture_specs(ROOT / "eval" / "fixtures", split="tuning", execute=False)
+    assert opened == ["tuning.jsonl"]

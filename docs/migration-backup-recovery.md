@@ -15,7 +15,9 @@ version; run migrations; inspect affected run IDs; offline-replay them; compare
 projection/claims/memo hashes; then switch the configured data root. Missing pinned
 corpus or planner versions must be restored before replay.
 
-Retention deletion must remain inside the configured private root and must not
-follow symlinks. Use `delete_private_tree`; exports use `atomic_write_private` so a
-crash cannot expose a partial artifact. Confirm stale Pi mirrors are removed only
-after SQLite recovery succeeds.
+Validated exports are written by the CLI through `persist_private_artifact`, which
+uses a same-directory fsync and atomic replace. Retention deletion must remain inside
+the configured private root and must not follow symlinks. Run
+`jyotish artifacts prune --retention-seconds <seconds>` (or configure
+`JYOTISH_ARTIFACT_RETENTION_SECONDS` for the post-ask sweep); the default is seven
+days. Confirm stale Pi mirrors are removed only after SQLite recovery succeeds.

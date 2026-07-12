@@ -184,7 +184,7 @@ def test_v4_upgrade_atomically_backfills_normalized_fragment_search(
 
     store.initialize()
     with sqlite3.connect(store.database_path) as connection:
-        assert connection.execute("PRAGMA user_version").fetchone()[0] == 7
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 8
         assert connection.execute(
             "SELECT COUNT(*) FROM source_fragments_fts WHERE fragment_id=?",
             ("sf_v4_search_1",),

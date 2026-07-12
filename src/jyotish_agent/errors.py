@@ -14,9 +14,14 @@ rule that failed are reported.
 
 from __future__ import annotations
 
+import sqlite3
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+
+from .error_registry import error_record
+from .research_store import CorpusIntegrityError
 
 PROBLEM_JSON = "application/problem+json"
 _PROBLEM_BASE = "https://jyotish-agent.local/problems"
@@ -56,6 +61,28 @@ def problem_response(
     return JSONResponse(status_code=status, content=body, media_type=PROBLEM_JSON)
 
 
+def registry_problem_response(
+    error_code: str,
+    *,
+    status: int,
+    run_id: str | None,
+    stage: str,
+    title: str,
+) -> JSONResponse:
+    record = error_record(error_code, run_id=run_id, stage=stage)
+    return JSONResponse(
+        status_code=status,
+        media_type=PROBLEM_JSON,
+        content={
+            "type": f"{_PROBLEM_BASE}/{error_code.lower().replace('_', '-')}",
+            "title": title,
+            "status": status,
+            "detail": record["problem"],
+            **record,
+        },
+    )
+
+
 class CalculationError(ValueError):
     """A request was structurally valid but the engine rejected its parameters
     (e.g. an unknown or Moshier-unsafe ayanamsa). Maps to 422."""
@@ -72,6 +99,26 @@ def _loc(err: dict) -> str:
 
 
 def register_error_handlers(app: FastAPI) -> None:
+    @app.exception_handler(sqlite3.OperationalError)
+    async def _sqlite_handler(request: Request, exc: sqlite3.OperationalError):
+        message = str(exc).lower()
+        if "locked" in message or "busy" in message:
+            return registry_problem_response(
+                "SQLITE_BUSY", status=503, run_id=None, stage="persist",
+                title="Research ledger busy",
+            )
+        return registry_problem_response(
+            "UNEXPECTED_INTERNAL", status=500, run_id=None, stage="persist",
+            title="Internal error",
+        )
+
+    @app.exception_handler(CorpusIntegrityError)
+    async def _corpus_integrity_handler(request: Request, exc: CorpusIntegrityError):
+        return registry_problem_response(
+            "CORPUS_INTEGRITY_ERROR", status=409, run_id=None, stage="retrieve",
+            title="Corpus integrity failure",
+        )
+
     @app.exception_handler(RequestValidationError)
     async def _validation_handler(request: Request, exc: RequestValidationError):
         body = exc.body if isinstance(exc.body, dict) else {}
@@ -126,11 +173,7 @@ def register_error_handlers(app: FastAPI) -> None:
     async def _unhandled_handler(request: Request, exc: Exception):
         # Catch-all so 500s also speak problem+json and NEVER leak internals or
         # birth-derived data. No detail from the exception is included.
-        return problem_response(
-            status=500,
+        return registry_problem_response(
+            "UNEXPECTED_INTERNAL", status=500, run_id=None, stage="request",
             title="Internal error",
-            problem="An unexpected error occurred while processing the request.",
-            cause="Internal engine or server error.",
-            fix="Retry; if it persists, report the request shape (not the data).",
-            problem_type="internal-error",
         )

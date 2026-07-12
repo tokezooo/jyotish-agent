@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import socket
+import sqlite3
 import subprocess
 import sys
 from pathlib import Path
@@ -226,26 +227,33 @@ def test_black_box_ask_rejects_arbitrary_fake_pi_stdout(tmp_path: Path):
 
 
 def test_black_box_ask_outputs_only_verified_backend_artifact(tmp_path: Path):
-    completed, _captured, _port = _run_black_box(tmp_path, "validated")
+    completed, captured, _port = _run_black_box(tmp_path, "validated")
     assert completed.returncode == 0, completed.stderr
     output = json.loads(completed.stdout)
     assert output["answer"].startswith("# Validated fake-Pi memo")
     assert "ARBITRARY_MODEL_STDOUT" not in output["answer"]
+    artifact = tmp_path / "data" / "artifacts" / captured["run_id"] / "answer.md"
+    assert artifact.read_text(encoding="utf-8") == output["answer"]
+    assert artifact.stat().st_mode & 0o777 == 0o600
 
 
 def test_black_box_temporary_home_doctor_ask_inspect_replay_hash_shutdown(tmp_path: Path):
     home = tmp_path / "home"
     home.mkdir(mode=0o700)
-    completed, captured, port = _run_black_box(
-        tmp_path, "validated", {"HOME": str(home)}
-    )
-    assert completed.returncode == 0, completed.stderr
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    _executable, capture = _fake_pi(bin_dir)
+    profile = tmp_path / "profile.json"
+    _profile(profile)
+    port = _free_port()
     env = {
         **os.environ,
         "HOME": str(home),
-        "PATH": f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}",
+        "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
         "JYOTISH_API_URL": f"http://127.0.0.1:{port}",
         "JYOTISH_AGENT_DATA_ROOT": str(tmp_path / "data"),
+        "FAKE_PI_CAPTURE": str(capture),
+        "FAKE_PI_MODE": "validated",
     }
     server = subprocess.Popen(
         [
@@ -266,6 +274,7 @@ def test_black_box_temporary_home_doctor_ask_inspect_replay_hash_shutdown(tmp_pa
         stderr=subprocess.DEVNULL,
     )
     try:
+        # One server lifecycle, exact operator order: doctor -> ask -> inspect -> replay.
         for _ in range(100):
             doctor = subprocess.run(
                 [sys.executable, "-m", "jyotish_agent.cli", "doctor"],
@@ -280,6 +289,15 @@ def test_black_box_temporary_home_doctor_ask_inspect_replay_hash_shutdown(tmp_pa
             import time
             time.sleep(0.05)
         assert doctor.returncode == 0, doctor.stdout + doctor.stderr
+        completed = subprocess.run(
+            [
+                sys.executable, "-m", "jyotish_agent.cli", "ask",
+                "Which career factors?", "--chart", str(profile), "--json",
+            ],
+            cwd=ROOT, env=env, text=True, capture_output=True, timeout=30, check=False,
+        )
+        assert completed.returncode == 0, completed.stderr
+        captured = json.loads(capture.read_text(encoding="utf-8"))
         inspect = subprocess.run(
             [sys.executable, "-m", "jyotish_agent.cli", "run", "inspect", captured["run_id"], "--json"],
             cwd=ROOT, env=env, text=True, capture_output=True, check=False,
@@ -304,6 +322,67 @@ def test_black_box_temporary_home_doctor_ask_inspect_replay_hash_shutdown(tmp_pa
         server.wait(timeout=5)
     with socket.socket() as sock:
         assert sock.connect_ex(("127.0.0.1", port)) != 0
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_code"),
+    [
+        ("missing_version", "MISSING_PINNED_VERSION"),
+        ("memo_hash", "MEMO_HASH_MISMATCH"),
+    ],
+)
+def test_cli_replay_surfaces_exact_registry_branch(tmp_path: Path, mutation: str, expected_code: str):
+    completed, captured, port = _run_black_box(tmp_path, "validated")
+    assert completed.returncode == 0, completed.stderr
+    database = tmp_path / "data" / "research.sqlite3"
+    with sqlite3.connect(database) as connection:
+        if mutation == "missing_version":
+            connection.execute(
+                "DELETE FROM available_versions WHERE run_id=? AND version_type='corpus'",
+                (captured["run_id"],),
+            )
+        else:
+            connection.execute("DROP TRIGGER answers_no_update")
+            row = connection.execute(
+                "SELECT payload_json FROM answers WHERE run_id=?", (captured["run_id"],)
+            ).fetchone()
+            payload = json.loads(row[0])
+            payload["markdown"] += "\ncorrupt"
+            encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+            import hashlib
+            connection.execute(
+                "UPDATE answers SET payload_json=?, payload_hash=? WHERE run_id=?",
+                (encoded, hashlib.sha256(encoded.encode()).hexdigest(), captured["run_id"]),
+            )
+    env = {
+        **os.environ,
+        "PATH": f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}",
+        "JYOTISH_API_URL": f"http://127.0.0.1:{port}",
+        "JYOTISH_AGENT_DATA_ROOT": str(tmp_path / "data"),
+    }
+    server = subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "jyotish_agent.api:app", "--host", "127.0.0.1",
+         "--port", str(port), "--log-level", "warning"],
+        cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    try:
+        for _ in range(100):
+            if subprocess.run(
+                [sys.executable, "-m", "jyotish_agent.cli", "doctor"], cwd=ROOT, env=env,
+                text=True, capture_output=True, check=False,
+            ).returncode == 0:
+                break
+            import time
+            time.sleep(0.05)
+        replay = subprocess.run(
+            [sys.executable, "-m", "jyotish_agent.cli", "run", "replay", captured["run_id"], "--json"],
+            cwd=ROOT, env=env, text=True, capture_output=True, check=False,
+        )
+        assert replay.returncode == 4
+        assert replay.stderr.strip() == f"offline replay failed: {expected_code}"
+    finally:
+        server.terminate()
+        server.wait(timeout=5)
 
 
 def test_seeded_demo_inputs_are_small_authored_fixtures():

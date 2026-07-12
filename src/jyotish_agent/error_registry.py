@@ -9,26 +9,31 @@ ERROR_REGISTRY: dict[str, dict[str, Any]] = {
     "SQLITE_BUSY": {
         "retryable": True,
         "problem": "The research ledger is temporarily busy.",
+        "cause": "The bounded SQLite lock wait expired.",
         "fix": "Retry after the bounded backoff; inspect concurrent writers if it persists.",
     },
-    "CORRUPT_LEDGER": {
+    "CORPUS_INTEGRITY_ERROR": {
         "retryable": False,
-        "problem": "Persisted research material failed an integrity check.",
-        "fix": "Stop writes, restore a verified backup, and replay before resuming.",
+        "problem": "The governed corpus failed an integrity check.",
+        "cause": "Stored fragment bytes or search-index membership differ from their committed checksums.",
+        "fix": "Stop retrieval, restore a verified corpus backup, and validate the index before resuming.",
     },
-    "PINNED_VERSION_MISSING": {
+    "MISSING_PINNED_VERSION": {
         "retryable": False,
         "problem": "A version pinned by the run is unavailable.",
+        "cause": "At least one required immutable runtime or corpus version is absent.",
         "fix": "Restore the exact pinned corpus or engine version and replay.",
     },
-    "RENDER_HASH_MISMATCH": {
+    "MEMO_HASH_MISMATCH": {
         "retryable": False,
         "problem": "Rendered output does not match its committed hash.",
+        "cause": "Re-rendered memo bytes differ from the immutable answer artifact.",
         "fix": "Reject the artifact and inspect the immutable event chain.",
     },
     "UNEXPECTED_INTERNAL": {
         "retryable": True,
         "problem": "An unexpected internal failure interrupted the operation.",
+        "cause": "The service encountered a non-public internal error.",
         "fix": "Retry once; then inspect privacy-safe logs using the run ID.",
     },
 }
@@ -39,9 +44,8 @@ def error_record(
     *,
     run_id: str | None,
     stage: str,
-    cause: str,
 ) -> dict[str, Any]:
-    """Build the complete structured error envelope without exception contents."""
+    """Build an actionable envelope from controlled registry text only."""
     definition = ERROR_REGISTRY[error_code]
     return {
         "error_code": error_code,
@@ -49,6 +53,6 @@ def error_record(
         "stage": stage,
         "retryable": definition["retryable"],
         "problem": definition["problem"],
-        "cause": cause,
+        "cause": definition["cause"],
         "fix": definition["fix"],
     }

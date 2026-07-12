@@ -362,6 +362,52 @@ def test_replay_distinguishes_unsupported_contract_and_version_mismatch(tmp_path
     assert response.json()["error_code"] == "PINNED_VERSION_MISMATCH"
 
 
+def test_replay_requires_available_pinned_corpus_version(tmp_path: Path, monkeypatch):
+    client, store, calculated = _client(tmp_path, monkeypatch)
+    client.post(
+        f"/v2/research-runs/{calculated['run_id']}/answers",
+        json={"operation_id": _id("op_"), "expected_revision": calculated["revision"],
+              "answer": _answer(calculated["evidence_ids"][0])},
+    )
+    with sqlite3.connect(store.database_path) as connection:
+        connection.execute(
+            "DELETE FROM available_versions WHERE run_id=? AND version_type='corpus'",
+            (calculated["run_id"],),
+        )
+    response = client.post(f"/v2/research-runs/{calculated['run_id']}/replay")
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error_code"] == "MISSING_PINNED_VERSION"
+    assert body["run_id"] == calculated["run_id"]
+    assert body["cause"] == "At least one required immutable runtime or corpus version is absent."
+
+
+def test_replay_rejects_exact_memo_hash_mismatch(tmp_path: Path, monkeypatch):
+    client, store, calculated = _client(tmp_path, monkeypatch)
+    client.post(
+        f"/v2/research-runs/{calculated['run_id']}/answers",
+        json={"operation_id": _id("op_"), "expected_revision": calculated["revision"],
+              "answer": _answer(calculated["evidence_ids"][0])},
+    )
+    with sqlite3.connect(store.database_path) as connection:
+        connection.execute("DROP TRIGGER answers_no_update")
+        row = connection.execute(
+            "SELECT payload_json FROM answers WHERE run_id=?", (calculated["run_id"],)
+        ).fetchone()
+        payload = json.loads(row[0])
+        payload["markdown"] += "\ncorrupt"
+        encoded = canonical_json(payload)
+        connection.execute(
+            "UPDATE answers SET payload_json=?, payload_hash=? WHERE run_id=?",
+            (encoded, sha256_text(encoded), calculated["run_id"]),
+        )
+    response = client.post(f"/v2/research-runs/{calculated['run_id']}/replay")
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error_code"] == "MEMO_HASH_MISMATCH"
+    assert body["cause"] == "Re-rendered memo bytes differ from the immutable answer artifact."
+
+
 @pytest.mark.parametrize("target", ["intent", "plan"])
 def test_replay_rejects_coordinated_planning_projection_and_self_hash_tamper(
     tmp_path: Path, monkeypatch, target

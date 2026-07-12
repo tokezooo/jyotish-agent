@@ -26,3 +26,19 @@ claims score 3, traceability scores at least 2, and no material rewrite is neede
 Oracle placeholders are intentionally unscored. Populate an oracle only from an
 independent artifact with exact tool/version, input, timestamp, output checksum,
 rights/provenance URL, and reviewer; never copy the system-under-test output.
+
+## Fixed executable specifications
+
+`fixtures/specs.json` maps every one of the 60 case IDs to an explicit setup,
+deterministic repository command, and exact exit-code assertion. The four missing
+independent-oracle cases are instead marked `manual_not_scored` with a reason. Run
+the 40-case tuning split with:
+
+```bash
+uv run python -m jyotish_agent.evaluation tuning
+```
+
+The 20-case held-out split is physically separate and requires the declared final
+review gate `held-out --allow-held-out`. `fixtures/checksums.json` freezes SHA-256
+digests for profiles, both case files, and executable specs; checksum drift fails
+before a runner command executes.

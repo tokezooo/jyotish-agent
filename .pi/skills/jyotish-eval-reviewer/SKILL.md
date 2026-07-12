@@ -13,14 +13,17 @@ tuning code, prompts, policies, or thresholds.
 
 1. Read `eval/ADJUDICATION.md` and `eval/fixtures/profiles.json` from the repository
    root. Confirm the profiles contain no real personal data.
-2. Validate corpus shape before execution:
+2. Validate checksums and execute every fixed tuning spec through the repository
+   runner (the runner deduplicates shared deterministic commands):
 
    ```bash
-   uv run pytest tests/test_task6_hardening.py -q
+   uv run python -m jyotish_agent.evaluation tuning
    ```
 
 3. Select `eval/fixtures/tuning.jsonl` for development evaluation. Open
-   `held-out.jsonl` only for a declared final holdout run after tuning is frozen.
+   `held-out.jsonl` only for a declared final holdout run after tuning is frozen;
+   invoke it explicitly with
+   `uv run python -m jyotish_agent.evaluation held-out --allow-held-out`.
 4. For each selected case, create an isolated temporary data root, record case ID,
    git commit, Python/Bun versions, pinned engine/planner/corpus/contract versions,
    start/end UTC timestamps, duration, exit code, stdout/stderr hashes, run ID, and

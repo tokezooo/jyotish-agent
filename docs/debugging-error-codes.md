@@ -8,9 +8,9 @@ text, prompts, tokens, or rendered answers.
 | Code | Meaning | Retry |
 |---|---|---|
 | `SQLITE_BUSY` | bounded ledger lock wait expired | yes, then inspect writers |
-| `CORRUPT_LEDGER` | event/payload/index integrity failed | no; restore backup |
-| `PINNED_VERSION_MISSING` | exact replay dependency absent | no; restore version |
-| `RENDER_HASH_MISMATCH` | memo bytes differ from committed hash | no; reject artifact |
+| `CORPUS_INTEGRITY_ERROR` | governed fragment bytes/index integrity failed | no; restore backup |
+| `MISSING_PINNED_VERSION` | an exact engine/model/planner/corpus/contract availability record is absent | no; restore version |
+| `MEMO_HASH_MISMATCH` | replayed memo bytes differ from the committed artifact | no; reject artifact |
 | `UNEXPECTED_INTERNAL` | privacy-safe unexpected failure | once |
 
 Endpoint-specific codes such as `TIMEZONE_OFFSET_MISMATCH`,
@@ -18,3 +18,8 @@ Endpoint-specific codes such as `TIMEZONE_OFFSET_MISMATCH`,
 `PROJECTION_HASH_MISMATCH` retain their stable names. Start with `jyotish run inspect
 <rr_id> --json`, verify the event chain and pinned versions, then use offline replay.
 Do not paste private inputs into bug reports.
+
+Registry causes are controlled static text. SQLite `busy`/`locked` failures map to
+`SQLITE_BUSY`; `CorpusIntegrityError` maps to `CORPUS_INTEGRITY_ERROR`; exception
+messages are never copied into public envelopes. Replay returns the real run ID for
+the exact `MISSING_PINNED_VERSION` and `MEMO_HASH_MISMATCH` branches.

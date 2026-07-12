@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -37,6 +40,114 @@ def _load_jsonl(path: Path) -> list[dict[str, Any]]:
 def load_fixture_sets(root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Load physically separate tuning and held-out regression cases."""
     return _load_jsonl(root / "tuning.jsonl"), _load_jsonl(root / "held-out.jsonl")
+
+
+def validate_fixture_checksums(root: Path) -> dict[str, Any]:
+    manifest_path = root / "checksums.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if manifest.get("algorithm") != "sha256" or not isinstance(manifest.get("files"), dict):
+        raise ValueError("invalid fixture checksum manifest")
+    for relative, expected in manifest["files"].items():
+        path = root / relative
+        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        if actual != expected:
+            raise ValueError(f"fixture checksum mismatch: {relative}")
+    return {"files": len(manifest["files"]), "algorithm": "sha256"}
+
+
+def run_fixture_specs(
+    root: Path, *, split: str, execute: bool = True, allow_held_out: bool = False
+) -> dict[str, int]:
+    if split not in {"tuning", "held-out"}:
+        raise ValueError("split must be tuning or held-out")
+    if split == "held-out" and not allow_held_out:
+        raise ValueError("held-out execution requires an explicit final-review gate")
+    validate_fixture_checksums(root)
+    filename = "tuning.jsonl" if split == "tuning" else "held-out.jsonl"
+    cases = _load_jsonl(root / filename)
+    specs_doc = json.loads((root / "specs.json").read_text(encoding="utf-8"))
+    groups = specs_doc.get("groups")
+    if not isinstance(groups, list):
+        raise ValueError("fixture specs must contain groups")
+    by_id: dict[str, dict[str, Any]] = {}
+    for group in groups:
+        if set(group) != {"case_ids", "setup", "action", "assertion", "mode"}:
+            raise ValueError("fixture spec group has an invalid schema")
+        for case_id in group["case_ids"]:
+            if case_id in by_id:
+                raise ValueError(f"duplicate fixture spec: {case_id}")
+            by_id[case_id] = group
+    if len(by_id) != 60 or not {case["id"] for case in cases} <= set(by_id):
+        raise ValueError("fixture specs must cover the selected fixed cases")
+    automated = manual = 0
+    executed: dict[tuple[str, ...], subprocess.CompletedProcess[str]] = {}
+    for case in cases:
+        spec = by_id[case["id"]]
+        if spec["mode"] == "manual_not_scored":
+            if spec["action"] is not None or not spec["assertion"].get("reason"):
+                raise ValueError(f"manual fixture {case['id']} lacks a not-scored reason")
+            manual += 1
+            continue
+        if spec["mode"] != "automated":
+            raise ValueError(f"fixture {case['id']} has an invalid mode")
+        command = spec["action"].get("command")
+        if not isinstance(command, list) or not command or not all(
+            isinstance(item, str) and item for item in command
+        ):
+            raise ValueError(f"fixture {case['id']} lacks a deterministic command")
+        if spec["assertion"] != {"exit_code": 0}:
+            raise ValueError(f"fixture {case['id']} lacks an exact exit assertion")
+        automated += 1
+        if execute:
+            key = tuple(command)
+            if key not in executed:
+                executed[key] = subprocess.run(
+                    command,
+                    cwd=root.parents[1],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+            completed = executed[key]
+            if completed.returncode != 0:
+                raise RuntimeError(
+                    f"fixture {case['id']} failed ({completed.returncode}): "
+                    f"{completed.stdout}{completed.stderr}"
+                )
+    return {"total": len(cases), "automated": automated, "manual_not_scored": manual}
+
+
+def validate_fixture_spec_coverage(root: Path) -> dict[str, int]:
+    """Explicit maintainer gate that may inspect both frozen splits."""
+    tuning, held_out = load_fixture_sets(root)
+    specs_doc = json.loads((root / "specs.json").read_text(encoding="utf-8"))
+    listed = [case_id for group in specs_doc["groups"] for case_id in group["case_ids"]]
+    expected = {case["id"] for case in tuning + held_out}
+    if len(listed) != 60 or len(set(listed)) != 60 or set(listed) != expected:
+        raise ValueError("fixture specs must cover all 60 cases exactly")
+    return {"cases": 60, "groups": len(specs_doc["groups"])}
+
+
+def _main(argv: list[str]) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Run frozen Jyotish evaluation specs")
+    parser.add_argument("split", choices=("tuning", "held-out"))
+    parser.add_argument("--allow-held-out", action="store_true")
+    parser.add_argument("--validate-only", action="store_true")
+    args = parser.parse_args(argv)
+    result = run_fixture_specs(
+        Path(__file__).resolve().parents[2] / "eval" / "fixtures",
+        split=args.split,
+        execute=not args.validate_only,
+        allow_held_out=args.allow_held_out,
+    )
+    print(json.dumps(result, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(_main(sys.argv[1:]))
 
 
 def validate_fixture_corpus(
