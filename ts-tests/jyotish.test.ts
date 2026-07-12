@@ -481,6 +481,61 @@ describe("ResearchRuntime", () => {
     ).toEqual([{ type: "text", text: FAIL_CLOSED_TEXT }]);
   });
 
+  test("starts a fresh run after a terminal answer without leaking stale prose", () => {
+    const nextRunId = "rr_66666666-6666-4666-8666-666666666666";
+    const nextCreateOp = "op_66666666-6666-4666-8666-666666666666";
+    const runtime = new ResearchRuntime();
+    runtime.restore([mirror("validated", planOp, 4, hash1)]);
+    runtime.reconcile(
+      { run_id: runId, status: "validated", revision: 4 },
+      [{
+        seq: 4,
+        operation_id: planOp,
+        event_hash: hash1,
+        payload: { result: { markdown: "# Previous validated answer\n" } },
+      }],
+      () => {},
+    );
+    runtime.beginAssistantMessage("next-question-leaf");
+    expect(
+      runtime.reserve(
+        "next-create-call",
+        "jyotish_create_research_run",
+        { run_id: nextRunId, operation_id: nextCreateOp, expected_revision: 0 },
+        () => {},
+      ),
+    ).toBeUndefined();
+    expect(runtime.snapshot()?.run_id).toBe(nextRunId);
+    expect(runtime.snapshot()?.needs_reconciliation).toBe(true);
+    expect(
+      runtime.gateFinalMessage({
+        role: "assistant",
+        content: [{ type: "text", text: "# Previous validated answer\n" }],
+      })?.content,
+    ).toEqual([{ type: "text", text: FAIL_CLOSED_TEXT }]);
+  });
+
+  test.each(["created", "screened_safe", "planned", "calculated", "answer_needs_repair", "unresolved"])(
+    "blocks a fresh run while %s is nonterminal",
+    (status) => {
+      const runtime = new ResearchRuntime();
+      runtime.restore([mirror(status, createOp)]);
+      runtime.beginAssistantMessage(`blocked-${status}`);
+      expect(
+        runtime.reserve(
+          `create-${status}`,
+          "jyotish_create_research_run",
+          {
+            run_id: "rr_66666666-6666-4666-8666-666666666666",
+            operation_id: "op_66666666-6666-4666-8666-666666666666",
+            expected_revision: 0,
+          },
+          () => {},
+        )?.block,
+      ).toBe(true);
+    },
+  );
+
   test.each([
     ["backend uncommitted", true, undefined],
     [
