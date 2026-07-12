@@ -993,13 +993,13 @@ describe("ResearchRuntime", () => {
     const handlers = new Map<string, Array<(event: any, context: any) => any>>();
     const branch: unknown[] = [mirror("created", createOp)];
     const appended: unknown[] = [];
-    const tools: string[] = [];
+    const tools = new Map<string, any>();
     const fakePi = {
       on(event: string, handler: (event: any, context: any) => any) {
         handlers.set(event, [...(handlers.get(event) ?? []), handler]);
       },
       registerTool(tool: { name: string }) {
-        tools.push(tool.name);
+        tools.set(tool.name, tool);
       },
       appendEntry(customType: string, data: unknown) {
         const entry = { type: "custom", customType, data };
@@ -1018,12 +1018,15 @@ describe("ResearchRuntime", () => {
     expect(handlers.has("tool_call")).toBe(true);
     expect(handlers.has("tool_result")).toBe(true);
     expect(handlers.has("message_end")).toBe(true);
-    expect(tools).toContain("jyotish_create_research_run");
-    expect(tools).toContain("jyotish_screen_research_run");
-    expect(tools).toContain("jyotish_plan_research_run");
-    expect(tools).toContain("jyotish_calculate_research_run");
-    expect(tools).toContain("jyotish_retrieve_research_run");
-    expect(tools).toContain("jyotish_submit_answer");
+    expect(tools.has("jyotish_create_research_run")).toBe(true);
+    expect(tools.has("jyotish_screen_research_run")).toBe(true);
+    expect(tools.has("jyotish_plan_research_run")).toBe(true);
+    expect(tools.has("jyotish_calculate_research_run")).toBe(true);
+    expect(tools.has("jyotish_retrieve_research_run")).toBe(true);
+    expect(tools.has("jyotish_submit_answer")).toBe(true);
+    expect(tools.get("jyotish_calculate_research_run").description).toContain(
+      "supported deterministic plan",
+    );
 
     await handlers.get("session_start")?.[0]?.({ type: "session_start" }, context);
     await handlers.get("message_start")?.[0]?.(

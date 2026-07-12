@@ -319,7 +319,7 @@ async def calculate_research_run(
         return _research_problem(
             409, "Research operation conflict",
             "Calculation is stale or invalid for the run's current state.",
-            "Screen the run safely first, then retry with the current revision and a fresh operation ID.",
+            "Create a supported deterministic plan, then retry with the current revision and a fresh operation ID.",
         )
     except ConfigError as exc:
         raise CalculationError(str(exc)) from exc

@@ -199,6 +199,7 @@ def test_screened_safe_run_without_persisted_plan_cannot_calculate(tmp_path: Pat
 
     assert response.status_code == 409
     assert response.json()["detail"] == "Calculation is stale or invalid for the run's current state."
+    assert "supported deterministic plan" in response.json()["fix"]
     assert app.state.research_service.store.list_events(run["run_id"]) == before_events
     assert app.state.research_service.store.list_evidence(run["run_id"]) == []
 

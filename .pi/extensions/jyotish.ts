@@ -1228,7 +1228,7 @@ export default function (pi: ExtensionAPI) {
     name: "jyotish_calculate_research_run",
     label: "Calculate research run",
     description:
-      "Calculate a safely screened ResearchRun and persist immutable typed computed evidence.",
+      "Calculate a ResearchRun with a supported deterministic plan and persist immutable typed computed evidence.",
     parameters: OperationSchema,
     async execute(_toolCallId, params, signal, onUpdate) {
       onUpdate?.({ content: [{ type: "text", text: "Computing research evidence…" }], details: {} });
