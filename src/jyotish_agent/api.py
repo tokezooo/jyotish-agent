@@ -237,7 +237,7 @@ async def ingest_corpus_source(
 ) -> dict | JSONResponse:
     try:
         return _research_service(request).ingest_source(req)
-    except SourceConflict:
+    except (OptimisticConflict, SourceConflict):
         return _research_problem(
             409, "Corpus source conflict",
             "The source identifier conflicts with persisted provenance.",
@@ -254,11 +254,8 @@ async def ingest_corpus_fragments(
     source_version_id: str, req: CorpusFragmentsIngestRequest, request: Request
 ) -> dict | JSONResponse:
     try:
-        rows = _research_service(request).ingest_fragments(
-            source_version_id, req.fragments
-        )
-        return {"source_version_id": source_version_id, "fragments": rows}
-    except SourceConflict:
+        return _research_service(request).ingest_fragments(source_version_id, req)
+    except (OptimisticConflict, SourceConflict):
         return _research_problem(
             409, "Corpus fragment conflict",
             "A fragment checksum, locator, or identifier conflicts with persisted data.",
@@ -274,10 +271,11 @@ async def review_corpus_source(
 ) -> dict | JSONResponse:
     try:
         return _research_service(request).review_source(source_version_id, req)
-    except SourceConflict:
+    except (OptimisticConflict, SourceConflict):
         return _research_problem(
-            404, "Corpus source not found", "No source version has that ID.",
-            "Check the source-version ID and retry.",
+            409, "Corpus source review conflict",
+            "The review is stale, conflicts with its operation, manifest, or terminal state.",
+            "Refresh the pending source revision or create a new immutable source version.",
         )
 
 
@@ -287,10 +285,11 @@ async def review_corpus_fragment(
 ) -> dict | JSONResponse:
     try:
         return _research_service(request).review_fragment(fragment_id, req)
-    except SourceConflict:
+    except (OptimisticConflict, SourceConflict):
         return _research_problem(
-            404, "Corpus fragment not found", "No source fragment has that ID.",
-            "Check the fragment ID and retry.",
+            409, "Corpus fragment review conflict",
+            "The review is stale, conflicts with its operation, parent approval, or terminal state.",
+            "Refresh the pending fragment revision or create a new immutable source version.",
         )
 
 

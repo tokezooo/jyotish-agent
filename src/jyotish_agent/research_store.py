@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 DATABASE_NAME = "research.sqlite3"
 
 
@@ -57,6 +57,12 @@ def sha256_text(value: str) -> str:
 
 def new_id(prefix: str) -> str:
     return f"{prefix}{uuid.uuid4()}"
+
+
+def stable_operation_id(seed: str) -> str:
+    """Return a deterministic UUID4-shaped ID for idempotent built-in seed actions."""
+    digest = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:32]
+    return f"op_{uuid.UUID(hex=digest, version=4)}"
 
 
 def default_data_root() -> Path:
@@ -267,12 +273,72 @@ CREATE TABLE question_plans (
 );
 """
 
+_MIGRATION_6 = """
+ALTER TABLE source_versions ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE source_versions ADD COLUMN updated_at TEXT;
+UPDATE source_versions SET updated_at=created_at WHERE updated_at IS NULL;
+
+ALTER TABLE source_fragments ADD COLUMN revision INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE source_fragments ADD COLUMN aliases_json TEXT NOT NULL DEFAULT '[]';
+ALTER TABLE source_fragments ADD COLUMN created_at TEXT;
+ALTER TABLE source_fragments ADD COLUMN updated_at TEXT;
+UPDATE source_fragments
+SET created_at=(SELECT created_at FROM source_versions s
+                WHERE s.source_version_id=source_fragments.source_version_id),
+    updated_at=(SELECT created_at FROM source_versions s
+                WHERE s.source_version_id=source_fragments.source_version_id)
+WHERE created_at IS NULL OR updated_at IS NULL;
+
+CREATE TABLE corpus_operations (
+    operation_id TEXT PRIMARY KEY,
+    resource_type TEXT NOT NULL,
+    resource_id TEXT NOT NULL,
+    operation_type TEXT NOT NULL,
+    expected_revision INTEGER NOT NULL CHECK (expected_revision >= 0),
+    request_hash TEXT NOT NULL,
+    status TEXT NOT NULL,
+    result_json TEXT,
+    created_at TEXT NOT NULL,
+    completed_at TEXT
+);
+
+CREATE TABLE corpus_review_history (
+    review_id TEXT PRIMARY KEY,
+    operation_id TEXT NOT NULL UNIQUE REFERENCES corpus_operations(operation_id),
+    resource_type TEXT NOT NULL,
+    resource_id TEXT NOT NULL,
+    from_status TEXT NOT NULL,
+    to_status TEXT NOT NULL,
+    reviewer TEXT NOT NULL,
+    review_note TEXT NOT NULL,
+    reviewed_at TEXT NOT NULL
+);
+
+CREATE INDEX corpus_review_history_resource
+ON corpus_review_history(resource_type, resource_id, reviewed_at, review_id);
+
+CREATE TRIGGER corpus_operations_no_update
+BEFORE UPDATE ON corpus_operations
+WHEN OLD.status='completed'
+BEGIN SELECT RAISE(ABORT, 'completed corpus_operations are immutable'); END;
+CREATE TRIGGER corpus_operations_no_delete
+BEFORE DELETE ON corpus_operations
+BEGIN SELECT RAISE(ABORT, 'corpus_operations are append-only'); END;
+CREATE TRIGGER corpus_review_history_no_update
+BEFORE UPDATE ON corpus_review_history
+BEGIN SELECT RAISE(ABORT, 'corpus_review_history is append-only'); END;
+CREATE TRIGGER corpus_review_history_no_delete
+BEFORE DELETE ON corpus_review_history
+BEGIN SELECT RAISE(ABORT, 'corpus_review_history is append-only'); END;
+"""
+
 _MIGRATIONS: dict[int, str] = {
     1: _MIGRATION_1,
     2: _MIGRATION_2,
     3: _MIGRATION_3,
     4: _MIGRATION_4,
     5: _MIGRATION_5,
+    6: _MIGRATION_6,
 }
 
 
@@ -900,67 +966,177 @@ class ResearchStore:
         finally:
             connection.close()
 
-    def ingest_source_version(self, source: Mapping[str, Any]) -> dict[str, Any]:
-        """Insert a pending source manifest, or replay the exact same manifest."""
+    @staticmethod
+    def _corpus_operation_hash(
+        *,
+        resource_type: str,
+        resource_id: str,
+        operation_type: str,
+        expected_revision: int,
+        payload: Mapping[str, Any],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "resource_type": resource_type,
+                    "resource_id": resource_id,
+                    "operation_type": operation_type,
+                    "expected_revision": expected_revision,
+                    "payload": payload,
+                }
+            )
+        )
+
+    @staticmethod
+    def _replay_corpus_operation(
+        connection: sqlite3.Connection, operation_id: str, request_hash: str
+    ) -> dict[str, Any] | None:
+        row = connection.execute(
+            "SELECT request_hash, status, result_json FROM corpus_operations WHERE operation_id=?",
+            (operation_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        if row["request_hash"] != request_hash:
+            raise OptimisticConflict("operation_id was already used with another corpus request")
+        if row["status"] != "completed" or row["result_json"] is None:
+            raise OptimisticConflict("corpus operation is incomplete and requires reconciliation")
+        return json.loads(row["result_json"])
+
+    @staticmethod
+    def _begin_corpus_operation(
+        connection: sqlite3.Connection,
+        *,
+        operation_id: str,
+        resource_type: str,
+        resource_id: str,
+        operation_type: str,
+        expected_revision: int,
+        request_hash: str,
+        now: str,
+    ) -> None:
+        connection.execute(
+            """INSERT INTO corpus_operations (
+                operation_id, resource_type, resource_id, operation_type,
+                expected_revision, request_hash, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?)""",
+            (
+                operation_id, resource_type, resource_id, operation_type,
+                expected_revision, request_hash, now,
+            ),
+        )
+
+    @staticmethod
+    def _complete_corpus_operation(
+        connection: sqlite3.Connection,
+        operation_id: str,
+        result: Mapping[str, Any],
+        now: str,
+    ) -> None:
+        connection.execute(
+            """UPDATE corpus_operations
+               SET status='completed', result_json=?, completed_at=?
+               WHERE operation_id=? AND status='pending'""",
+            (canonical_json(result), now, operation_id),
+        )
+
+    @staticmethod
+    def _source_projection(row: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            key: row[key]
+            for key in (
+                "source_version_id", "work_id", "title", "source_class", "language",
+                "edition", "provenance_url", "rights_note", "manifest_checksum",
+                "approval_status", "revision", "reviewed_by", "review_note",
+                "reviewed_at", "created_at", "updated_at",
+            )
+        }
+
+    @staticmethod
+    def _fragment_projection(row: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            "fragment_id": row["fragment_id"],
+            "source_version_id": row["source_version_id"],
+            "ordinal": row["ordinal"],
+            "locator": row["locator"],
+            "text": row["text"],
+            "transliteration_aliases": json.loads(row["aliases_json"]),
+            "checksum": row["checksum"],
+            "approval_status": row["approval_status"],
+            "revision": row["revision"],
+            "reviewed_by": row["reviewed_by"],
+            "review_note": row["review_note"],
+            "reviewed_at": row["reviewed_at"],
+            "created_at": row["created_at"],
+            "updated_at": row["updated_at"],
+        }
+
+    def ingest_source_version(
+        self,
+        source: Mapping[str, Any],
+        *,
+        operation_id: str,
+        expected_revision: int,
+    ) -> dict[str, Any]:
+        """Create a pending immutable source aggregate at revision one."""
         source_data = dict(source)
+        resource_id = source_data["source_version_id"]
+        request_hash = self._corpus_operation_hash(
+            resource_type="source_version",
+            resource_id=resource_id,
+            operation_type="corpus.source_version.ingest",
+            expected_revision=expected_revision,
+            payload=source_data,
+        )
         now = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
         metadata = {
-            "work_id": source_data["work_id"],
-            "language": source_data["language"],
-            "edition": source_data["edition"],
-            "provenance_url": source_data["provenance_url"],
+            key: source_data[key]
+            for key in ("work_id", "language", "edition", "provenance_url")
         }
         connection = self._ready_connection()
         try:
             connection.execute("BEGIN IMMEDIATE")
-            existing = connection.execute(
-                "SELECT * FROM source_versions WHERE source_version_id=?",
-                (source_data["source_version_id"],),
-            ).fetchone()
-            if existing is not None:
-                comparable = dict(existing)
-                expected = {
-                    "title": source_data["title"],
-                    "source_class": source_data["source_class"],
-                    "rights_note": source_data["rights_note"],
-                    "work_id": source_data["work_id"],
-                    "language": source_data["language"],
-                    "edition": source_data["edition"],
-                    "provenance_url": source_data["provenance_url"],
-                    "manifest_checksum": source_data["manifest_checksum"],
-                }
-                if any(comparable[key] != value for key, value in expected.items()):
-                    raise SourceConflict("source_version_id conflicts with another manifest")
+            replay = self._replay_corpus_operation(connection, operation_id, request_hash)
+            if replay is not None:
                 connection.commit()
-                return comparable
+                return replay
+            if expected_revision != 0:
+                raise OptimisticConflict("new source versions require expected_revision=0")
+            if connection.execute(
+                "SELECT 1 FROM source_versions WHERE source_version_id=?", (resource_id,)
+            ).fetchone() is not None:
+                raise OptimisticConflict("source version already exists")
+            self._begin_corpus_operation(
+                connection,
+                operation_id=operation_id,
+                resource_type="source_version",
+                resource_id=resource_id,
+                operation_type="corpus.source_version.ingest",
+                expected_revision=expected_revision,
+                request_hash=request_hash,
+                now=now,
+            )
             connection.execute(
                 """INSERT INTO source_versions (
                     source_version_id, title, source_class, rights_note, checksum,
                     approval_status, metadata_json, created_at, work_id, language,
-                    edition, provenance_url, manifest_checksum
-                ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?)""",
+                    edition, provenance_url, manifest_checksum, revision, updated_at
+                ) VALUES (?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?, ?, ?, ?, 1, ?)""",
                 (
-                    source_data["source_version_id"],
-                    source_data["title"],
-                    source_data["source_class"],
-                    source_data["rights_note"],
-                    source_data["manifest_checksum"],
-                    canonical_json(metadata),
-                    now,
-                    source_data["work_id"],
-                    source_data["language"],
-                    source_data["edition"],
-                    source_data["provenance_url"],
-                    source_data["manifest_checksum"],
+                    resource_id, source_data["title"], source_data["source_class"],
+                    source_data["rights_note"], source_data["manifest_checksum"],
+                    canonical_json(metadata), now, source_data["work_id"],
+                    source_data["language"], source_data["edition"],
+                    source_data["provenance_url"], source_data["manifest_checksum"], now,
                 ),
             )
+            row = connection.execute(
+                "SELECT * FROM source_versions WHERE source_version_id=?", (resource_id,)
+            ).fetchone()
+            result = {"operation_id": operation_id, **self._source_projection(row)}
+            self._complete_corpus_operation(connection, operation_id, result, now)
             connection.commit()
-            return dict(
-                connection.execute(
-                    "SELECT * FROM source_versions WHERE source_version_id=?",
-                    (source_data["source_version_id"],),
-                ).fetchone()
-            )
+            return result
         except Exception:
             connection.rollback()
             raise
@@ -968,55 +1144,67 @@ class ResearchStore:
             connection.close()
 
     def ingest_source_fragments(
-        self, source_version_id: str, fragments: Iterable[Mapping[str, Any]]
-    ) -> list[dict[str, Any]]:
+        self,
+        source_version_id: str,
+        fragments: Iterable[Mapping[str, Any]],
+        *,
+        operation_id: str,
+        expected_revision: int,
+    ) -> dict[str, Any]:
         from .corpus import normalize_search_text
 
         rows = [dict(fragment) for fragment in fragments]
+        request_payload = {"fragments": rows}
+        request_hash = self._corpus_operation_hash(
+            resource_type="source_version",
+            resource_id=source_version_id,
+            operation_type="corpus.source_fragments.ingest",
+            expected_revision=expected_revision,
+            payload=request_payload,
+        )
+        now = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
         connection = self._ready_connection()
         try:
             connection.execute("BEGIN IMMEDIATE")
+            replay = self._replay_corpus_operation(connection, operation_id, request_hash)
+            if replay is not None:
+                connection.commit()
+                return replay
             source = connection.execute(
-                "SELECT 1 FROM source_versions WHERE source_version_id=?",
+                "SELECT * FROM source_versions WHERE source_version_id=?",
                 (source_version_id,),
             ).fetchone()
             if source is None:
                 raise SourceConflict("source version does not exist")
+            if source["revision"] != expected_revision:
+                raise OptimisticConflict("source version revision is stale")
+            if source["approval_status"] != "pending":
+                raise SourceConflict("reviewed source versions are immutable; create a new version")
+            self._begin_corpus_operation(
+                connection,
+                operation_id=operation_id,
+                resource_type="source_version",
+                resource_id=source_version_id,
+                operation_type="corpus.source_fragments.ingest",
+                expected_revision=expected_revision,
+                request_hash=request_hash,
+                now=now,
+            )
             for fragment in rows:
                 if sha256_text(fragment["text"]) != fragment["checksum"]:
                     raise SourceConflict("fragment checksum does not match exact text")
-                aliases = " ".join(fragment.get("transliteration_aliases", []))
-                existing = connection.execute(
-                    "SELECT * FROM source_fragments WHERE fragment_id=?",
-                    (fragment["fragment_id"],),
-                ).fetchone()
-                if existing is not None:
-                    expected = (
-                        source_version_id,
-                        fragment["ordinal"],
-                        fragment["locator"],
-                        fragment["text"],
-                        fragment["checksum"],
-                        aliases,
-                    )
-                    actual = tuple(
-                        existing[key]
-                        for key in (
-                            "source_version_id", "ordinal", "locator", "text",
-                            "checksum", "aliases_text",
-                        )
-                    )
-                    if actual != expected:
-                        raise SourceConflict("fragment_id conflicts with another fragment")
-                    continue
+                aliases_list = fragment.get("transliteration_aliases", [])
+                aliases = " ".join(aliases_list)
                 connection.execute(
                     """INSERT INTO source_fragments (
                         fragment_id, source_version_id, ordinal, locator, text,
-                        checksum, aliases_text, approval_status
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending')""",
+                        checksum, aliases_text, aliases_json, approval_status,
+                        revision, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', 1, ?, ?)""",
                     (
                         fragment["fragment_id"], source_version_id, fragment["ordinal"],
-                        fragment["locator"], fragment["text"], fragment["checksum"], aliases,
+                        fragment["locator"], fragment["text"], fragment["checksum"],
+                        aliases, canonical_json(aliases_list), now, now,
                     ),
                 )
                 connection.execute(
@@ -1024,17 +1212,36 @@ class ResearchStore:
                         fragment_id, normalized_text, aliases_text
                     ) VALUES (?, ?, ?)""",
                     (
-                        fragment["fragment_id"],
-                        normalize_search_text(fragment["text"]),
+                        fragment["fragment_id"], normalize_search_text(fragment["text"]),
                         normalize_search_text(aliases),
                     ),
                 )
+            next_revision = expected_revision + 1
+            connection.execute(
+                """UPDATE source_versions SET revision=?, updated_at=?
+                   WHERE source_version_id=? AND revision=?""",
+                (next_revision, now, source_version_id, expected_revision),
+            )
+            stored = connection.execute(
+                """SELECT * FROM source_fragments WHERE source_version_id=?
+                   AND fragment_id IN ({}) ORDER BY ordinal, fragment_id""".format(
+                    ",".join("?" for _ in rows)
+                ),
+                (source_version_id, *(item["fragment_id"] for item in rows)),
+            ).fetchall()
+            result = {
+                "operation_id": operation_id,
+                "source_version_id": source_version_id,
+                "revision": next_revision,
+                "fragments": [self._fragment_projection(row) for row in stored],
+            }
+            self._complete_corpus_operation(connection, operation_id, result, now)
             connection.commit()
-            return rows
+            return result
         except sqlite3.IntegrityError as exc:
             connection.rollback()
             raise SourceConflict(
-                "fragment ordinal or locator conflicts within the immutable source version"
+                "fragment ID, ordinal, or locator conflicts with immutable corpus data"
             ) from exc
         except Exception:
             connection.rollback()
@@ -1042,40 +1249,163 @@ class ResearchStore:
         finally:
             connection.close()
 
+    def _persisted_manifest_checksum(
+        self, connection: sqlite3.Connection, source: Mapping[str, Any]
+    ) -> str:
+        from .corpus import canonical_manifest_checksum
+
+        fragment_rows = connection.execute(
+            """SELECT * FROM source_fragments WHERE source_version_id=?
+               ORDER BY ordinal, fragment_id""",
+            (source["source_version_id"],),
+        ).fetchall()
+        fragments = [self._fragment_projection(row) for row in fragment_rows]
+        return canonical_manifest_checksum(dict(source), fragments)
+
     def review_source_version(
-        self, source_version_id: str, review: Mapping[str, str]
+        self,
+        source_version_id: str,
+        review: Mapping[str, str],
+        *,
+        operation_id: str,
+        expected_revision: int,
     ) -> dict[str, Any]:
-        return self._review_record("source_versions", "source_version_id", source_version_id, review)
+        return self._review_record(
+            "source_version", source_version_id, review,
+            operation_id=operation_id, expected_revision=expected_revision,
+        )
 
     def review_source_fragment(
-        self, fragment_id: str, review: Mapping[str, str]
+        self,
+        fragment_id: str,
+        review: Mapping[str, str],
+        *,
+        operation_id: str,
+        expected_revision: int,
     ) -> dict[str, Any]:
-        return self._review_record("source_fragments", "fragment_id", fragment_id, review)
+        return self._review_record(
+            "source_fragment", fragment_id, review,
+            operation_id=operation_id, expected_revision=expected_revision,
+        )
 
     def _review_record(
-        self, table: str, key_name: str, key: str, review: Mapping[str, str]
+        self,
+        resource_type: str,
+        resource_id: str,
+        review: Mapping[str, str],
+        *,
+        operation_id: str,
+        expected_revision: int,
     ) -> dict[str, Any]:
-        if table not in {"source_versions", "source_fragments"}:
-            raise ValueError("unsupported review table")
+        table, key_name = {
+            "source_version": ("source_versions", "source_version_id"),
+            "source_fragment": ("source_fragments", "fragment_id"),
+        }[resource_type]
+        review_payload = dict(review)
+        request_hash = self._corpus_operation_hash(
+            resource_type=resource_type,
+            resource_id=resource_id,
+            operation_type="corpus.review",
+            expected_revision=expected_revision,
+            payload=review_payload,
+        )
         now = dt.datetime.now(dt.UTC).isoformat().replace("+00:00", "Z")
         connection = self._ready_connection()
         try:
             connection.execute("BEGIN IMMEDIATE")
-            changed = connection.execute(
-                f"""UPDATE {table} SET approval_status=?, reviewed_by=?,
-                    review_note=?, reviewed_at=? WHERE {key_name}=?""",
-                (review["status"], review["reviewer"], review["note"], now, key),
-            ).rowcount
-            if changed != 1:
-                raise SourceConflict("review target does not exist")
+            replay = self._replay_corpus_operation(connection, operation_id, request_hash)
+            if replay is not None:
+                connection.commit()
+                return replay
             row = connection.execute(
-                f"SELECT * FROM {table} WHERE {key_name}=?", (key,)
+                f"SELECT * FROM {table} WHERE {key_name}=?", (resource_id,)
             ).fetchone()
+            if row is None:
+                raise SourceConflict("review target does not exist")
+            if row["revision"] != expected_revision:
+                raise OptimisticConflict("review target revision is stale")
+            if row["approval_status"] != "pending":
+                raise SourceConflict("reviewed resources are terminal; create a new version")
+            if resource_type == "source_version" and review["status"] == "approved":
+                actual_checksum = self._persisted_manifest_checksum(connection, row)
+                if actual_checksum != row["manifest_checksum"]:
+                    raise SourceConflict("source manifest checksum does not match persisted fragments")
+            if resource_type == "source_fragment" and review["status"] == "approved":
+                parent = connection.execute(
+                    "SELECT approval_status FROM source_versions WHERE source_version_id=?",
+                    (row["source_version_id"],),
+                ).fetchone()
+                if parent is None or parent["approval_status"] != "approved":
+                    raise SourceConflict("fragment approval requires an approved source version")
+            self._begin_corpus_operation(
+                connection,
+                operation_id=operation_id,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                operation_type="corpus.review",
+                expected_revision=expected_revision,
+                request_hash=request_hash,
+                now=now,
+            )
+            next_revision = expected_revision + 1
+            connection.execute(
+                f"""UPDATE {table} SET approval_status=?, revision=?, reviewed_by=?,
+                    review_note=?, reviewed_at=?, updated_at=?
+                    WHERE {key_name}=? AND revision=?""",
+                (
+                    review["status"], next_revision, review["reviewer"], review["note"],
+                    now, now, resource_id, expected_revision,
+                ),
+            )
+            connection.execute(
+                """INSERT INTO corpus_review_history (
+                    review_id, operation_id, resource_type, resource_id,
+                    from_status, to_status, reviewer, review_note, reviewed_at
+                ) VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, ?)""",
+                (
+                    new_id("cr_"), operation_id, resource_type, resource_id,
+                    review["status"], review["reviewer"], review["note"], now,
+                ),
+            )
+            updated = connection.execute(
+                f"SELECT * FROM {table} WHERE {key_name}=?", (resource_id,)
+            ).fetchone()
+            projection = (
+                self._source_projection(updated)
+                if resource_type == "source_version"
+                else self._fragment_projection(updated)
+            )
+            result = {"operation_id": operation_id, **projection}
+            self._complete_corpus_operation(connection, operation_id, result, now)
             connection.commit()
-            return dict(row)
+            return result
         except Exception:
             connection.rollback()
             raise
+        finally:
+            connection.close()
+
+    def list_corpus_review_history(
+        self, resource_type: str | None = None, resource_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        clauses: list[str] = []
+        parameters: list[str] = []
+        if resource_type is not None:
+            clauses.append("resource_type=?")
+            parameters.append(resource_type)
+        if resource_id is not None:
+            clauses.append("resource_id=?")
+            parameters.append(resource_id)
+        where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
+        connection = self._ready_connection()
+        try:
+            rows = connection.execute(
+                "SELECT * FROM corpus_review_history"
+                + where
+                + " ORDER BY reviewed_at, review_id",
+                parameters,
+            ).fetchall()
+            return [dict(row) for row in rows]
         finally:
             connection.close()
 
@@ -1091,7 +1421,15 @@ class ResearchStore:
             rows = connection.execute(
                 """SELECT f.fragment_id, f.source_version_id, s.work_id, s.title,
                           s.source_class, f.locator, f.text AS quote, f.checksum,
-                          s.rights_note, s.provenance_url
+                          s.rights_note, s.provenance_url,
+                          s.approval_status AS source_approval_status,
+                          s.reviewed_by AS source_reviewed_by,
+                          s.review_note AS source_review_note,
+                          s.reviewed_at AS source_reviewed_at,
+                          f.approval_status AS fragment_approval_status,
+                          f.reviewed_by AS fragment_reviewed_by,
+                          f.review_note AS fragment_review_note,
+                          f.reviewed_at AS fragment_reviewed_at
                    FROM source_fragments_fts x
                    JOIN source_fragments f ON f.fragment_id=x.fragment_id
                    JOIN source_versions s ON s.source_version_id=f.source_version_id
@@ -1137,22 +1475,50 @@ class ResearchStore:
         inserted = 0
         for entry in manifest["sources"]:
             fragments = entry["fragments"]
-            self.ingest_source_version(
+            source_result = self.ingest_source_version(
                 {
                     key: value
                     for key, value in entry.items()
                     if key not in {"fragments", "review"}
-                }
+                },
+                operation_id=stable_operation_id(
+                    f"builtin:{entry['source_version_id']}:source"
+                ),
+                expected_revision=0,
             )
-            self.ingest_source_fragments(entry["source_version_id"], fragments)
+            source_revision = source_result["revision"]
+            if fragments:
+                fragment_result = self.ingest_source_fragments(
+                    entry["source_version_id"],
+                    fragments,
+                    operation_id=stable_operation_id(
+                        f"builtin:{entry['source_version_id']}:fragments"
+                    ),
+                    expected_revision=source_revision,
+                )
+                source_revision = fragment_result["revision"]
             source_review = {
                 "status": entry["review"]["status"],
                 "reviewer": entry["review"]["reviewer"],
                 "note": entry["review"]["note"],
             }
-            self.review_source_version(entry["source_version_id"], source_review)
+            self.review_source_version(
+                entry["source_version_id"],
+                source_review,
+                operation_id=stable_operation_id(
+                    f"builtin:{entry['source_version_id']}:source-review"
+                ),
+                expected_revision=source_revision,
+            )
             for fragment in fragments:
-                self.review_source_fragment(fragment["fragment_id"], source_review)
+                self.review_source_fragment(
+                    fragment["fragment_id"],
+                    source_review,
+                    operation_id=stable_operation_id(
+                        f"builtin:{fragment['fragment_id']}:fragment-review"
+                    ),
+                    expected_revision=1,
+                )
                 inserted += 1
         return inserted
 

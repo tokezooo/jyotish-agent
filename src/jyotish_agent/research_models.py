@@ -198,7 +198,20 @@ SourceClass = Literal[
 ReviewStatus = Literal["pending", "approved", "rejected", "quarantined"]
 
 
-class CorpusSourceIngest(BaseModel):
+class CorpusOperationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    operation_id: str
+    expected_revision: int = Field(ge=0)
+
+    @field_validator("operation_id")
+    @classmethod
+    def valid_operation_id(cls, value: str) -> str:
+        if not _ID_RE.fullmatch(value):
+            raise ValueError("operation_id must be an op_ prefixed UUID4")
+        return value
+
+
+class CorpusSourceIngest(CorpusOperationRequest):
     model_config = ConfigDict(extra="forbid")
     source_version_id: str = Field(pattern=r"^sv_[a-z0-9][a-z0-9_.-]{2,127}$")
     work_id: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{1,99}$")
@@ -221,13 +234,11 @@ class CorpusFragmentIngest(BaseModel):
     checksum: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
-class CorpusFragmentsIngestRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class CorpusFragmentsIngestRequest(CorpusOperationRequest):
     fragments: list[CorpusFragmentIngest] = Field(min_length=1, max_length=500)
 
 
-class CorpusReviewRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class CorpusReviewRequest(CorpusOperationRequest):
     status: Literal["approved", "rejected", "quarantined"]
     reviewer: str = Field(min_length=1, max_length=200)
     note: str = Field(min_length=1, max_length=2_000)
@@ -247,6 +258,14 @@ class RetrievedCorpusFragment(BaseModel):
     checksum: str
     rights_note: str
     provenance_url: str
+    source_approval_status: Literal["approved"]
+    source_reviewed_by: str
+    source_review_note: str
+    source_reviewed_at: str
+    fragment_approval_status: Literal["approved"]
+    fragment_reviewed_by: str
+    fragment_review_note: str
+    fragment_reviewed_at: str
 
 
 class ResearchRetrievalResponse(ResearchOperationResponse):

@@ -15,7 +15,7 @@ from .interpretations import iter_fact_atoms, redirect_message, screen_question
 from .models import BirthProfileRequest, CalculationConfigRequest
 from .pyjhora_facade import compute_chart
 from .research_models import (
-    CorpusFragmentIngest,
+    CorpusFragmentsIngestRequest,
     CorpusReviewRequest,
     CorpusSourceIngest,
     CreateResearchRunRequest,
@@ -201,7 +201,17 @@ class ResearchService:
         profile_input = json.loads(canonical_json(stored_profile))
         profile_input["place"]["timezone"] = run["resolved_offset_minutes"] / 60
         profile_request = BirthProfileRequest.model_validate(profile_input)
-        config_request = CalculationConfigRequest.model_validate(run["calculation_config"])
+        config_payload = json.loads(canonical_json(run["calculation_config"]))
+        if run["status"] == "planned":
+            persisted_plan = self.store.get_question_plan(run_id)
+            if persisted_plan is None:
+                raise InvalidRunTransition("planned run is missing its persisted plan")
+            plan = persisted_plan["plan"]
+            if plan.get("outcome") != "supported":
+                raise InvalidRunTransition("only a supported plan can be calculated")
+            config_payload["charts"] = plan["charts"]
+            config_payload["modules"] = plan["modules"]
+        config_request = CalculationConfigRequest.model_validate(config_payload)
         reference = (
             config_request.reference_date.year,
             config_request.reference_date.month,
@@ -212,7 +222,9 @@ class ResearchService:
             reference_date=reference,
             config=config_request.to_calculation_config(),
         )
-        evidence = self._computed_evidence(run, calculated["facts"])
+        evidence = self._computed_evidence(
+            run, calculated["facts"], calculated["calculation_config"]
+        )
         evidence_ids = [item["evidence_id"] for item in evidence]
         result = {
             "run_id": run_id,
@@ -371,28 +383,46 @@ class ResearchService:
         return ResearchRetrievalResponse(**self._operation_response(event, revision))
 
     def ingest_source(self, source: CorpusSourceIngest) -> dict[str, Any]:
-        return self.store.ingest_source_version(source.model_dump(mode="json"))
+        return self.store.ingest_source_version(
+            source.model_dump(
+                mode="json", exclude={"operation_id", "expected_revision"}
+            ),
+            operation_id=source.operation_id,
+            expected_revision=source.expected_revision,
+        )
 
     def ingest_fragments(
-        self, source_version_id: str, fragments: list[CorpusFragmentIngest]
-    ) -> list[dict[str, Any]]:
+        self, source_version_id: str, request: CorpusFragmentsIngestRequest
+    ) -> dict[str, Any]:
         return self.store.ingest_source_fragments(
             source_version_id,
-            [fragment.model_dump(mode="json") for fragment in fragments],
+            [fragment.model_dump(mode="json") for fragment in request.fragments],
+            operation_id=request.operation_id,
+            expected_revision=request.expected_revision,
         )
 
     def review_source(
         self, source_version_id: str, review: CorpusReviewRequest
     ) -> dict[str, Any]:
         return self.store.review_source_version(
-            source_version_id, review.model_dump(mode="json")
+            source_version_id,
+            review.model_dump(
+                mode="json", exclude={"operation_id", "expected_revision"}
+            ),
+            operation_id=review.operation_id,
+            expected_revision=review.expected_revision,
         )
 
     def review_fragment(
         self, fragment_id: str, review: CorpusReviewRequest
     ) -> dict[str, Any]:
         return self.store.review_source_fragment(
-            fragment_id, review.model_dump(mode="json")
+            fragment_id,
+            review.model_dump(
+                mode="json", exclude={"operation_id", "expected_revision"}
+            ),
+            operation_id=review.operation_id,
+            expected_revision=review.expected_revision,
         )
 
     def search_corpus(self, query: str, *, limit: int) -> list[RetrievedCorpusFragment]:
@@ -551,9 +581,11 @@ class ResearchService:
         }
 
     @staticmethod
-    def _computed_evidence(run: dict[str, Any], facts: dict) -> list[dict[str, Any]]:
+    def _computed_evidence(
+        run: dict[str, Any], facts: dict, calculation_config: dict[str, Any]
+    ) -> list[dict[str, Any]]:
         profile_hash = sha256_text(canonical_json(run["birth_profile"]))
-        config_hash = sha256_text(canonical_json(run["calculation_config"]))
+        config_hash = sha256_text(canonical_json(calculation_config))
         engine_hash = sha256_text(
             canonical_json({"name": run["engine_name"], "version": run["engine_version"]})
         )

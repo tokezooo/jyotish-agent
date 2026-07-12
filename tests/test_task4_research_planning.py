@@ -12,7 +12,7 @@ from jyotish_agent.api import app
 from jyotish_agent.planner import build_question_plan, question_plan_bytes
 from jyotish_agent.research_models import QuestionIntent
 from jyotish_agent.research_service import ResearchService
-from jyotish_agent.research_store import ResearchStore
+from jyotish_agent.research_store import ResearchStore, canonical_json
 
 
 def _op() -> str:
@@ -127,6 +127,60 @@ def test_plan_endpoint_persists_classifier_and_plan_separately(tmp_path: Path):
     assert plan_row["plan_hash"] == hashlib.sha256(
         question_plan_bytes(build_question_plan(QuestionIntent(family="career_factors_and_timing")))
     ).hexdigest()
+
+
+def test_planned_calculation_executes_exact_plan_not_creation_modules(tmp_path: Path):
+    client = _client(tmp_path)
+    body = _create_body()
+    body["calculation_config"] = {
+        "reference_date": "2026-07-12",
+        "charts": ["D1"],
+        "modules": ["yogas_engine", "varshaphal"],
+    }
+    run = client.post("/v2/research-runs", json=body).json()
+    screened = client.post(
+        f"/v2/research-runs/{run['run_id']}/screen",
+        json={"operation_id": _op(), "expected_revision": run["revision"]},
+    ).json()
+    planned = client.post(
+        f"/v2/research-runs/{run['run_id']}/plan",
+        json={
+            "operation_id": _op(),
+            "expected_revision": screened["revision"],
+            "intent": {
+                "family": "career_factors_and_timing",
+                "explicit_annual_scope": False,
+            },
+            "classifier": {
+                "classifier_model": "fixture",
+                "classifier_version": "1",
+                "prompt_hash": hashlib.sha256(b"fixture").hexdigest(),
+            },
+        },
+    ).json()
+    response = client.post(
+        f"/v2/research-runs/{run['run_id']}/calculate",
+        json={"operation_id": _op(), "expected_revision": planned["revision"]},
+    )
+    assert response.status_code == 200, response.text
+    calculated = response.json()
+    assert calculated["calculation_config"]["charts"] == ["D1", "D9", "D10"]
+    assert calculated["calculation_config"]["modules"] == [
+        "ashtakavarga",
+        "shadbala",
+        "transits",
+    ]
+    assert {"d1", "d9", "d10", "shadbala", "transits", "ashtakavarga"} <= set(
+        calculated["facts"]
+    )
+    assert "yogas_engine" not in calculated["facts"]
+    assert "varshaphal" not in calculated["facts"]
+    executed_hash = hashlib.sha256(
+        canonical_json(calculated["calculation_config"]).encode()
+    ).hexdigest()
+    evidence = app.state.research_service.store.list_evidence(run["run_id"])
+    assert evidence
+    assert {item["payload"]["config_hash"] for item in evidence} == {executed_hash}
 
 
 def test_cli_run_inspect_has_human_and_json_output(tmp_path: Path, monkeypatch, capsys):
