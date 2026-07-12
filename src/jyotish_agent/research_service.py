@@ -182,6 +182,26 @@ class ResearchService:
             raise ReplayError("UNSUPPORTED_PINNED_VERSION")
         if plan["planner_version"] != current["planner_version"]:
             raise ReplayError("PINNED_VERSION_MISMATCH")
+        events = self.store.list_events(run_id)
+        planned_events = [
+            json.loads(event["payload_json"])
+            for event in events if event["event_type"] == "research_run.planned"
+        ]
+        if len(planned_events) != 1:
+            raise ReplayError("PINNED_PLANNING_MISMATCH")
+        planned_result = planned_events[0].get("result", {})
+        classifier = planned_result.get("classifier", {})
+        if (
+            planned_result.get("intent") != intent["intent"]
+            or planned_result.get("plan") != plan["plan"]
+            or planned_result.get("plan_hash") != plan["plan_hash"]
+            or classifier.get("classifier_model") != intent["classifier_model"]
+            or classifier.get("classifier_version") != intent["classifier_version"]
+            or classifier.get("prompt_hash") != intent["classifier_prompt_hash"]
+        ):
+            raise ReplayError("PINNED_PLANNING_MISMATCH")
+        if sha256_text(canonical_json(planned_result.get("plan"))) != planned_result.get("plan_hash"):
+            raise ReplayError("PINNED_PLANNING_MISMATCH")
         if sha256_text(canonical_json(plan["plan"])) != plan["plan_hash"]:
             raise ReplayError("PINNED_PAYLOAD_HASH_MISMATCH")
         if sha256_text(canonical_json(intent["intent"])) != intent["intent_hash"]:
@@ -196,7 +216,7 @@ class ResearchService:
         expected_evidence: set[str] = set()
         expected_answers: set[str] = set()
         expected_attempts: set[str] = set()
-        for event in self.store.list_events(run_id):
+        for event in events:
             payload = json.loads(event["payload_json"])
             result = payload.get("result", {})
             if event["event_type"] == "research_run.calculated":

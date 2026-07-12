@@ -17,6 +17,22 @@ class RenderedAnswer:
     sha256: str
 
 
+_D1_PLACEMENT_HOUSE = re.compile(r"^d1\.[^.]+\.house$")
+_HOUSE_VARGA_PREFIXES = (
+    "ascendant.", "houses.",
+    "d9.", "d10.",
+    "bhava.d1.", "bhava.d9.", "bhava.d10.",
+    "lagnas.d1.", "lagnas.d9.", "lagnas.d10.",
+)
+
+
+def is_house_varga_sensitive_fact_path(path: str) -> bool:
+    """Return whether an evidence path depends materially on precise birth time."""
+    return path.startswith(_HOUSE_VARGA_PREFIXES) or bool(
+        _D1_PLACEMENT_HOUSE.fullmatch(path)
+    )
+
+
 def validate_answer_contract(
     answer: AnswerContractV2, evidence_items: list[dict[str, Any]],
     *, birth_time_confidence: str = "exact",
@@ -91,9 +107,7 @@ def validate_answer_contract(
             if "BIRTH_TIME_SENSITIVITY_UNSTABLE" not in claim.caveats or claim.confidence > 0.5:
                 violations.append("central synthesis using unstable evidence requires caveat and confidence <= 0.5")
         if birth_time_confidence == "unknown" and claim.materiality == "major" and any(
-            path.startswith(("d9.", "d10.", "houses.", "ascendant.",
-                             "bhava.d9.", "bhava.d10.",
-                             "lagnas.d9.", "lagnas.d10.")) for path in paths
+            is_house_varga_sensitive_fact_path(path) for path in paths
         ):
             violations.append("unknown birth time cannot support strong house/varga-sensitive conclusions")
 

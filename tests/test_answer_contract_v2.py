@@ -12,6 +12,7 @@ from fastapi.testclient import TestClient
 
 from jyotish_agent.answer_contract import (
     adapt_v1_answer,
+    is_house_varga_sensitive_fact_path,
     render_answer_markdown,
     validate_answer_contract,
 )
@@ -361,6 +362,63 @@ def test_replay_distinguishes_unsupported_contract_and_version_mismatch(tmp_path
     assert response.json()["error_code"] == "PINNED_VERSION_MISMATCH"
 
 
+@pytest.mark.parametrize("target", ["intent", "plan"])
+def test_replay_rejects_coordinated_planning_projection_and_self_hash_tamper(
+    tmp_path: Path, monkeypatch, target
+):
+    client, store, calculated = _client(tmp_path, monkeypatch)
+    client.post(
+        f"/v2/research-runs/{calculated['run_id']}/answers",
+        json={"operation_id": _id("op_"), "expected_revision": calculated["revision"],
+              "answer": _answer(calculated["evidence_ids"][0])},
+    )
+    with sqlite3.connect(store.database_path) as connection:
+        if target == "intent":
+            value = {"family": "unknown", "explicit_annual_scope": False}
+            encoded = canonical_json(value)
+            connection.execute(
+                """UPDATE question_intents
+                   SET intent_json=?, intent_hash=?, classifier_model='tampered',
+                       classifier_version='tampered', classifier_prompt_hash=?
+                   WHERE run_id=?""",
+                (encoded, sha256_text(encoded), "f" * 64, calculated["run_id"]),
+            )
+        else:
+            row = store.get_question_plan(calculated["run_id"])
+            value = {**row["plan"], "fact_paths": ["tampered."]}
+            encoded = canonical_json(value)
+            connection.execute(
+                "UPDATE question_plans SET plan_json=?, plan_hash=? WHERE run_id=?",
+                (encoded, sha256_text(encoded), calculated["run_id"]),
+            )
+    response = client.post(f"/v2/research-runs/{calculated['run_id']}/replay")
+    assert response.status_code == 409
+    assert response.json()["error_code"] == "PINNED_PLANNING_MISMATCH"
+
+
+def test_replay_requires_exactly_one_hash_chained_planned_event(tmp_path: Path, monkeypatch):
+    client, store, calculated = _client(tmp_path, monkeypatch)
+    submitted = client.post(
+        f"/v2/research-runs/{calculated['run_id']}/answers",
+        json={"operation_id": _id("op_"), "expected_revision": calculated["revision"],
+              "answer": _answer(calculated["evidence_ids"][0])},
+    ).json()
+    planned_payload = next(
+        json.loads(row["payload_json"])
+        for row in store.list_events(calculated["run_id"])
+        if row["event_type"] == "research_run.planned"
+    )
+    store.append_event(
+        calculated["run_id"], operation_id=_id("op_"),
+        expected_revision=submitted["revision"], event_type="research_run.planned",
+        payload={**planned_payload, "status": "validated"}, next_status="validated",
+        producer="pytest", producer_version="1",
+    )
+    response = client.post(f"/v2/research-runs/{calculated['run_id']}/replay")
+    assert response.status_code == 409
+    assert response.json()["error_code"] == "PINNED_PLANNING_MISMATCH"
+
+
 def test_approximate_birth_time_records_exact_seven_point_sweep(tmp_path: Path, monkeypatch):
     _client_api, store, calculated = _client(tmp_path, monkeypatch, confidence="approximate")
     assert calculated["sensitivity"]
@@ -417,6 +475,7 @@ def test_answer_policy_allows_nonprobabilistic_uncertainty_language(phrase):
 
 
 @pytest.mark.parametrize("path", [
+    "d1.Sun.house", "bhava.d1.10.lord", "lagnas.d1.sign",
     "bhava.d9.10.lord", "bhava.d10.10.sign", "lagnas.d9.sign", "lagnas.d10.sign",
 ])
 def test_unknown_time_blocks_all_actual_house_and_varga_path_families(path):
@@ -426,6 +485,21 @@ def test_unknown_time_blocks_all_actual_house_and_varga_path_families(path):
                  "payload": {"path": path, "value": "Aries"}}]
     violations = validate_answer_contract(answer, evidence, birth_time_confidence="unknown")
     assert any("house/varga" in item for item in violations)
+
+
+def test_sensitive_fact_path_predicate_is_centralized_and_does_not_overblock_d1_signs():
+    assert is_house_varga_sensitive_fact_path("d1.Sun.house")
+    assert is_house_varga_sensitive_fact_path("bhava.d1.10.lord")
+    assert is_house_varga_sensitive_fact_path("lagnas.d1.sign")
+    assert not is_house_varga_sensitive_fact_path("d1.Sun.sign")
+
+    evidence_id = _id("evi_")
+    answer = AnswerContractV2.model_validate(_answer(evidence_id))
+    evidence = [{"evidence_id": evidence_id, "evidence_type": "computed_fact",
+                 "payload": {"path": "d1.Sun.sign", "value": "Aries"}}]
+    assert validate_answer_contract(
+        answer, evidence, birth_time_confidence="unknown"
+    ) == []
 
 
 def test_one_repair_budget_is_persisted_and_exhausted(tmp_path: Path, monkeypatch):
