@@ -139,11 +139,6 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(RequestValidationError)
     async def _validation_handler(request: Request, exc: RequestValidationError):
         run_id, stage = request_run_context(request)
-        if run_id is not None:
-            return registry_problem_response(
-                "INPUT_INVALID", status=422, run_id=run_id, stage=stage,
-                title="Invalid run operation payload",
-            )
         body = exc.body if isinstance(exc.body, dict) else {}
         answer = body.get("answer") if isinstance(body, dict) else None
         schema_version = answer.get("schema_version") if isinstance(answer, dict) else None
@@ -153,14 +148,17 @@ def register_error_handlers(app: FastAPI) -> None:
             and isinstance(schema_version, str)
             and schema_version.split(".", 1)[0] != "2"
         ):
-            return problem_response(
+            return registry_problem_response(
+                "UNSUPPORTED_SCHEMA_VERSION",
                 status=422,
+                run_id=run_id,
+                stage=stage,
                 title="Unsupported answer schema version",
-                problem="The requested AnswerContract major version is unsupported.",
-                cause="This endpoint accepts AnswerContract major version 2 only.",
-                fix="Submit schema_version '2.0'.",
-                problem_type="unsupported-schema-version",
-                extra={"error_code": "UNSUPPORTED_SCHEMA_VERSION"},
+            )
+        if run_id is not None:
+            return registry_problem_response(
+                "INPUT_INVALID", status=422, run_id=run_id, stage=stage,
+                title="Invalid run operation payload",
             )
         # Report field locations and rule messages, NOT the submitted values.
         fields = sorted({_loc(e) for e in exc.errors()})

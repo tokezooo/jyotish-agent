@@ -30,6 +30,12 @@ ERROR_REGISTRY: dict[str, dict[str, Any]] = {
         "cause": "One or more required operation fields failed schema validation.",
         "fix": "Correct the payload for this run stage and resubmit it.",
     },
+    "UNSUPPORTED_SCHEMA_VERSION": {
+        "retryable": False,
+        "problem": "The requested AnswerContract major version is unsupported.",
+        "cause": "This endpoint accepts AnswerContract major version 2 only.",
+        "fix": "Submit schema_version '2.0'.",
+    },
     "SQLITE_BUSY": {
         "retryable": True,
         "problem": "The research ledger is temporarily busy.",
