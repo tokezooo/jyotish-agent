@@ -7,7 +7,7 @@ import re
 import uuid
 from typing import Annotated, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .models import BirthTimeConfidence, CalculationConfigRequest
 
@@ -30,6 +30,7 @@ class IanaTimezone(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["iana"]
     zone_id: str = Field(min_length=1, max_length=100)
+    fold: Literal[0, 1] | None = None
 
 
 class IanaWithAssertedOffset(BaseModel):
@@ -37,6 +38,7 @@ class IanaWithAssertedOffset(BaseModel):
     kind: Literal["iana_with_asserted_offset"]
     zone_id: str = Field(min_length=1, max_length=100)
     asserted_offset_hours: float = Field(ge=-12, le=14, allow_inf_nan=False)
+    fold: Literal[0, 1] | None = None
 
 
 TimezoneSpec = Annotated[
@@ -60,6 +62,24 @@ class ResearchBirthProfileRequest(BaseModel):
     time: dt.time
     place: ResearchPlace
     birth_time_confidence: BirthTimeConfidence = BirthTimeConfidence.exact
+    birth_time_range: tuple[dt.time, dt.time] | None = None
+
+    @model_validator(mode="after")
+    def unknown_time_requires_bounded_range(self):
+        if self.birth_time_confidence == BirthTimeConfidence.unknown:
+            if self.birth_time_range is None:
+                raise ValueError("unknown birth time requires an explicit bounded birth_time_range")
+            start, end = self.birth_time_range
+            if start.tzinfo or end.tzinfo or start >= end:
+                raise ValueError("birth_time_range must be an ordered same-day civil range")
+            if not start <= self.time <= end:
+                raise ValueError("birth time must fall within birth_time_range")
+            span = (dt.datetime.combine(self.date, end) - dt.datetime.combine(self.date, start))
+            if span > dt.timedelta(hours=6):
+                raise ValueError("birth_time_range must not exceed six hours")
+        elif self.birth_time_range is not None:
+            raise ValueError("birth_time_range is valid only when birth_time_confidence is unknown")
+        return self
 
     @field_validator("date")
     @classmethod
@@ -173,6 +193,7 @@ class QuestionPlan(BaseModel):
     modules: tuple[
         Literal["shadbala", "transits", "ashtakavarga", "varshaphal"], ...
     ]
+    fact_paths: tuple[str, ...] = ()
 
 
 class PlanResearchRunRequest(ResearchOperationRequest):
@@ -327,8 +348,12 @@ class TimezoneResolution(BaseModel):
     model_config = ConfigDict(extra="forbid")
     original_civil_datetime: str
     mode: Literal["fixed_offset_legacy", "iana", "iana_with_asserted_offset"]
+    zone_id: str | None
+    tzdb_fingerprint: str
     resolved_offset_minutes: int
     utc_instant: str
+    fold: Literal[0, 1]
+    warnings: list[str]
 
 
 class ResearchRunResponse(BaseModel):
@@ -388,6 +413,7 @@ class ResearchCalculationResponse(ResearchOperationResponse):
     provenance: dict
     warnings: list[str]
     evidence_ids: list[str]
+    sensitivity: list[dict] = Field(default_factory=list)
 
 
 class ClaimBase(BaseModel):
@@ -454,3 +480,15 @@ class ResearchAnswerResponse(ResearchOperationResponse):
     answer_id: str | None = None
     markdown: str | None = None
     markdown_sha256: str | None = None
+
+
+class ResearchReplayResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_id: str
+    status: Literal["replayed"]
+    offline: Literal[True] = True
+    projection_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    claims_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    memo_hash: str = Field(pattern=r"^[0-9a-f]{64}$")
+    answer_id: str
+    source_disagreements: list[dict]

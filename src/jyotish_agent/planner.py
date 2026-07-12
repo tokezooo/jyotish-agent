@@ -18,6 +18,10 @@ def build_question_plan(intent: QuestionIntent) -> QuestionPlan:
             explicit_annual_scope=intent.explicit_annual_scope,
             charts=("D1", "D9", "D10"),
             modules=modules,
+            fact_paths=("ascendant.", "houses.", "bhava.d9.", "bhava.d10.",
+                        "lagnas.d9.", "lagnas.d10.", "d1.", "d9.", "d10.",
+                        "shadbala.", "transits.", "ashtakavarga.") +
+                       (("varshaphal.",) if intent.explicit_annual_scope else ()),
         )
     if intent.family in {"unknown", "composite"}:
         return QuestionPlan(
@@ -26,6 +30,7 @@ def build_question_plan(intent: QuestionIntent) -> QuestionPlan:
             explicit_annual_scope=False,
             charts=(),
             modules=(),
+            fact_paths=(),
         )
     return QuestionPlan(
         outcome="unsupported",
@@ -33,6 +38,7 @@ def build_question_plan(intent: QuestionIntent) -> QuestionPlan:
         explicit_annual_scope=False,
         charts=(),
         modules=(),
+        fact_paths=(),
     )
 
 

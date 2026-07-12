@@ -20,7 +20,8 @@ from urllib.parse import urlparse
 from pydantic import ValidationError
 
 from .research_models import ResearchBirthProfileRequest
-from .research_store import ResearchStore, canonical_json, default_data_root
+from .research_store import ResearchStore, RunNotFound, canonical_json, default_data_root
+from .research_service import ReplayError, ResearchService
 
 DEFAULT_API_URL = "http://127.0.0.1:8000"
 REQUIRED_V2_BLOCKER = (
@@ -332,6 +333,25 @@ def _inspect_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _replay_run(args: argparse.Namespace) -> int:
+    try:
+        replay = ResearchService(ResearchStore(default_data_root())).replay_run(args.run_id)
+    except RunNotFound as exc:
+        raise CliError(f"research run not found: {args.run_id}", 2) from exc
+    except ReplayError as exc:
+        raise CliError(f"offline replay failed: {exc.error_code}", 4) from exc
+    body = replay.model_dump(mode="json")
+    if args.json:
+        print(json.dumps(body, ensure_ascii=False, sort_keys=True))
+    else:
+        print(f"run_id: {body['run_id']}")
+        print("status: replayed (offline)")
+        print(f"projection_hash: {body['projection_hash']}")
+        print(f"claims_hash: {body['claims_hash']}")
+        print(f"memo_hash: {body['memo_hash']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="jyotish")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -350,6 +370,10 @@ def build_parser() -> argparse.ArgumentParser:
     inspect.add_argument("run_id")
     inspect.add_argument("--json", action="store_true", help="emit canonical JSON")
     inspect.set_defaults(handler=_inspect_run)
+    replay = run_subparsers.add_parser("replay", help="offline replay from pinned ledger")
+    replay.add_argument("run_id")
+    replay.add_argument("--json", action="store_true", help="emit canonical JSON")
+    replay.set_defaults(handler=_replay_run)
     return parser
 
 

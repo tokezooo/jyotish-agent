@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sqlite3
 import uuid
 from pathlib import Path
@@ -14,6 +15,7 @@ from jyotish_agent.answer_contract import (
     validate_answer_contract,
 )
 from jyotish_agent.api import app
+from jyotish_agent import cli
 from jyotish_agent.models import AnswerContract, FactRef
 from jyotish_agent.research_models import AnswerContractV2
 from jyotish_agent.research_service import ResearchService
@@ -24,7 +26,7 @@ def _id(prefix: str) -> str:
     return f"{prefix}{uuid.uuid4()}"
 
 
-def _run_body() -> dict:
+def _run_body(*, confidence: str = "exact") -> dict:
     return {
         "run_id": _id("rr_"),
         "operation_id": _id("op_"),
@@ -34,6 +36,7 @@ def _run_body() -> dict:
             "name": "Authored Fixture",
             "date": "1990-01-01",
             "time": "12:30:00",
+            "birth_time_confidence": confidence,
             "place": {
                 "name": "Chennai",
                 "latitude": 13.0827,
@@ -49,11 +52,11 @@ def _run_body() -> dict:
     }
 
 
-def _client(tmp_path: Path, monkeypatch) -> tuple[TestClient, ResearchStore, dict]:
+def _client(tmp_path: Path, monkeypatch, *, confidence: str = "exact") -> tuple[TestClient, ResearchStore, dict]:
     store = ResearchStore(tmp_path / "data")
     app.state.research_service = ResearchService(store)
     client = TestClient(app)
-    created = client.post("/v2/research-runs", json=_run_body()).json()
+    created = client.post("/v2/research-runs", json=_run_body(confidence=confidence)).json()
     screened = client.post(
         f"/v2/research-runs/{created['run_id']}/screen",
         json={"operation_id": _id("op_"), "expected_revision": 1},
@@ -231,6 +234,53 @@ def test_submit_answer_persists_immutable_canonical_artifact(tmp_path: Path, mon
                 "DELETE FROM claim_supports WHERE claim_id=?",
                 (body["answer"]["claims"][0]["claim_id"],),
             )
+
+
+def test_offline_replay_reproduces_projection_claims_and_memo(tmp_path: Path, monkeypatch, capsys):
+    client, store, calculated = _client(tmp_path, monkeypatch)
+    submitted = client.post(
+        f"/v2/research-runs/{calculated['run_id']}/answers",
+        json={"operation_id": _id("op_"), "expected_revision": calculated["revision"],
+              "answer": _answer(calculated["evidence_ids"][0])},
+    ).json()
+    monkeypatch.setattr("jyotish_agent.research_service.compute_chart",
+                        lambda *a, **k: pytest.fail("replay invoked calculation"))
+    response = client.post(f"/v2/research-runs/{calculated['run_id']}/replay")
+    assert response.status_code == 200, response.text
+    replay = response.json()
+    assert replay["offline"] is True
+    assert replay["memo_hash"] == submitted["markdown_sha256"]
+    assert len(replay["projection_hash"]) == len(replay["claims_hash"]) == 64
+    monkeypatch.setenv("JYOTISH_AGENT_DATA_ROOT", str(tmp_path / "data"))
+    assert cli.main(["run", "replay", calculated["run_id"], "--json"]) == 0
+    cli_replay = json.loads(capsys.readouterr().out)
+    assert cli_replay == replay
+
+
+def test_approximate_birth_time_records_exact_seven_point_sweep(tmp_path: Path, monkeypatch):
+    _client_api, store, calculated = _client(tmp_path, monkeypatch, confidence="approximate")
+    assert calculated["sensitivity"]
+    assert {tuple(item["offsets_minutes"]) for item in calculated["sensitivity"]} == {
+        (-15, -10, -5, 0, 5, 10, 15)
+    }
+    assert {item["stability"] for item in calculated["sensitivity"]} == {"stable"}
+    evidence = store.list_evidence(calculated["run_id"])
+    assert any(item["evidence_type"] == "sensitivity_fact" for item in evidence)
+
+
+def test_offline_replay_detects_projection_divergence(tmp_path: Path, monkeypatch):
+    client, store, calculated = _client(tmp_path, monkeypatch)
+    client.post(
+        f"/v2/research-runs/{calculated['run_id']}/answers",
+        json={"operation_id": _id("op_"), "expected_revision": calculated["revision"],
+              "answer": _answer(calculated["evidence_ids"][0])},
+    )
+    with sqlite3.connect(store.database_path) as connection:
+        connection.execute("UPDATE research_runs SET question='diverged' WHERE run_id=?",
+                           (calculated["run_id"],))
+    response = client.post(f"/v2/research-runs/{calculated['run_id']}/replay")
+    assert response.status_code == 409
+    assert response.json()["error_code"] == "PROJECTION_HASH_MISMATCH"
 
 
 def test_one_repair_budget_is_persisted_and_exhausted(tmp_path: Path, monkeypatch):

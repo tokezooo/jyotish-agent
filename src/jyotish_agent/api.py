@@ -47,12 +47,14 @@ from .research_models import (
     ResearchOperationRequest,
     ResearchPlanResponse,
     ResearchRetrievalResponse,
+    ResearchReplayResponse,
     ResearchRunResponse,
     ResearchScreenResponse,
     SubmitAnswerRequest,
     RetrieveResearchRunRequest,
 )
-from .research_service import InvalidRunTransition, ResearchService, UnsupportedTimezoneMode
+from .research_service import InvalidRunTransition, ReplayError, ResearchService, UnsupportedTimezoneMode
+from .timezone_resolution import TimezoneResolutionError
 from .research_store import (
     OptimisticConflict,
     ResearchStore,
@@ -141,6 +143,16 @@ async def create_research_run(
             "This version cannot resolve the requested timezone mode.",
             "Use fixed_offset_legacy (or a numeric UTC offset) for Task 1.",
         )
+    except TimezoneResolutionError as exc:
+        response = _research_problem(
+            422, "Timezone resolution failed", exc.error_code,
+            "Correct the civil time, fold, zone ID, or asserted offset and retry.",
+        )
+        body = bytes(response.body)
+        import json as _json
+        content = _json.loads(body)
+        content["error_code"] = exc.error_code
+        return JSONResponse(status_code=422, media_type="application/problem+json", content=content)
 
 
 @app.get("/v2/research-runs/{run_id}", response_model=ResearchRunResponse)
@@ -171,6 +183,23 @@ async def get_research_events(
             "No persisted research run has that ID.",
             "Check the rr_ run ID and retry.",
         )
+
+
+@app.post("/v2/research-runs/{run_id}/replay", response_model=ResearchReplayResponse)
+async def replay_research_run(run_id: str, request: Request):
+    try:
+        return _research_service(request).replay_run(run_id)
+    except RunNotFound:
+        return _research_problem(404, "Research run not found",
+                                 "No persisted research run has that ID.",
+                                 "Check the rr_ run ID and retry.")
+    except ReplayError as exc:
+        problem = _research_problem(409, "Offline replay failed", exc.error_code,
+                                    "Restore the pinned ledger material/version and retry.")
+        import json as _json
+        content = _json.loads(problem.body)
+        content["error_code"] = exc.error_code
+        return JSONResponse(status_code=409, media_type="application/problem+json", content=content)
 
 
 @app.post(

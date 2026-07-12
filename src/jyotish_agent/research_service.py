@@ -16,10 +16,13 @@ from .models import BirthProfileRequest, CalculationConfigRequest
 from .pyjhora_facade import compute_chart
 from .research_models import (
     CorpusFragmentsIngestRequest,
+    AnswerContractV2,
     CorpusReviewRequest,
     CorpusSourceIngest,
     CreateResearchRunRequest,
     FixedOffsetLegacy,
+    IanaTimezone,
+    IanaWithAssertedOffset,
     PlanResearchRunRequest,
     ResearchPlanResponse,
     ResearchRetrievalResponse,
@@ -30,12 +33,14 @@ from .research_models import (
     ResearchEventsResponse,
     ResearchOperationRequest,
     ResearchRunResponse,
+    ResearchReplayResponse,
     ResearchScreenResponse,
     SubmitAnswerRequest,
     TimezoneResolution,
 )
 from .research_store import ResearchStore, RunNotFound, canonical_json, new_id, sha256_text
 from .validation import profile_warnings
+from .timezone_resolution import resolve_fixed, resolve_iana
 
 
 class UnsupportedTimezoneMode(ValueError):
@@ -44,6 +49,12 @@ class UnsupportedTimezoneMode(ValueError):
 
 class InvalidRunTransition(ValueError):
     pass
+
+
+class ReplayError(ValueError):
+    def __init__(self, error_code: str):
+        self.error_code = error_code
+        super().__init__(error_code)
 
 
 def _utc_now() -> dt.datetime:
@@ -64,29 +75,29 @@ class ResearchService:
         now_datetime = self.clock().astimezone(dt.UTC)
         profile = request.birth_profile
         timezone = profile.place.timezone
-        if isinstance(timezone, (int, float)):
-            offset_hours = float(timezone)
-        elif isinstance(timezone, FixedOffsetLegacy):
-            offset_hours = timezone.offset_hours
-        else:
-            raise UnsupportedTimezoneMode(
-                "Task 1 executes fixed_offset_legacy timezone resolution only"
-            )
-        offset_minutes_float = offset_hours * 60
-        offset_minutes = round(offset_minutes_float)
-        if abs(offset_minutes_float - offset_minutes) > 1e-9:
-            raise UnsupportedTimezoneMode("fixed offset must resolve to whole minutes")
-
         civil = dt.datetime.combine(profile.date, profile.time)
-        utc = (civil - dt.timedelta(minutes=offset_minutes)).replace(tzinfo=dt.UTC)
+        if isinstance(timezone, (int, float, FixedOffsetLegacy)):
+            offset_hours = (timezone.offset_hours if isinstance(timezone, FixedOffsetLegacy)
+                            else float(timezone))
+            resolved = resolve_fixed(civil, offset_hours=offset_hours,
+                                     longitude=profile.place.longitude)
+        elif isinstance(timezone, (IanaTimezone, IanaWithAssertedOffset)):
+            resolved = resolve_iana(
+                civil, mode=timezone.kind, zone_id=timezone.zone_id,
+                fold=timezone.fold,
+                asserted_offset_hours=(timezone.asserted_offset_hours
+                    if isinstance(timezone, IanaWithAssertedOffset) else None),
+                longitude=profile.place.longitude,
+            )
+        else:
+            raise UnsupportedTimezoneMode("unsupported timezone")
         civil_text = civil.isoformat()
-        utc_text = utc.isoformat().replace("+00:00", "Z")
+        utc_text = resolved.utc_instant.isoformat().replace("+00:00", "Z")
         reference_date = request.calculation_config.reference_date or now_datetime.date()
         normalized_profile = profile.model_dump(mode="json")
-        normalized_profile["place"]["timezone"] = {
-            "kind": "fixed_offset_legacy",
-            "offset_hours": offset_hours,
-        }
+        if isinstance(timezone, (int, float)):
+            normalized_profile["place"]["timezone"] = {
+                "kind": "fixed_offset_legacy", "offset_hours": offset_hours}
         normalized_request = request.model_dump(
             mode="json",
             exclude={"operation_id", "expected_revision"},
@@ -105,8 +116,12 @@ class ResearchService:
             "calculation_config": normalized_request["calculation_config"],
             "reference_date": reference_date.isoformat(),
             "civil_datetime": civil_text,
-            "timezone_resolution_mode": "fixed_offset_legacy",
-            "resolved_offset_minutes": offset_minutes,
+            "timezone_resolution_mode": resolved.mode,
+            "timezone_zone_id": resolved.zone_id,
+            "timezone_fingerprint": resolved.tzdb_fingerprint,
+            "timezone_fold": resolved.fold,
+            "timezone_warnings": list(resolved.warnings),
+            "resolved_offset_minutes": resolved.offset_minutes,
             "utc_instant": utc_text,
             "engine_name": ENGINE,
             "engine_version": ENGINE_VERSION,
@@ -140,6 +155,50 @@ class ResearchService:
             event["payload"] = json.loads(row["payload_json"])
             events.append(event)
         return ResearchEventsResponse(events=events)
+
+    def replay_run(self, run_id: str) -> ResearchReplayResponse:
+        """Reconstruct hashes using only immutable/pinned local ledger material."""
+        current = self._require_run(run_id)
+        rebuilt = self.store.rebuild_run(run_id)
+        if canonical_json(current) != canonical_json(rebuilt):
+            raise ReplayError("PROJECTION_HASH_MISMATCH")
+        if not all(current.get(key) for key in (
+            "engine_version", "model_version", "planner_version", "corpus_version",
+            "contract_version", "timezone_fingerprint"
+        )):
+            raise ReplayError("MISSING_PINNED_VERSION")
+        plan = self.store.get_question_plan(run_id)
+        answers = self.store.list_answers(run_id)
+        if plan is None or not answers:
+            raise ReplayError("MISSING_PINNED_MATERIAL")
+        answer_row = answers[-1]
+        try:
+            answer = AnswerContractV2.model_validate(answer_row["payload"]["contract"])
+        except Exception:
+            raise ReplayError("UNSUPPORTED_PINNED_VERSION") from None
+        evidence = self.store.list_evidence(run_id)
+        violations = validate_answer_contract(
+            answer, evidence,
+            birth_time_confidence=current["birth_profile"].get("birth_time_confidence", "exact"),
+        )
+        if violations:
+            raise ReplayError("PINNED_CLAIMS_INVALID")
+        rendered = render_answer_markdown(answer, evidence)
+        if (rendered.markdown != answer_row["payload"]["markdown"] or
+                rendered.sha256 != answer_row["payload"]["markdown_sha256"]):
+            raise ReplayError("MEMO_HASH_MISMATCH")
+        claims_payload = [claim.model_dump(mode="json") for claim in answer.claims]
+        disagreements = [
+            {"claim_id": claim.claim_id, "conflicts": list(claim.conflicts)}
+            for claim in answer.claims if claim.conflicts
+        ]
+        return ResearchReplayResponse(
+            run_id=run_id, status="replayed",
+            projection_hash=sha256_text(canonical_json(rebuilt)),
+            claims_hash=sha256_text(canonical_json(claims_payload)),
+            memo_hash=rendered.sha256, answer_id=answer_row["answer_id"],
+            source_disagreements=disagreements,
+        )
 
     def screen_run(
         self, run_id: str, request: ResearchOperationRequest
@@ -204,6 +263,7 @@ class ResearchService:
 
         stored_profile = run["birth_profile"]
         profile_input = json.loads(canonical_json(stored_profile))
+        profile_input.pop("birth_time_range", None)
         profile_input["place"]["timezone"] = run["resolved_offset_minutes"] / 60
         profile_request = BirthProfileRequest.model_validate(profile_input)
         config_payload = json.loads(canonical_json(run["calculation_config"]))
@@ -224,6 +284,17 @@ class ResearchService:
         evidence = self._computed_evidence(
             run, calculated["facts"], calculated["calculation_config"]
         )
+        sensitivity = []
+        confidence = stored_profile.get("birth_time_confidence", "exact")
+        if confidence in {"approximate", "unknown"}:
+            sensitivity = self._sensitivity_sweep(
+                run, profile_input, config_request, plan, calculated["facts"]
+            )
+            evidence.extend(
+                {"evidence_id": new_id("evi_"), "evidence_type": "sensitivity_fact",
+                 "payload": item}
+                for item in sensitivity
+            )
         evidence_ids = [item["evidence_id"] for item in evidence]
         result = {
             "run_id": run_id,
@@ -235,6 +306,7 @@ class ResearchService:
             "provenance": calculated["provenance"],
             "warnings": profile_warnings(profile_request),
             "evidence_ids": evidence_ids,
+            "sensitivity": sensitivity,
         }
         event, revision = self.store.append_event(
             run_id,
@@ -467,7 +539,10 @@ class ResearchService:
         violations = []
         if request.answer.run_status != run["status"]:
             violations.append("answer run_status does not match authoritative run status")
-        violations.extend(validate_answer_contract(request.answer, evidence))
+        violations.extend(validate_answer_contract(
+            request.answer, evidence,
+            birth_time_confidence=run["birth_profile"].get("birth_time_confidence", "exact"),
+        ))
         violations = list(dict.fromkeys(violations))
         valid = not violations
         attempt_no = len(prior_attempts) + 1
@@ -613,6 +688,47 @@ class ResearchService:
         return result
 
     @staticmethod
+    def _sensitivity_sweep(run: dict[str, Any], profile_input: dict[str, Any],
+                           config_request: CalculationConfigRequest, plan: dict[str, Any],
+                           baseline_facts: dict[str, Any]) -> list[dict[str, Any]]:
+        confidence = run["birth_profile"].get("birth_time_confidence")
+        if confidence == "approximate":
+            offsets = (-15, -10, -5, 0, 5, 10, 15)
+        else:
+            start, end = run["birth_profile"]["birth_time_range"]
+            start_dt = dt.datetime.combine(dt.date.fromisoformat(run["birth_profile"]["date"]), dt.time.fromisoformat(start))
+            end_dt = dt.datetime.combine(start_dt.date(), dt.time.fromisoformat(end))
+            center = dt.datetime.combine(start_dt.date(), dt.time.fromisoformat(run["birth_profile"]["time"]))
+            offsets = tuple(range(int((start_dt-center).total_seconds()/60), int((end_dt-center).total_seconds()/60)+1, 5))
+            if offsets[-1] != int((end_dt-center).total_seconds()/60):
+                offsets += (int((end_dt-center).total_seconds()/60),)
+        reference = (config_request.reference_date.year, config_request.reference_date.month,
+                     config_request.reference_date.day)
+        base_dt = dt.datetime.fromisoformat(run["civil_datetime"])
+        samples: dict[int, dict[str, str]] = {}
+        baseline_atoms = iter_fact_atoms(baseline_facts)
+        for offset in offsets:
+            if offset == 0:
+                atoms = baseline_atoms
+            else:
+                shifted = base_dt + dt.timedelta(minutes=offset)
+                payload = json.loads(canonical_json(profile_input))
+                payload["date"], payload["time"] = shifted.date().isoformat(), shifted.time().isoformat()
+                request = BirthProfileRequest.model_validate(payload)
+                result = compute_chart(request.to_birth_profile(), reference_date=reference,
+                                       config=config_request.to_calculation_config())
+                atoms = iter_fact_atoms(result["facts"])
+            samples[offset] = atoms
+        selected = sorted(path for path in set().union(*(set(v) for v in samples.values()))
+                          if any(path.startswith(prefix) for prefix in plan["fact_paths"]))
+        return [
+            {"path": path, "stability": "stable" if len({samples[o].get(path) for o in offsets}) == 1 else "unstable",
+             "offsets_minutes": list(offsets),
+             "values": [{"offset_minutes": o, "value": samples[o].get(path)} for o in offsets]}
+            for path in selected
+        ]
+
+    @staticmethod
     def _response(run: dict[str, Any]) -> ResearchRunResponse:
         return ResearchRunResponse(
             run_id=run["run_id"],
@@ -625,8 +741,12 @@ class ResearchService:
             timezone_resolution=TimezoneResolution(
                 original_civil_datetime=run["civil_datetime"],
                 mode=run["timezone_resolution_mode"],
+                zone_id=run.get("timezone_zone_id"),
+                tzdb_fingerprint=run.get("timezone_fingerprint", "fixed-offset:v1"),
                 resolved_offset_minutes=run["resolved_offset_minutes"],
                 utc_instant=run["utc_instant"],
+                fold=run.get("timezone_fold", 0),
+                warnings=run.get("timezone_warnings", []),
             ),
             engine_name=run["engine_name"],
             engine_version=run["engine_version"],

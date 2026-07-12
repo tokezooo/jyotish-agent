@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 DATABASE_NAME = "research.sqlite3"
 
 
@@ -353,6 +353,13 @@ BEFORE DELETE ON corpus_review_history
 BEGIN SELECT RAISE(ABORT, 'corpus_review_history is append-only'); END;
 """
 
+_MIGRATION_7 = """
+ALTER TABLE research_runs ADD COLUMN timezone_zone_id TEXT;
+ALTER TABLE research_runs ADD COLUMN timezone_fingerprint TEXT NOT NULL DEFAULT 'fixed-offset:v1';
+ALTER TABLE research_runs ADD COLUMN timezone_fold INTEGER NOT NULL DEFAULT 0 CHECK(timezone_fold IN (0, 1));
+ALTER TABLE research_runs ADD COLUMN timezone_warnings_json TEXT NOT NULL DEFAULT 'null';
+"""
+
 _MIGRATIONS: dict[int, str] = {
     1: _MIGRATION_1,
     2: _MIGRATION_2,
@@ -360,6 +367,7 @@ _MIGRATIONS: dict[int, str] = {
     4: _MIGRATION_4,
     5: _MIGRATION_5,
     6: _MIGRATION_6,
+    7: _MIGRATION_7,
 }
 
 
@@ -942,9 +950,10 @@ class ResearchStore:
                     run_id, revision, status, question, birth_profile_json,
                     calculation_config_json, reference_date, civil_datetime,
                     timezone_resolution_mode, resolved_offset_minutes, utc_instant,
+                    timezone_zone_id, timezone_fingerprint, timezone_fold, timezone_warnings_json,
                     engine_name, engine_version, model_version, planner_version,
                     corpus_version, contract_version, request_hash, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 self._run_values(run_data),
             )
             connection.execute(
@@ -986,8 +995,10 @@ class ResearchStore:
             canonical_json(run["birth_profile"]),
             canonical_json(run["calculation_config"]), run["reference_date"],
             run["civil_datetime"], run["timezone_resolution_mode"],
-            run["resolved_offset_minutes"], run["utc_instant"], run["engine_name"],
-            run["engine_version"], run["model_version"], run["planner_version"],
+            run["resolved_offset_minutes"], run["utc_instant"],
+            run.get("timezone_zone_id"), run.get("timezone_fingerprint", "fixed-offset:v1"),
+            run.get("timezone_fold", 0), canonical_json(run.get("timezone_warnings")),
+            run["engine_name"], run["engine_version"], run["model_version"], run["planner_version"],
             run["corpus_version"], run["contract_version"], run["request_hash"],
             run["created_at"], run["updated_at"],
         )
@@ -1324,6 +1335,13 @@ class ResearchStore:
         data = dict(row)
         data["birth_profile"] = json.loads(data.pop("birth_profile_json"))
         data["calculation_config"] = json.loads(data.pop("calculation_config_json"))
+        warnings = json.loads(data.pop("timezone_warnings_json"))
+        if warnings is None:
+            data.pop("timezone_zone_id", None)
+            data.pop("timezone_fingerprint", None)
+            data.pop("timezone_fold", None)
+        else:
+            data["timezone_warnings"] = warnings
         return data
 
     def list_events(self, run_id: str) -> list[dict[str, Any]]:

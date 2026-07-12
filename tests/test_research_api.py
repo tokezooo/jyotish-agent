@@ -144,7 +144,7 @@ def test_numeric_and_explicit_fixed_offsets_have_same_normalized_hash(tmp_path: 
     assert explicit["request_hash"] == numeric["request_hash"]
 
 
-def test_v2_boundary_forbids_extra_fields_and_iana_execution(tmp_path: Path):
+def test_v2_boundary_forbids_extra_fields_and_executes_iana(tmp_path: Path):
     client = _client(tmp_path)
     extra = _body()
     extra["secret"] = "must-not-be-reflected"
@@ -158,8 +158,8 @@ def test_v2_boundary_forbids_extra_fields_and_iana_execution(tmp_path: Path):
         "zone_id": "Asia/Kolkata",
     }
     response = client.post("/v2/research-runs", json=iana)
-    assert response.status_code == 422
-    assert "fixed_offset_legacy" in response.json()["fix"]
+    assert response.status_code == 201
+    assert response.json()["timezone_resolution"]["zone_id"] == "Asia/Kolkata"
 
 
 def test_v2_rejects_timezone_aware_civil_time(tmp_path: Path):

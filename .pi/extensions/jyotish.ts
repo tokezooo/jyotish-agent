@@ -42,11 +42,7 @@ const PlaceSchema = Type.Object(
     name: Type.String({ minLength: 1, maxLength: 200, description: "Place label" }),
     latitude: Type.Number({ minimum: -90, maximum: 90 }),
     longitude: Type.Number({ minimum: -180, maximum: 180 }),
-    timezone: Type.Number({
-      description: "UTC offset in hours, e.g. 5.5 for IST. Required (no resolver).",
-      minimum: -12,
-      maximum: 14,
-    }),
+    timezone: Type.Number({ minimum: -12, maximum: 14 }),
   },
   NO_EXTRA,
 );
@@ -68,6 +64,30 @@ export const BirthProfileSchema = Type.Object(
     ),
   },
   NO_EXTRA,
+);
+
+const ResearchBirthProfileSchema = Type.Object(
+  {
+    name: Type.String({ minLength: 1, maxLength: 200 }),
+    date: Type.String({ pattern: "^\\d{4}-\\d{2}-\\d{2}$" }),
+    time: Type.String({ pattern: "^\\d{2}:\\d{2}:\\d{2}$" }),
+    place: Type.Object({
+      name: Type.String({ minLength: 1, maxLength: 200 }),
+      latitude: Type.Number({ minimum: -90, maximum: 90 }),
+      longitude: Type.Number({ minimum: -180, maximum: 180 }),
+      timezone: Type.Union([
+        Type.Number({ minimum: -12, maximum: 14 }),
+        Type.Object({ kind: Type.Literal("fixed_offset_legacy"), offset_hours: Type.Number({ minimum: -12, maximum: 14 }) }, NO_EXTRA),
+        Type.Object({ kind: Type.Literal("iana"), zone_id: Type.String({ minLength: 1 }), fold: Type.Optional(Type.Union([Type.Literal(0), Type.Literal(1)])) }, NO_EXTRA),
+        Type.Object({ kind: Type.Literal("iana_with_asserted_offset"), zone_id: Type.String({ minLength: 1 }), asserted_offset_hours: Type.Number({ minimum: -12, maximum: 14 }), fold: Type.Optional(Type.Union([Type.Literal(0), Type.Literal(1)])) }, NO_EXTRA),
+      ]),
+    }, NO_EXTRA),
+    birth_time_confidence: Type.Optional(StringEnum(["exact", "approximate", "unknown"] as const)),
+    birth_time_range: Type.Optional(Type.Tuple([
+      Type.String({ pattern: "^\\d{2}:\\d{2}:\\d{2}$" }),
+      Type.String({ pattern: "^\\d{2}:\\d{2}:\\d{2}$" }),
+    ])),
+  }, NO_EXTRA,
 );
 
 const ConfigSchema = Type.Object(
@@ -1121,7 +1141,7 @@ export default function (pi: ExtensionAPI) {
         }),
         expected_revision: Type.Literal(0),
         question: Type.String({ minLength: 1, maxLength: 10_000 }),
-        birth_profile: BirthProfileSchema,
+        birth_profile: ResearchBirthProfileSchema,
         calculation_config: Type.Optional(ConfigSchema),
         model_version: Type.String({ minLength: 1 }),
         planner_version: Type.String({ minLength: 1 }),

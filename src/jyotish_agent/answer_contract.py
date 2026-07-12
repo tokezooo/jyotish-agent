@@ -17,11 +17,20 @@ class RenderedAnswer:
 
 
 def validate_answer_contract(
-    answer: AnswerContractV2, evidence_items: list[dict[str, Any]]
+    answer: AnswerContractV2, evidence_items: list[dict[str, Any]],
+    *, birth_time_confidence: str = "exact",
 ) -> list[str]:
     evidence = {item["evidence_id"]: item for item in evidence_items}
     claims = {claim.claim_id: claim for claim in answer.claims}
     violations: list[str] = []
+    unstable_paths = {item["payload"]["path"] for item in evidence_items
+                      if item["evidence_type"] == "sensitivity_fact"
+                      and item["payload"].get("stability") == "unstable"}
+    forbidden = ("probability", "probabilistic", "rectification", "rectify")
+    prose = [answer.title, *answer.limitations, *answer.followups]
+    prose.extend(getattr(claim, "text", "") for claim in answer.claims)
+    if any(term in text.lower() for text in prose for term in forbidden):
+        violations.append("probability language and birth-time rectification are prohibited")
     if len(claims) != len(answer.claims):
         violations.append("claim_id values must be unique")
 
@@ -59,6 +68,26 @@ def validate_answer_contract(
                     violations.append(
                         f"synthesis claim {claim.claim_id} support does not exist: {support}"
                     )
+
+    def leaf_paths(claim_id: str, seen: frozenset[str] = frozenset()) -> set[str]:
+        if claim_id in seen or claim_id not in claims:
+            return set()
+        claim = claims[claim_id]
+        if isinstance(claim, ComputedClaim):
+            return {evidence[s]["payload"].get("path", "") for s in claim.supports if s in evidence}
+        if isinstance(claim, SynthesisClaim):
+            return set().union(*(leaf_paths(s, seen | {claim_id}) for s in claim.supports))
+        return set()
+
+    for claim in answer.claims:
+        paths = leaf_paths(claim.claim_id)
+        if isinstance(claim, SynthesisClaim) and claim.materiality == "major" and paths & unstable_paths:
+            if "BIRTH_TIME_SENSITIVITY_UNSTABLE" not in claim.caveats or claim.confidence > 0.5:
+                violations.append("central synthesis using unstable evidence requires caveat and confidence <= 0.5")
+        if birth_time_confidence == "unknown" and claim.materiality == "major" and any(
+            path.startswith(("d9.", "d10.", "houses.", "ascendant.")) for path in paths
+        ):
+            violations.append("unknown birth time cannot support strong house/varga-sensitive conclusions")
 
     visiting: set[str] = set()
     visited: set[str] = set()
