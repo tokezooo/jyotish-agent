@@ -269,8 +269,7 @@ def test_offline_replay_reproduces_projection_claims_and_memo(tmp_path: Path, mo
         return Response()
 
     monkeypatch.setattr(urllib.request, "urlopen", urlopen)
-    monkeypatch.setattr("jyotish_agent.cli.ResearchStore",
-                        lambda *a, **k: pytest.fail("CLI replay bypassed loopback API"))
+    assert not hasattr(cli, "ResearchStore")
     assert cli.main(["run", "replay", calculated["run_id"], "--json"]) == 0
     cli_replay = json.loads(capsys.readouterr().out)
     assert cli_replay == replay
@@ -338,16 +337,13 @@ def test_replay_validates_every_pinned_row_and_graph(
 
 
 def test_replay_distinguishes_unsupported_contract_and_version_mismatch(tmp_path: Path, monkeypatch):
-    unsupported_client, _store, calculated = _client(
-        tmp_path / "unsupported", monkeypatch, contract_version="3.0"
-    )
-    unsupported_client.post(
-        f"/v2/research-runs/{calculated['run_id']}/answers",
-        json={"operation_id": _id("op_"), "expected_revision": calculated["revision"],
-              "answer": _answer(calculated["evidence_ids"][0])},
-    )
-    response = unsupported_client.post(f"/v2/research-runs/{calculated['run_id']}/replay")
-    assert response.json()["error_code"] == "UNSUPPORTED_PINNED_VERSION"
+    app.state.research_service = ResearchService(ResearchStore(tmp_path / "unsupported"))
+    unsupported_client = TestClient(app)
+    unsupported = _run_body()
+    unsupported["contract_version"] = "3.0"
+    response = unsupported_client.post("/v2/research-runs", json=unsupported)
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "UNSUPPORTED_CONTRACT_VERSION"
 
     client, store, calculated = _client(tmp_path / "mismatch", monkeypatch)
     client.post(

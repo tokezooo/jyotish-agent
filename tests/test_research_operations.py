@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 import uuid
+import datetime as dt
 from pathlib import Path
 
 import pytest
@@ -9,7 +10,8 @@ from fastapi.testclient import TestClient
 
 from jyotish_agent.api import app
 from jyotish_agent.research_service import ResearchService
-from jyotish_agent.research_store import ResearchStore
+from jyotish_agent.research_store import OptimisticConflict, ResearchStore
+from jyotish_agent.research_models import CreateResearchRunRequest
 
 
 def _operation_id() -> str:
@@ -36,7 +38,7 @@ def _run_body(question: str = "Which career factors should be investigated?") ->
         "model_version": "test-model-v1",
         "planner_version": "provisional-v1",
         "corpus_version": "test-corpus-v1",
-        "contract_version": "1.0",
+        "contract_version": "2.0",
     }
 
 
@@ -50,6 +52,39 @@ def _create(client: TestClient, question: str = "Which career factors?") -> dict
     response = client.post("/v2/research-runs", json=_run_body(question))
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def test_create_idempotency_uses_client_payload_across_date_rollover(tmp_path: Path):
+    now = [dt.datetime(2026, 7, 12, 23, 59, tzinfo=dt.UTC)]
+    service = ResearchService(ResearchStore(tmp_path / "data"), clock=lambda: now[0])
+    body = _run_body()
+    body["calculation_config"] = {}
+    request = CreateResearchRunRequest.model_validate(body)
+
+    first = service.create_run(request)
+    now[0] = dt.datetime(2026, 7, 13, 0, 1, tzinfo=dt.UTC)
+    replayed = service.create_run(request)
+
+    assert replayed == first
+    assert first.reference_date.isoformat() == "2026-07-12"
+    changed = request.model_copy(
+        update={
+            "calculation_config": request.calculation_config.model_copy(
+                update={"reference_date": dt.date(2026, 7, 13)}
+            )
+        }
+    )
+    with pytest.raises(OptimisticConflict):
+        service.create_run(changed)
+
+
+def test_create_defaults_to_server_owned_contract_2(tmp_path: Path):
+    client, _store = _client(tmp_path)
+    body = _run_body()
+    body.pop("contract_version")
+    response = client.post("/v2/research-runs", json=body)
+    assert response.status_code == 201
+    assert response.json()["contract_version"] == "2.0"
 
 
 def _plan(client: TestClient, run_id: str, expected_revision: int) -> dict:

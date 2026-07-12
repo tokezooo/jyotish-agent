@@ -39,7 +39,7 @@ def _body(operation_id: str | None = None) -> dict:
         "model_version": "test-model-v1",
         "planner_version": "provisional-v1",
         "corpus_version": "test-corpus-v1",
-        "contract_version": "1.0",
+        "contract_version": "2.0",
     }
 
 
@@ -132,7 +132,7 @@ def test_client_assigned_run_id_collision_is_409_and_preserves_original_ledger(
     assert events.json()["events"][0]["operation_id"] == original_body["operation_id"]
 
 
-def test_numeric_and_explicit_fixed_offsets_have_same_normalized_hash(tmp_path: Path):
+def test_numeric_and_explicit_fixed_offsets_remain_distinct_client_payloads(tmp_path: Path):
     client = _client(tmp_path)
     numeric = client.post("/v2/research-runs", json=_body()).json()
     explicit_body = _body()
@@ -141,7 +141,7 @@ def test_numeric_and_explicit_fixed_offsets_have_same_normalized_hash(tmp_path: 
         "offset_hours": 5.5,
     }
     explicit = client.post("/v2/research-runs", json=explicit_body).json()
-    assert explicit["request_hash"] == numeric["request_hash"]
+    assert explicit["request_hash"] != numeric["request_hash"]
 
 
 def test_v2_boundary_forbids_extra_fields_and_executes_iana(tmp_path: Path):

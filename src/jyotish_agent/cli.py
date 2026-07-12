@@ -21,7 +21,7 @@ from pydantic import ValidationError
 
 from .hardening import backup_and_purge_store, persist_private_artifact, prune_private_artifacts
 from .research_models import ResearchBirthProfileRequest
-from .research_store import ResearchStore, canonical_json, default_data_root
+from .research_store import canonical_json, default_data_root
 
 DEFAULT_API_URL = "http://127.0.0.1:8000"
 REQUIRED_V2_BLOCKER = (
@@ -56,6 +56,22 @@ def _get_json(base: str, path: str) -> dict | None:
         return body if isinstance(body, dict) else None
     except (OSError, ValueError, urllib.error.URLError):
         return None
+
+
+def _get_required_json(base: str, path: str) -> dict:
+    _loopback_address(base)
+    try:
+        with urllib.request.urlopen(f"{base}{path}", timeout=20) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise CliError(f"research run not found: {path.split('/')[-2]}", 2) from exc
+        raise CliError("loopback inspect API failed", 3) from exc
+    except (OSError, ValueError, urllib.error.URLError) as exc:
+        raise CliError("loopback inspect API is unreachable", 3) from exc
+    if not isinstance(body, dict):
+        raise CliError("loopback inspect API returned an invalid response", 3)
+    return body
 
 
 def _post_empty_json(base: str, path: str) -> dict:
@@ -339,34 +355,28 @@ def _ask(args: argparse.Namespace) -> int:
 
 
 def _inspect_run(args: argparse.Namespace) -> int:
-    store = ResearchStore(default_data_root())
-    run = store.get_run(args.run_id)
-    if run is None:
-        raise CliError(f"research run not found: {args.run_id}", 2)
-    events = []
-    for row in store.list_events(args.run_id):
-        event = {key: value for key, value in row.items() if key != "payload_json"}
-        event["payload"] = json.loads(row["payload_json"])
-        events.append(event)
-    body = {
-        "run": run,
-        "intent": store.get_question_intent(args.run_id),
-        "plan": store.get_question_plan(args.run_id),
-        "events": events,
-        "evidence": store.list_evidence(args.run_id),
-        "answers": store.list_answers(args.run_id),
-    }
-    if args.json:
-        print(json.dumps(body, ensure_ascii=False, sort_keys=True))
-    else:
-        print(f"run_id: {run['run_id']}")
-        print(f"status: {run['status']}")
-        print(f"revision: {run['revision']}")
-        print(f"events: {len(events)}")
-        print(f"evidence: {len(body['evidence'])}")
-        if body["plan"] is not None:
-            print(f"plan_hash: {body['plan']['plan_hash']}")
-    return 0
+    base = _api_base()
+    _loopback_address(base)
+    child = None if _health(base) else _start_api(base)
+    try:
+        body = _get_required_json(
+            base, f"/v2/research-runs/{quote(args.run_id)}/inspect"
+        )
+        run = body["run"]
+        events = body["events"]
+        if args.json:
+            print(json.dumps(body, ensure_ascii=False, sort_keys=True))
+        else:
+            print(f"run_id: {run['run_id']}")
+            print(f"status: {run['status']}")
+            print(f"revision: {run['revision']}")
+            print(f"events: {len(events)}")
+            print(f"evidence: {len(body['evidence'])}")
+            if body["plan"] is not None:
+                print(f"plan_hash: {body['plan']['plan_hash']}")
+        return 0
+    finally:
+        _stop_process(child)
 
 
 def _replay_run(args: argparse.Namespace) -> int:

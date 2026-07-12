@@ -16,6 +16,12 @@ import {
 } from "../.pi/extensions/jyotish";
 import registerJyotishExtension from "../.pi/extensions/jyotish";
 
+const honorExtensionSemantics = async (canary: any) => ({
+  toolCallBlocked: canary.toolCallResult.block === true,
+  toolResultMarker: canary.toolResultResult.details.marker,
+  messageReplacementMarker: canary.messageEndResult.message.content[0].text,
+});
+
 describe("formatProblem", () => {
   test("renders problem/cause/fix triad", () => {
     const out = formatProblem(422, {
@@ -909,6 +915,7 @@ describe("ResearchRuntime", () => {
         },
         registerTool() {},
         appendEntry() {},
+        verifyExtensionSemantics: honorExtensionSemantics,
       };
       registerJyotishExtension(fakePi as any);
       const context = {
@@ -1043,14 +1050,21 @@ describe("ResearchRuntime", () => {
         branch.push(entry);
         appended.push(entry);
       },
+      verifyExtensionSemantics: honorExtensionSemantics,
     };
     registerJyotishExtension(fakePi as any);
     const context = {
       sessionManager: { getBranch: () => branch, getLeafId: () => "active-leaf" },
       ui: { notify() {} },
     };
-    expect(probeResearchRuntimeCapabilities(fakePi as any, context.sessionManager)).toBe(true);
-    expect(probeResearchRuntimeCapabilities(fakePi as any, {})).toBe(false);
+    expect(await probeResearchRuntimeCapabilities(fakePi as any, context.sessionManager)).toBe(true);
+    expect(await probeResearchRuntimeCapabilities(fakePi as any, {})).toBe(false);
+    expect(await probeResearchRuntimeCapabilities(
+      { ...fakePi, verifyExtensionSemantics: async () => ({
+        toolCallBlocked: false, toolResultMarker: "ignored", messageReplacementMarker: "ignored",
+      }) } as any,
+      context.sessionManager,
+    )).toBe(false);
     expect(handlers.has("before_agent_start")).toBe(true);
     expect(handlers.has("tool_call")).toBe(true);
     expect(handlers.has("tool_result")).toBe(true);
@@ -1159,6 +1173,7 @@ describe("ResearchRuntime", () => {
       appendEntry(customType: string, data: unknown) {
         branch.push({ type: "custom", customType, data });
       },
+      verifyExtensionSemantics: honorExtensionSemantics,
     };
     const context = {
       sessionManager: { getBranch: () => branch, getLeafId: () => "create-leaf" },

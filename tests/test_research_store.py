@@ -38,7 +38,7 @@ def _run() -> dict:
         "model_version": "test-model",
         "planner_version": "provisional-1",
         "corpus_version": "test-corpus-v1",
-        "contract_version": "1.0",
+        "contract_version": "2.0",
         "request_hash": "a" * 64,
         "created_at": "2026-07-12T09:00:00Z",
         "updated_at": "2026-07-12T09:00:00Z",

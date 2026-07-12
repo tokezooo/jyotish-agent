@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import socket
 import uuid
 from pathlib import Path
 
@@ -215,6 +216,10 @@ def test_cli_run_inspect_has_human_and_json_output(tmp_path: Path, monkeypatch, 
 
     run = service.create_run(CreateResearchRunRequest.model_validate(request))
     monkeypatch.setenv("JYOTISH_AGENT_DATA_ROOT", str(tmp_path / "data"))
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    monkeypatch.setenv("JYOTISH_API_URL", f"http://127.0.0.1:{port}")
 
     assert cli.main(["run", "inspect", run.run_id, "--json"]) == 0
     body = json.loads(capsys.readouterr().out)

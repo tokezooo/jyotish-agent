@@ -24,6 +24,12 @@ ERROR_REGISTRY: dict[str, dict[str, Any]] = {
         "cause": "The request does not identify a supported deterministic timezone mode.",
         "fix": "Use a supported IANA or fixed-offset timezone specification.",
     },
+    "UNSUPPORTED_CONTRACT_VERSION": {
+        "retryable": False,
+        "problem": "The requested answer contract version is unsupported.",
+        "cause": "This service owns and supports AnswerContract version 2.0 only.",
+        "fix": "Omit contract_version or submit contract_version '2.0'.",
+    },
     "INPUT_INVALID": {
         "retryable": False,
         "problem": "The run operation payload is invalid or incomplete.",

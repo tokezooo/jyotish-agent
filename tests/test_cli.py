@@ -6,6 +6,7 @@ import socket
 import sqlite3
 import subprocess
 import sys
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,35 @@ from jyotish_agent import cli
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_inspect_uses_supervised_loopback_api_without_store_path(monkeypatch, capsys):
+    run_id = "rr_00000000-0000-4000-8000-000000000000"
+    child = object()
+    calls: list[object] = []
+    monkeypatch.setattr(cli, "_api_base", lambda: "http://127.0.0.1:8765")
+    monkeypatch.setattr(cli, "_health", lambda _base: None)
+    monkeypatch.setattr(cli, "_start_api", lambda base: calls.append(("start", base)) or child)
+    monkeypatch.setattr(cli, "_stop_process", lambda process: calls.append(("stop", process)))
+    monkeypatch.setattr(
+        cli, "default_data_root",
+        lambda: (_ for _ in ()).throw(AssertionError("inspect must not open the store")),
+    )
+    monkeypatch.setattr(
+        cli, "_get_required_json",
+        lambda base, path: calls.append(("get", base, path)) or {
+            "run": {"run_id": run_id, "status": "created", "revision": 1},
+            "intent": None, "plan": None, "events": [], "evidence": [], "answers": [],
+        },
+    )
+
+    assert cli._inspect_run(SimpleNamespace(run_id=run_id, json=True)) == 0
+    assert json.loads(capsys.readouterr().out)["run"]["run_id"] == run_id
+    assert calls == [
+        ("start", "http://127.0.0.1:8765"),
+        ("get", "http://127.0.0.1:8765", f"/v2/research-runs/{run_id}/inspect"),
+        ("stop", child),
+    ]
 
 
 def _free_port() -> int:

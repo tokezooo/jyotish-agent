@@ -13,6 +13,7 @@ text, prompts, tokens, or rendered answers.
 | `MEMO_HASH_MISMATCH` | replayed memo bytes differ from the committed artifact | no; reject artifact |
 | `UNEXPECTED_INTERNAL` | privacy-safe unexpected failure | once |
 | `INPUT_INVALID` | malformed run-stage operation payload | no; correct payload |
+| `UNSUPPORTED_CONTRACT_VERSION` | create requested a contract other than server-owned 2.0 | no; omit it or use 2.0 |
 
 Endpoint-specific codes such as `TIMEZONE_OFFSET_MISMATCH`,
 `AMBIGUOUS_LOCAL_TIME`, `NONEXISTENT_LOCAL_TIME`, `PINNED_VERSION_MISMATCH`, and

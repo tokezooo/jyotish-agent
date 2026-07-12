@@ -109,7 +109,7 @@ class CreateResearchRunRequest(BaseModel):
     model_version: str = Field(min_length=1, max_length=200)
     planner_version: str = Field(min_length=1, max_length=200)
     corpus_version: str = Field(min_length=1, max_length=200)
-    contract_version: str = Field(min_length=1, max_length=50)
+    contract_version: str = Field(default="2.0", min_length=1, max_length=50)
 
     @field_validator("operation_id")
     @classmethod
@@ -398,6 +398,16 @@ class ResearchEventResponse(BaseModel):
 class ResearchEventsResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     events: list[ResearchEventResponse]
+
+
+class ResearchInspectResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run: ResearchRunResponse
+    intent: dict | None
+    plan: dict | None
+    events: list[ResearchEventResponse]
+    evidence: list[dict]
+    answers: list[dict]
 
 
 class ResearchScreenResponse(ResearchOperationResponse):

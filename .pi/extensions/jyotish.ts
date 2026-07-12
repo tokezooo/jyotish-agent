@@ -1013,18 +1013,49 @@ export class ResearchRuntime {
   }
 }
 
-export function probeResearchRuntimeCapabilities(
-  pi: Pick<ExtensionAPI, "appendEntry">,
+type SemanticHandshakeResult = {
+  toolCallBlocked: boolean;
+  toolResultMarker: string;
+  messageReplacementMarker: string;
+};
+
+type SemanticHandshakeHost = {
+  verifyExtensionSemantics?: (canary: {
+    marker: string;
+    toolCallResult: { block: true; reason: string };
+    toolResultResult: { content: Array<{ type: "text"; text: string }>; details: { marker: string } };
+    messageEndResult: { message: { role: "assistant"; content: Array<{ type: "text"; text: string }> } };
+  }) => SemanticHandshakeResult | Promise<SemanticHandshakeResult>;
+};
+
+export async function probeResearchRuntimeCapabilities(
+  pi: Pick<ExtensionAPI, "appendEntry"> & SemanticHandshakeHost,
   sessionManager: { getBranch?: unknown; getLeafId?: unknown },
   registeredHooks?: ReadonlySet<string>,
-): boolean {
+): Promise<boolean> {
   const requiredHooks = ["before_agent_start", "tool_call", "tool_result", "message_end"];
-  return (
+  const structurallyAvailable = (
     typeof pi.appendEntry === "function" &&
     typeof sessionManager.getBranch === "function" &&
     typeof sessionManager.getLeafId === "function" &&
     (!registeredHooks || requiredHooks.every((hook) => registeredHooks.has(hook)))
   );
+  if (!structurallyAvailable || typeof pi.verifyExtensionSemantics !== "function") return false;
+  const marker = `jyotish-capability-${Date.now()}-${Math.random()}`;
+  const observed = await pi.verifyExtensionSemantics({
+    marker,
+    toolCallResult: { block: true, reason: marker },
+    toolResultResult: {
+      content: [{ type: "text", text: marker }],
+      details: { marker },
+    },
+    messageEndResult: {
+      message: { role: "assistant", content: [{ type: "text", text: marker }] },
+    },
+  });
+  return observed?.toolCallBlocked === true
+    && observed.toolResultMarker === marker
+    && observed.messageReplacementMarker === marker;
 }
 
 // --- extension --------------------------------------------------------------
@@ -1040,7 +1071,7 @@ export default function (pi: ExtensionAPI) {
   };
 
   pi.on("session_start", async (_event, ctx) => {
-    if (!probeResearchRuntimeCapabilities(pi, ctx.sessionManager, registeredHooks)) {
+    if (!(await probeResearchRuntimeCapabilities(pi as ExtensionAPI & SemanticHandshakeHost, ctx.sessionManager, registeredHooks))) {
       researchRuntime.disable("required append/branch/leaf hooks are unavailable");
       ctx.ui.notify("Jyotish research runtime disabled: required Pi hook semantics are unavailable.", "error");
     } else {

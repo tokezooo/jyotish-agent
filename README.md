@@ -45,8 +45,10 @@ uv run jyotish run replay <rr_id> --json
 `ask` starts the loopback API when needed, invokes Pi with only the six governed
 research tools, and prints only a backend-validated AnswerContract 2.0 artifact.
 The command blocks if Pi fails, the assigned run ID is not validated, or the
-canonical Markdown hash differs. SQLite is authoritative; inspect and replay do not
-trust a Pi transcript mirror.
+canonical Markdown hash differs. SQLite is authoritative; inspect is served by a
+typed supervised loopback FastAPI endpoint and replay uses that same API boundary.
+Neither command opens or migrates SQLite directly, and neither trusts a Pi transcript
+mirror.
 
 Operator references:
 

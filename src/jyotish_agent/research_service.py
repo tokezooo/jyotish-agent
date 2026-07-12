@@ -31,6 +31,7 @@ from .research_models import (
     ResearchCalculationResponse,
     ResearchAnswerResponse,
     ResearchEventsResponse,
+    ResearchInspectResponse,
     ResearchOperationRequest,
     ResearchRunResponse,
     ResearchReplayResponse,
@@ -45,6 +46,10 @@ from .timezone_resolution import TimezoneResolutionError, timezone_fingerprint
 
 
 class UnsupportedTimezoneMode(ValueError):
+    pass
+
+
+class UnsupportedContractVersion(ValueError):
     pass
 
 
@@ -73,6 +78,8 @@ class ResearchService:
         self.clock = clock
 
     def create_run(self, request: CreateResearchRunRequest) -> ResearchRunResponse:
+        if request.contract_version != "2.0":
+            raise UnsupportedContractVersion("only AnswerContract 2.0 is supported")
         now_datetime = self.clock().astimezone(dt.UTC)
         profile = request.birth_profile
         timezone = profile.place.timezone
@@ -99,14 +106,15 @@ class ResearchService:
         if isinstance(timezone, (int, float)):
             normalized_profile["place"]["timezone"] = {
                 "kind": "fixed_offset_legacy", "offset_hours": offset_hours}
-        normalized_request = request.model_dump(
+        identity_request = request.model_dump(
             mode="json",
             exclude={"operation_id", "expected_revision"},
             exclude_none=True,
         )
+        request_hash = sha256_text(canonical_json(identity_request))
+        normalized_request = json.loads(canonical_json(identity_request))
         normalized_request["birth_profile"] = normalized_profile
         normalized_request["calculation_config"]["reference_date"] = reference_date.isoformat()
-        request_hash = sha256_text(canonical_json(normalized_request))
         now = now_datetime.isoformat().replace("+00:00", "Z")
         stored = {
             "run_id": request.run_id or new_id("rr_"),
@@ -129,7 +137,7 @@ class ResearchService:
             "model_version": request.model_version,
             "planner_version": request.planner_version,
             "corpus_version": request.corpus_version,
-            "contract_version": request.contract_version,
+            "contract_version": "2.0",
             "request_hash": request_hash,
             "created_at": now,
             "updated_at": now,
@@ -156,6 +164,18 @@ class ResearchService:
             event["payload"] = json.loads(row["payload_json"])
             events.append(event)
         return ResearchEventsResponse(events=events)
+
+    def inspect_run(self, run_id: str) -> ResearchInspectResponse:
+        run = self.get_run(run_id)
+        events = self.get_events(run_id)
+        return ResearchInspectResponse(
+            run=run,
+            intent=self.store.get_question_intent(run_id),
+            plan=self.store.get_question_plan(run_id),
+            events=events.events,
+            evidence=self.store.list_evidence(run_id),
+            answers=self.store.list_answers(run_id),
+        )
 
     def replay_run(self, run_id: str) -> ResearchReplayResponse:
         """Reconstruct hashes using only immutable/pinned local ledger material."""
@@ -656,6 +676,8 @@ class ResearchService:
             return ResearchAnswerResponse(**self._operation_response(event, revision))
 
         run = self._require_run(run_id)
+        if request.answer.schema_version != run["contract_version"]:
+            raise InvalidRunTransition("answer schema does not match the pinned contract")
         if run["status"] not in {"calculated", "answer_needs_repair"}:
             raise InvalidRunTransition(
                 "answers require a calculated run with repair budget remaining"

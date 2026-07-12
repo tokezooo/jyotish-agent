@@ -103,8 +103,8 @@ The Task 6 review findings were closed in a follow-up commit based on `1605267`:
   `MEMO_HASH_MISMATCH` names. API handlers map bounded SQLite busy/locked failures
   and `CorpusIntegrityError` to stable registry envelopes. Causes come only from
   controlled registry text; exception messages are never exposed.
-- Schema v8 stores per-run availability records for all pinned engine, model,
-  planner, corpus, and contract versions. Removing the pinned corpus availability
+- Schema v10 stores checksummed engine/planner/contract dependencies and the exact
+  per-run source-version/manifest corpus snapshot. Removing pinned corpus material
   reaches the real replay error. A separately coordinated memo-byte/hash mutation
   reaches the real memo mismatch. Both branches are exercised through service/API
   tests and the subprocess CLI replay path.
@@ -136,6 +136,13 @@ The Task 6 review findings were closed in a follow-up commit based on `1605267`:
 - Offline dependency availability now recalculates checksums for engine, planner,
   contract, and approved-corpus manifest material; the non-executed model label is no
   longer treated as a replay dependency.
+- Create idempotency now hashes the original client payload before resolving the
+  default reference date; rollover retries replay the first pinned date. Contract
+  `2.0` is server-owned/defaulted and unsupported creation pins fail stably.
+- Pi startup requires an explicit behavioral host handshake for block/modify/replace
+  semantics; a host that registers handlers but ignores their results fails closed.
+- `run inspect` uses the typed `/v2/research-runs/{run_id}/inspect` endpoint and a
+  supervised loopback server; the CLI no longer imports `ResearchStore`.
 - The temporary-HOME smoke now uses exactly one data root and one server lifecycle
   in doctor → validated fake-Pi ask → inspect JSON → offline replay/hash → shutdown
   order. README now says six phases and documents artifact retention and the runner.
@@ -145,11 +152,11 @@ The Task 6 review findings were closed in a follow-up commit based on `1605267`:
 - Focused Python (`test_task6_hardening`, AnswerContract v2, CLI, corpus migration):
   **75 passed**.
 - Exact black-box plus both CLI replay registry branches: **3 passed in 8.62s**.
-- Full Python after final external-review remediation: **365 passed, 2 skipped in
-  92.31s** (only Swiss-ephemeris tests).
+- Full Python after final whole-branch remediation: **368 passed, 2 skipped in
+  92.33s** (only Swiss-ephemeris tests).
 - Tuning runner: **4 automated passed, 36 manual_not_scored, 40 total**.
 - Explicit held-out runner: **3 automated passed, 17 manual_not_scored, 20 total**.
-- Bun: **45 passed, 0 failed, 144 assertions**.
+- Bun: **45 passed, 0 failed, 145 assertions**.
 - TypeScript `tsc --noEmit`: **passed**.
 - `compileall`: **passed**.
 - Both repository-local skills: **valid**.

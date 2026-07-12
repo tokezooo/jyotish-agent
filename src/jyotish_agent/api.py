@@ -51,6 +51,7 @@ from .research_models import (
     ResearchCalculationResponse,
     ResearchAnswerResponse,
     ResearchEventsResponse,
+    ResearchInspectResponse,
     ResearchOperationRequest,
     ResearchPlanResponse,
     ResearchRetrievalResponse,
@@ -60,7 +61,13 @@ from .research_models import (
     SubmitAnswerRequest,
     RetrieveResearchRunRequest,
 )
-from .research_service import InvalidRunTransition, ReplayError, ResearchService, UnsupportedTimezoneMode
+from .research_service import (
+    InvalidRunTransition,
+    ReplayError,
+    ResearchService,
+    UnsupportedContractVersion,
+    UnsupportedTimezoneMode,
+)
 from .timezone_resolution import TimezoneResolutionError
 from .research_store import (
     OptimisticConflict,
@@ -175,6 +182,11 @@ async def create_research_run(
             "This version cannot resolve the requested timezone mode.",
             "Use fixed_offset_legacy (or a numeric UTC offset) for Task 1.",
         )
+    except UnsupportedContractVersion:
+        return registry_problem_response(
+            "UNSUPPORTED_CONTRACT_VERSION", status=422, run_id=None,
+            stage="create", title="Unsupported answer contract",
+        )
     except TimezoneResolutionError as exc:
         response = _research_problem(
             422, "Timezone resolution failed", exc.error_code,
@@ -213,6 +225,19 @@ async def get_research_events(
             404,
             "Research run not found",
             "No persisted research run has that ID.",
+            "Check the rr_ run ID and retry.",
+        )
+
+
+@app.get("/v2/research-runs/{run_id}/inspect", response_model=ResearchInspectResponse)
+async def inspect_research_run(
+    run_id: str, request: Request
+) -> ResearchInspectResponse | JSONResponse:
+    try:
+        return _research_service(request).inspect_run(run_id)
+    except RunNotFound:
+        return _research_problem(
+            404, "Research run not found", "No persisted research run has that ID.",
             "Check the rr_ run ID and retry.",
         )
 
