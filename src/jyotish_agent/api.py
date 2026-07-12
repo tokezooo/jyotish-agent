@@ -166,7 +166,11 @@ async def _access_log(request: Request, call_next):
 
 @app.get("/health")
 async def health() -> dict:
-    return {"status": "ok", "engine_version": ENGINE_VERSION}
+    return {
+        "status": "ok",
+        "engine_version": ENGINE_VERSION,
+        "research_api_version": "2.0",
+    }
 
 
 @app.post("/v2/research-runs", response_model=ResearchRunResponse, status_code=201)

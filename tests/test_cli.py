@@ -175,6 +175,30 @@ def test_doctor_reports_backend_and_pi(monkeypatch, capsys):
     assert "Pi: /fake/pi" in output
 
 
+def test_health_requires_research_v2_capability(monkeypatch):
+    monkeypatch.setattr(
+        cli,
+        "_get_json",
+        lambda _base, _path: {"status": "ok", "engine_version": "4.8.6"},
+    )
+    assert cli._health("http://127.0.0.1:8000") is None
+
+    monkeypatch.setattr(
+        cli,
+        "_get_json",
+        lambda _base, _path: {
+            "status": "ok",
+            "engine_version": "4.8.6",
+            "research_api_version": "2.0",
+        },
+    )
+    assert cli._health("http://127.0.0.1:8000") == {
+        "status": "ok",
+        "engine_version": "4.8.6",
+        "research_api_version": "2.0",
+    }
+
+
 def test_ask_rejects_invalid_profile_before_starting_children(tmp_path: Path, capsys):
     profile = tmp_path / "bad.json"
     profile.write_text("[]", encoding="utf-8")

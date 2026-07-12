@@ -99,7 +99,14 @@ def _post_empty_json(base: str, path: str) -> dict:
 
 
 def _health(base: str) -> dict | None:
-    return _get_json(base, "/health")
+    health = _get_json(base, "/health")
+    if (
+        health
+        and health.get("status") == "ok"
+        and health.get("research_api_version") == "2.0"
+    ):
+        return health
+    return None
 
 
 def _loopback_address(base: str) -> tuple[str, int]:
