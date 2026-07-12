@@ -999,6 +999,19 @@ export class ResearchRuntime {
     const content = message.content as Array<{ type?: string; text?: string }>;
     if (content.some((item) => item.type === "toolCall")) return undefined;
     if (!content.some((item) => item.type === "text" && item.text?.trim())) return undefined;
+    const visibleText = content.every(
+      (item) => item.type === "text" && typeof item.text === "string",
+    )
+      ? content.map((item) => item.text as string).join("")
+      : undefined;
+    if (
+      state?.status === "validated" &&
+      !state.needs_reconciliation &&
+      this.validatedMarkdown &&
+      visibleText === this.validatedMarkdown
+    ) {
+      return undefined;
+    }
     const text =
       state?.status === "validated" &&
       !state.needs_reconciliation &&

@@ -965,6 +965,12 @@ describe("ResearchRuntime", () => {
     expect(replacement?.content).toEqual([
       { type: "text", text: "# Canonical backend memo\n" },
     ]);
+    expect(
+      runtime.gateFinalMessage({
+        role: "assistant",
+        content: [{ type: "text", text: "# Canonical backend memo\n" }],
+      }),
+    ).toBeUndefined();
   });
 
   test("reconciliation restores canonical validated markdown without a mirror payload", () => {
