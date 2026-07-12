@@ -109,9 +109,9 @@ The Task 6 review findings were closed in a follow-up commit based on `1605267`:
   reaches the real memo mismatch. Both branches are exercised through service/API
   tests and the subprocess CLI replay path.
 - Physically separate `tuning-specs.json` / `held-out-specs.json` and checksum
-  manifests map all 60 IDs to case-specific production boundaries: 56 automated
-  cases and four honest oracle placeholders marked `manual_not_scored`. Every
-  automated probe consumes its exact profile, prompt, and expected outcome; a
+  manifests map all 60 IDs to reviewed specifications: 31 exact automated
+  production setups and 29 honest `manual_not_scored` cases. Every automated probe
+  consumes its exact profile, prompt, and expected outcome; a
   mutation regression proves the exact case fails. Tuning succeeds even when all
   held-out case/spec/manifest files are physically absent.
 - The eval skill now invokes `python -m jyotish_agent.evaluation tuning`; held-out
@@ -126,6 +126,13 @@ The Task 6 review findings were closed in a follow-up commit based on `1605267`:
 - Retention rejects a symlinked artifact root before `exists`/`iterdir`, anchors the
   resolved root under `data_root`, and unlinks nested symlinks without following
   them. The exact external-victim deletion reproduction is now a regression test.
+- The configured SQLite/artifact root is also rejected when it is a symlink, every
+  managed directory ancestor is forced to `0700`, and operator erasure requires an
+  integrity-checked whole-store backup plus explicit confirmation. Append-only ledger
+  retention is documented as intentionally indefinite.
+- Offline dependency availability now recalculates checksums for engine, planner,
+  contract, and approved-corpus manifest material; the non-executed model label is no
+  longer treated as a replay dependency.
 - The temporary-HOME smoke now uses exactly one data root and one server lifecycle
   in doctor → validated fake-Pi ask → inspect JSON → offline replay/hash → shutdown
   order. README now says six phases and documents artifact retention and the runner.
@@ -135,15 +142,15 @@ The Task 6 review findings were closed in a follow-up commit based on `1605267`:
 - Focused Python (`test_task6_hardening`, AnswerContract v2, CLI, corpus migration):
   **75 passed**.
 - Exact black-box plus both CLI replay registry branches: **3 passed in 8.62s**.
-- Full Python after the second review remediation: **339 passed, 2 skipped in
-  93.54s** (only Swiss-ephemeris tests).
-- Tuning runner: **36 automated passed, 4 manual_not_scored, 40 total**.
-- Explicit held-out runner: **20 automated passed, 20 total**.
+- Full Python after external-review remediation: **355 passed, 2 skipped in
+  92.67s** (only Swiss-ephemeris tests).
+- Tuning runner: **19 automated passed, 21 manual_not_scored, 40 total**.
+- Explicit held-out runner: **12 automated passed, 8 manual_not_scored, 20 total**.
 - Bun: **44 passed, 0 failed, 137 assertions**.
 - TypeScript `tsc --noEmit`: **passed**.
 - `compileall`: **passed**.
 - Both repository-local skills: **valid**.
-- Split SHA-256 manifests: **all five unique files OK**; 60 cases across 15 groups.
+- Split SHA-256 manifests: **all five unique files OK**; 60 cases across 13 groups.
 - `git diff --check`: **passed**.
 
 External limitations are unchanged: no live Pi/Gemini call without credentials and

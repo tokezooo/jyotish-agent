@@ -9,7 +9,7 @@ text, prompts, tokens, or rendered answers.
 |---|---|---|
 | `SQLITE_BUSY` | bounded ledger lock wait expired | yes, then inspect writers |
 | `CORPUS_INTEGRITY_ERROR` | governed fragment bytes/index integrity failed | no; restore backup |
-| `MISSING_PINNED_VERSION` | an exact engine/model/planner/corpus/contract availability record is absent | no; restore version |
+| `MISSING_PINNED_VERSION` | a checksummed engine/planner/corpus/contract dependency is absent or changed | no; restore artifact |
 | `MEMO_HASH_MISMATCH` | replayed memo bytes differ from the committed artifact | no; reject artifact |
 | `UNEXPECTED_INTERNAL` | privacy-safe unexpected failure | once |
 
@@ -23,3 +23,5 @@ Registry causes are controlled static text. SQLite `busy`/`locked` failures map 
 `SQLITE_BUSY`; `CorpusIntegrityError` maps to `CORPUS_INTEGRITY_ERROR`; exception
 messages are never copied into public envelopes. Replay returns the real run ID for
 the exact `MISSING_PINNED_VERSION` and `MEMO_HASH_MISMATCH` branches.
+Run-scoped handlers preserve a known run ID and the requested `screen`, `plan`,
+`calculate`, `retrieve`, `answer`, or `replay` stage.

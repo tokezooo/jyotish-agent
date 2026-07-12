@@ -164,7 +164,7 @@ class ResearchService:
         if canonical_json(current) != canonical_json(rebuilt):
             raise ReplayError("PROJECTION_HASH_MISMATCH")
         if not all(current.get(key) for key in (
-            "engine_version", "model_version", "planner_version", "corpus_version",
+            "engine_version", "planner_version", "corpus_version",
             "contract_version", "timezone_fingerprint"
         )):
             raise ReplayError("MISSING_PINNED_VERSION")
@@ -172,7 +172,6 @@ class ResearchService:
             run_id,
             {
                 "engine": current["engine_version"],
-                "model": current["model_version"],
                 "planner": current["planner_version"],
                 "corpus": current["corpus_version"],
                 "contract": current["contract_version"],

@@ -21,3 +21,17 @@ the configured private root and must not follow symlinks. Run
 `jyotish artifacts prune --retention-seconds <seconds>` (or configure
 `JYOTISH_ARTIFACT_RETENTION_SECONDS` for the post-ask sweep); the default is seven
 days. Confirm stale Pi mirrors are removed only after SQLite recovery succeeds.
+
+The artifact window is not a ResearchRun deletion policy. The authoritative SQLite
+ledger and append-only audit history are intentionally retained indefinitely;
+partial run deletion would break replay semantics. To erase local research data,
+stop all writers and use the whole-store operation:
+
+```bash
+jyotish store backup-and-purge --backup /private/path/research.sqlite3 \
+  --confirm PURGE_ALL_RESEARCH_DATA
+```
+
+It uses SQLite's backup API, verifies `integrity_check`, writes the backup as `0600`,
+and only then removes the database and WAL sidecars. It rejects symlinked configured
+roots, existing backup targets, and missing confirmation.

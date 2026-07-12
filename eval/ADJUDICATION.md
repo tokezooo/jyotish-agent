@@ -29,16 +29,17 @@ rights/provenance URL, and reviewer; never copy the system-under-test output.
 
 ## Fixed executable specifications
 
-`fixtures/specs.json` maps every one of the 60 case IDs to an explicit setup,
-deterministic repository command, and exact exit-code assertion. The four missing
-independent-oracle cases are instead marked `manual_not_scored` with a reason. Run
-the 40-case tuning split with:
+`fixtures/tuning-specs.json` and `fixtures/held-out-specs.json` map every case to
+either an exact production-boundary probe or an explicit `manual_not_scored`
+reason. There are 31 deterministic automated cases and 29 manual cases. A case is
+never called automated merely because a related generic test passes. Run the
+40-case tuning split with:
 
 ```bash
 uv run python -m jyotish_agent.evaluation tuning
 ```
 
 The 20-case held-out split is physically separate and requires the declared final
-review gate `held-out --allow-held-out`. `fixtures/checksums.json` freezes SHA-256
-digests for profiles, both case files, and executable specs; checksum drift fails
-before a runner command executes.
+review gate `held-out --allow-held-out`. Split-specific
+`fixtures/tuning-checksums.json` and `fixtures/held-out-checksums.json` freeze only
+the files visible to that run; checksum drift fails before a probe executes.

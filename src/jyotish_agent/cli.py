@@ -19,7 +19,7 @@ from urllib.parse import quote, urlparse
 
 from pydantic import ValidationError
 
-from .hardening import persist_private_artifact, prune_private_artifacts
+from .hardening import backup_and_purge_store, persist_private_artifact, prune_private_artifacts
 from .research_models import ResearchBirthProfileRequest
 from .research_store import ResearchStore, canonical_json, default_data_root
 
@@ -392,6 +392,14 @@ def _prune_artifacts(args: argparse.Namespace) -> int:
     return 0
 
 
+def _purge_store(args: argparse.Namespace) -> int:
+    backup = backup_and_purge_store(
+        default_data_root(), backup_path=Path(args.backup), confirmation=args.confirm
+    )
+    print(json.dumps({"backup": str(backup), "purged": True}, sort_keys=True))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="jyotish")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -423,6 +431,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     prune.add_argument("--json", action="store_true")
     prune.set_defaults(handler=_prune_artifacts)
+    store = subparsers.add_parser("store", help="manage the authoritative private ledger")
+    store_subparsers = store.add_subparsers(dest="store_command", required=True)
+    purge = store_subparsers.add_parser("backup-and-purge", help="backup, verify, and purge the whole ledger")
+    purge.add_argument("--backup", required=True)
+    purge.add_argument("--confirm", required=True)
+    purge.set_defaults(handler=_purge_store)
     return parser
 
 

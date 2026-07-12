@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 DATABASE_NAME = "research.sqlite3"
 
 
@@ -385,6 +385,10 @@ INSERT INTO available_versions (run_id, version_type, version)
 SELECT run_id, 'contract', contract_version FROM research_runs;
 """
 
+_MIGRATION_9 = """
+ALTER TABLE available_versions ADD COLUMN artifact_checksum TEXT;
+"""
+
 _MIGRATIONS: dict[int, str] = {
     1: _MIGRATION_1,
     2: _MIGRATION_2,
@@ -394,6 +398,7 @@ _MIGRATIONS: dict[int, str] = {
     6: _MIGRATION_6,
     7: _MIGRATION_7,
     8: _MIGRATION_8,
+    9: _MIGRATION_9,
 }
 
 
@@ -449,6 +454,8 @@ class ResearchStore:
         self.busy_timeout_ms = busy_timeout_ms
 
     def initialize(self) -> None:
+        if self.data_root.is_symlink():
+            raise ResearchStoreError("configured data root must not be a symlink")
         self.data_root.mkdir(mode=0o700, parents=True, exist_ok=True)
         os.chmod(self.data_root, 0o700)
         connection = self._connect()
@@ -982,14 +989,18 @@ class ResearchStore:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 self._run_values(run_data),
             )
+            dependencies = {
+                "engine": run_data["engine_version"],
+                "planner": run_data["planner_version"],
+                "corpus": run_data["corpus_version"],
+                "contract": run_data["contract_version"],
+            }
             connection.executemany(
-                "INSERT INTO available_versions (run_id, version_type, version) VALUES (?, ?, ?)",
+                "INSERT INTO available_versions (run_id, version_type, version, artifact_checksum) VALUES (?, ?, ?, ?)",
                 [
-                    (run_data["run_id"], "engine", run_data["engine_version"]),
-                    (run_data["run_id"], "model", run_data["model_version"]),
-                    (run_data["run_id"], "planner", run_data["planner_version"]),
-                    (run_data["run_id"], "corpus", run_data["corpus_version"]),
-                    (run_data["run_id"], "contract", run_data["contract_version"]),
+                    (run_data["run_id"], kind, version,
+                     self._dependency_checksum(connection, kind, version))
+                    for kind, version in dependencies.items()
                 ],
             )
             connection.execute(
@@ -1044,13 +1055,36 @@ class ResearchStore:
         connection = self._ready_connection()
         try:
             rows = connection.execute(
-                "SELECT version_type, version FROM available_versions WHERE run_id=?",
+                "SELECT version_type, version, artifact_checksum FROM available_versions WHERE run_id=?",
                 (run_id,),
             ).fetchall()
-            actual = {row["version_type"]: row["version"] for row in rows}
-            return actual == dict(expected)
+            expected = {key: value for key, value in expected.items() if key != "model"}
+            actual = {row["version_type"]: row["version"] for row in rows if row["version_type"] != "model"}
+            if actual != expected:
+                return False
+            return all(
+                row["artifact_checksum"]
+                == self._dependency_checksum(connection, row["version_type"], row["version"])
+                for row in rows if row["version_type"] != "model"
+            )
         finally:
             connection.close()
+
+    def _dependency_checksum(
+        self, connection: sqlite3.Connection, version_type: str, version: str
+    ) -> str:
+        if version_type == "corpus":
+            manifests = [row[0] for row in connection.execute(
+                "SELECT manifest_checksum FROM source_versions WHERE approval_status='approved' ORDER BY source_version_id"
+            )]
+            material = canonical_json({"version": version, "approved_manifests": manifests})
+            return sha256_text(material)
+        filename = {
+            "engine": "pyjhora_facade.py",
+            "planner": "planner.py",
+            "contract": "research_models.py",
+        }[version_type]
+        return sha256_text(version + "\n" + (Path(__file__).parent / filename).read_text(encoding="utf-8"))
 
     def append_event(
         self,
