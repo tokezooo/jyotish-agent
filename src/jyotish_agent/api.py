@@ -94,6 +94,10 @@ def _research_problem(status: int, title: str, problem: str, fix: str) -> JSONRe
             "problem": problem,
             "cause": title,
             "fix": fix,
+            "error_code": f"RESEARCH_RUN_{status}",
+            "run_id": None,
+            "stage": "research_run",
+            "retryable": status >= 500,
         },
     )
 

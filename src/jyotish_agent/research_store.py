@@ -40,6 +40,10 @@ class SourceConflict(ResearchStoreError):
     pass
 
 
+class CorpusIntegrityError(ResearchStoreError):
+    pass
+
+
 def canonical_json(value: Any) -> str:
     """Return UTF-8-safe canonical JSON and reject NaN/Infinity."""
     return json.dumps(
@@ -1914,6 +1918,7 @@ class ResearchStore:
         match = " AND ".join(f'"{term.replace(chr(34), chr(34) * 2)}"' for term in terms)
         connection = self._ready_connection()
         try:
+            self._verify_corpus_integrity(connection)
             rows = connection.execute(
                 """SELECT f.fragment_id, f.source_version_id, s.work_id, s.title,
                           s.source_class, f.locator, f.text AS quote, f.checksum,
@@ -1939,6 +1944,25 @@ class ResearchStore:
             return [dict(row) for row in rows]
         finally:
             connection.close()
+
+    @staticmethod
+    def _verify_corpus_integrity(connection: sqlite3.Connection) -> None:
+        """Fail closed when fragment bytes or the exact FTS membership drift."""
+        try:
+            fragments = connection.execute(
+                "SELECT fragment_id, text, checksum FROM source_fragments"
+            ).fetchall()
+            expected_ids = {row["fragment_id"] for row in fragments}
+            indexed_rows = connection.execute(
+                "SELECT fragment_id FROM source_fragments_fts"
+            ).fetchall()
+            indexed_ids = [row["fragment_id"] for row in indexed_rows]
+        except sqlite3.DatabaseError as exc:
+            raise CorpusIntegrityError("corpus or index cannot be read") from exc
+        if any(sha256_text(row["text"]) != row["checksum"] for row in fragments):
+            raise CorpusIntegrityError("source fragment checksum mismatch")
+        if len(indexed_ids) != len(set(indexed_ids)) or set(indexed_ids) != expected_ids:
+            raise CorpusIntegrityError("source fragment index membership mismatch")
 
     def get_source_version(self, source_version_id: str) -> dict[str, Any] | None:
         connection = self._ready_connection()

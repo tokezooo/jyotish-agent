@@ -172,7 +172,9 @@ def test_private_prompt_neutrally_classifies_non_career_question(tmp_path: Path,
     assert "typed career intent" not in prompt
 
 
-def _run_black_box(tmp_path: Path, mode: str) -> tuple[subprocess.CompletedProcess, dict, int]:
+def _run_black_box(
+    tmp_path: Path, mode: str, env_overrides: dict[str, str] | None = None
+) -> tuple[subprocess.CompletedProcess, dict, int]:
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     _executable, capture = _fake_pi(bin_dir)
@@ -187,6 +189,7 @@ def _run_black_box(tmp_path: Path, mode: str) -> tuple[subprocess.CompletedProce
         "FAKE_PI_CAPTURE": str(capture),
         "FAKE_PI_MODE": mode,
     }
+    env.update(env_overrides or {})
     completed = subprocess.run(
         [
             sys.executable,
@@ -228,6 +231,79 @@ def test_black_box_ask_outputs_only_verified_backend_artifact(tmp_path: Path):
     output = json.loads(completed.stdout)
     assert output["answer"].startswith("# Validated fake-Pi memo")
     assert "ARBITRARY_MODEL_STDOUT" not in output["answer"]
+
+
+def test_black_box_temporary_home_doctor_ask_inspect_replay_hash_shutdown(tmp_path: Path):
+    home = tmp_path / "home"
+    home.mkdir(mode=0o700)
+    completed, captured, port = _run_black_box(
+        tmp_path, "validated", {"HOME": str(home)}
+    )
+    assert completed.returncode == 0, completed.stderr
+    env = {
+        **os.environ,
+        "HOME": str(home),
+        "PATH": f"{tmp_path / 'bin'}{os.pathsep}{os.environ['PATH']}",
+        "JYOTISH_API_URL": f"http://127.0.0.1:{port}",
+        "JYOTISH_AGENT_DATA_ROOT": str(tmp_path / "data"),
+    }
+    server = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "jyotish_agent.api:app",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            str(port),
+            "--log-level",
+            "warning",
+        ],
+        cwd=ROOT,
+        env=env,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        for _ in range(100):
+            doctor = subprocess.run(
+                [sys.executable, "-m", "jyotish_agent.cli", "doctor"],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if doctor.returncode == 0:
+                break
+            import time
+            time.sleep(0.05)
+        assert doctor.returncode == 0, doctor.stdout + doctor.stderr
+        inspect = subprocess.run(
+            [sys.executable, "-m", "jyotish_agent.cli", "run", "inspect", captured["run_id"], "--json"],
+            cwd=ROOT, env=env, text=True, capture_output=True, check=False,
+        )
+        assert inspect.returncode == 0, inspect.stderr
+        inspected = json.loads(inspect.stdout)
+        assert inspected["run"]["status"] == "validated"
+        stale_mirror = tmp_path / "data" / "runtime" / f"{captured['run_id']}.pi.json"
+        stale_mirror.parent.mkdir(mode=0o700, exist_ok=True)
+        stale_mirror.write_text('{"memo_hash":"stale"}', encoding="utf-8")
+        replay = subprocess.run(
+            [sys.executable, "-m", "jyotish_agent.cli", "run", "replay", captured["run_id"], "--json"],
+            cwd=ROOT, env=env, text=True, capture_output=True, check=False,
+        )
+        assert replay.returncode == 0, replay.stderr
+        replayed = json.loads(replay.stdout)
+        assert len(replayed["memo_hash"]) == 64
+        answer = inspected["answers"][-1]["payload"]["markdown"]
+        assert replayed["memo_hash"] == __import__("hashlib").sha256(answer.encode()).hexdigest()
+    finally:
+        server.terminate()
+        server.wait(timeout=5)
+    with socket.socket() as sock:
+        assert sock.connect_ex(("127.0.0.1", port)) != 0
 
 
 def test_seeded_demo_inputs_are_small_authored_fixtures():

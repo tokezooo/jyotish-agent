@@ -32,6 +32,31 @@ uv run python scripts/check_pyjhora_data.py   # verify PyJHora + ephemeris data
 uv run pytest                             # run the test suite
 ```
 
+## Golden path: governed ResearchRun v2
+
+```bash
+uv run jyotish doctor
+uv run jyotish ask "What career factors and timing are supported?" \
+  --chart examples/demo-profile.json --json
+uv run jyotish run inspect <rr_id> --json
+uv run jyotish run replay <rr_id> --json
+```
+
+`ask` starts the loopback API when needed, invokes Pi with only the six governed
+research tools, and prints only a backend-validated AnswerContract 2.0 artifact.
+The command blocks if Pi fails, the assigned run ID is not validated, or the
+canonical Markdown hash differs. SQLite is authoritative; inspect and replay do not
+trust a Pi transcript mirror.
+
+Operator references:
+
+- [state and run model](docs/run-model.md)
+- [AnswerContract v2](docs/answer-contract-v2.md)
+- [corpus governance](docs/corpus-governance.md)
+- [debugging and error codes](docs/debugging-error-codes.md)
+- [migration, backup, and recovery](docs/migration-backup-recovery.md)
+- [evaluation rubric and frozen 40/20 split](eval/ADJUDICATION.md)
+
 ### Ephemeris (optional)
 
 PyJHora wheels ship no Swiss ephemeris (`.se1`) files, so by default calculations run
@@ -118,4 +143,3 @@ guard, and the HTTP path via a mocked `fetch`).
 
 - PyJHora: https://github.com/naturalstupid/PyJHora
 - Pi: https://pi.dev/docs/latest
-

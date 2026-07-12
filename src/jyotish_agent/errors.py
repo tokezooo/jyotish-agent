@@ -42,6 +42,14 @@ def problem_response(
         "problem": problem,
         "cause": cause,
         "fix": fix,
+        "error_code": (
+            "UNEXPECTED_INTERNAL"
+            if status >= 500
+            else problem_type.replace("-", "_").upper()
+        ),
+        "run_id": None,
+        "stage": "request",
+        "retryable": status >= 500,
     }
     if extra:
         body.update(extra)
