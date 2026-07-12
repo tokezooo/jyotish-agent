@@ -92,7 +92,6 @@
     .eyebrow, .micro-label {
       margin: 0 0 1rem;
       color: var(--gold);
-      font-family: var(--mono);
       font-size: .72rem;
       font-weight: 700;
       letter-spacing: .16em;
@@ -230,8 +229,8 @@
       border: 1px solid rgba(158, 172, 194, .5);
       border-radius: 50%;
       background: var(--deep);
-      font-family: var(--mono);
       font-size: .65rem;
+      font-weight: 800;
       transition: all .35s ease;
     }
     .node-name { max-width: 11ch; font-size: .7rem; line-height: 1.25; text-align: center; }
@@ -259,7 +258,7 @@
       box-shadow: var(--shadow);
     }
     .explanation { display: flex; flex-direction: column; padding: clamp(1.4rem, 4vw, 2.5rem); }
-    .phase-kicker { color: var(--indigo); font-family: var(--mono); font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; }
+    .phase-kicker { color: var(--indigo); font-size: .78rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
     .phase-title { max-width: 13ch; margin: .7rem 0 .8rem; font-size: clamp(2.3rem, 4.8vw, 4.25rem); letter-spacing: -.04em; }
     .phase-short { max-width: 600px; margin-bottom: 1.7rem; color: #c7d2e4; font-size: 1.08rem; }
 
@@ -323,14 +322,14 @@
     }
     .card-top { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 1rem; align-items: start; padding: .7rem .65rem 1.2rem; }
     .card-top h3 { margin: .25rem 0 0; font-size: 1.35rem; }
-    .status-pill { flex: none; padding: .38rem .65rem; color: var(--verified); border: 1px solid rgba(85, 214, 190, .35); border-radius: 999px; font-family: var(--mono); font-size: .68rem; }
+    .status-pill { flex: none; padding: .38rem .65rem; color: var(--verified); border: 1px solid rgba(85, 214, 190, .35); border-radius: 999px; font-size: .68rem; font-weight: 800; }
     .question-box { position: relative; z-index: 1; margin-bottom: 1rem; padding: 1rem; border-radius: 14px; color: #ccd6e6; background: rgba(7, 17, 31, .65); }
-    .question-box span { display: block; margin-bottom: .45rem; color: var(--muted); font-family: var(--mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; }
+    .question-box span { display: block; margin-bottom: .45rem; color: var(--muted); font-size: .66rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
     .question-box p { margin: 0; }
     .artifact { position: relative; z-index: 1; min-height: 384px; padding: 1.15rem; border: 1px solid var(--line); border-radius: 16px; background: rgba(5, 14, 26, .48); }
     .artifact-head { display: flex; justify-content: space-between; gap: 1rem; align-items: baseline; margin-bottom: .9rem; }
-    .artifact-label { color: var(--gold); font-family: var(--mono); font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; }
-    .artifact-index { color: var(--muted); font-family: var(--mono); font-size: .68rem; }
+    .artifact-label { color: var(--gold); font-size: .68rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+    .artifact-index { color: var(--muted); font-size: .68rem; }
     .artifact h4 { margin: 0 0 1.2rem; font-family: var(--serif); font-size: 1.75rem; font-weight: 500; }
     .artifact-rows { display: grid; gap: .65rem; }
     .artifact-row { display: grid; grid-template-columns: minmax(95px, .72fr) minmax(0, 1.28fr); gap: 1rem; align-items: baseline; padding: .72rem 0; border-top: 1px solid var(--line); }
@@ -496,7 +495,7 @@
       <div class="details-body">
         <p>Golden path начинается с диагностики, затем CLI проводит вопрос через управляемый ResearchRun v2.</p>
         <div class="command">
-          <code id="commandText">uv run jyotish ask "What career factors and timing are supported?" --birth-date YYYY-MM-DD --birth-time HH:MM --place "City, Country"</code>
+          <code id="commandText">uv run jyotish ask "What career factors and timing are supported?" --chart examples/demo-profile.json --json</code>
           <button class="copy-button" id="copyButton" type="button">Скопировать</button>
         </div>
         <span class="sr-only" id="copyStatus" role="status" aria-live="polite"></span>
@@ -639,7 +638,10 @@
       activePhase: 0,
       mode: "simple",
       autoplay: false,
-      timer: null
+      timer: null,
+      copyLabel: "Скопировать",
+      copyStatus: "",
+      copyTimer: null
     };
 
     const els = {
@@ -664,23 +666,28 @@
     };
 
     function renderOrbit() {
-      els.orbitNodes.innerHTML = phases.map((phase, index) => `
-        <button
-          class="orbit-node"
-          type="button"
-          role="tab"
-          id="phase-tab-${index}"
-          aria-controls="phasePanel"
-          aria-selected="${index === state.activePhase}"
-          tabindex="${index === state.activePhase ? 0 : -1}"
-          data-index="${index}"
-          data-passed="${index < state.activePhase}"
-          title="Фаза ${index + 1}: ${phase.title}"
-        >
-          <span class="node-light">${phase.number}</span>
-          <span class="node-name">${phase.title}</span>
-        </button>
-      `).join("");
+      if (els.orbitNodes.children.length === 0) {
+        els.orbitNodes.innerHTML = phases.map((phase, index) => `
+          <button
+            class="orbit-node"
+            type="button"
+            role="tab"
+            id="phase-tab-${index}"
+            aria-controls="phasePanel"
+            data-index="${index}"
+            title="Фаза ${index + 1}: ${phase.title}"
+          >
+            <span class="node-light">${phase.number}</span>
+            <span class="node-name">${phase.title}</span>
+          </button>
+        `).join("");
+      }
+
+      [...els.orbitNodes.children].forEach((button, index) => {
+        button.setAttribute("aria-selected", String(index === state.activePhase));
+        button.tabIndex = index === state.activePhase ? 0 : -1;
+        button.dataset.passed = String(index < state.activePhase);
+      });
     }
 
     function renderMode(phase) {
@@ -727,6 +734,7 @@
     }
 
     function render() {
+      if (state.activePhase === phases.length - 1 && state.autoplay) pauseAutoplay();
       const phase = phases[state.activePhase];
       renderOrbit();
       els.phaseKicker.textContent = `Фаза ${phase.number} · ${phase.artifactLabel}`;
@@ -740,6 +748,8 @@
       els.nextButton.textContent = state.activePhase === phases.length - 2 ? "К финальной фазе →" : "Следующая фаза →";
       els.autoplayButton.setAttribute("aria-pressed", String(state.autoplay));
       els.autoplayButton.textContent = state.autoplay ? "Ⅱ Пауза" : "▶ Автопроход";
+      els.copyButton.textContent = state.copyLabel;
+      els.copyStatus.textContent = state.copyStatus;
 
       els.phasePanel.classList.remove("phase-enter");
       void els.phasePanel.offsetWidth;
@@ -755,11 +765,6 @@
     function scheduleAutoplay() {
       if (state.timer) window.clearInterval(state.timer);
       state.timer = window.setInterval(() => {
-        if (state.activePhase >= phases.length - 1) {
-          pauseAutoplay();
-          render();
-          return;
-        }
         state.activePhase += 1;
         render();
       }, 5500);
@@ -835,21 +840,35 @@
     els.copyButton.addEventListener("click", async () => {
       const text = els.commandText.textContent;
       let copied = false;
+      let selection = null;
       try {
         await navigator.clipboard.writeText(text);
         copied = true;
       } catch (_) {
         const range = document.createRange();
-        const selection = window.getSelection();
+        selection = window.getSelection();
         range.selectNodeContents(els.commandText);
         selection.removeAllRanges();
         selection.addRange(range);
-        copied = document.execCommand("copy");
-        selection.removeAllRanges();
+        try {
+          copied = document.execCommand("copy");
+        } catch (_) {
+          copied = false;
+        }
+        if (copied) selection.removeAllRanges();
       }
-      els.copyButton.textContent = copied ? "Скопировано ✓" : "Выделить команду";
-      els.copyStatus.textContent = copied ? "Команда скопирована" : "Не удалось скопировать автоматически";
-      window.setTimeout(() => { els.copyButton.textContent = "Скопировать"; }, 2200);
+      state.copyLabel = copied ? "Скопировано ✓" : "Команда выделена";
+      state.copyStatus = copied
+        ? "Команда скопирована"
+        : "Команда выделена. Нажмите Control+C или Command+C, чтобы скопировать.";
+      if (state.copyTimer) window.clearTimeout(state.copyTimer);
+      state.copyTimer = window.setTimeout(() => {
+        state.copyLabel = "Скопировать";
+        state.copyStatus = "";
+        state.copyTimer = null;
+        render();
+      }, 2200);
+      render();
     });
 
     render();
