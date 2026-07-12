@@ -1386,6 +1386,35 @@ class ResearchStore:
         finally:
             connection.close()
 
+    def list_claims(self, run_id: str) -> list[dict[str, Any]]:
+        connection = self._ready_connection()
+        try:
+            rows = connection.execute(
+                "SELECT * FROM claims WHERE run_id=? ORDER BY created_at, claim_id",
+                (run_id,),
+            ).fetchall()
+            result = []
+            for row in rows:
+                item = dict(row)
+                item["payload"] = json.loads(item.pop("payload_json"))
+                result.append(item)
+            return result
+        finally:
+            connection.close()
+
+    def list_claim_supports(self, run_id: str) -> list[dict[str, Any]]:
+        connection = self._ready_connection()
+        try:
+            rows = connection.execute(
+                """SELECT s.claim_id, s.evidence_id, s.support_type
+                   FROM claim_supports s JOIN claims c ON c.claim_id=s.claim_id
+                   WHERE c.run_id=? ORDER BY s.claim_id, s.evidence_id""",
+                (run_id,),
+            ).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            connection.close()
+
     def list_answer_attempts(self, run_id: str) -> list[dict[str, Any]]:
         connection = self._ready_connection()
         try:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any
 
 from .models import AnswerContract
@@ -26,10 +27,15 @@ def validate_answer_contract(
     unstable_paths = {item["payload"]["path"] for item in evidence_items
                       if item["evidence_type"] == "sensitivity_fact"
                       and item["payload"].get("stability") == "unstable"}
-    forbidden = ("probability", "probabilistic", "rectification", "rectify")
+    forbidden = re.compile(
+        r"\b(?:probabilit(?:y|ies)|probabilistic|probable|probably|unlikely|"
+        r"likely|likelihood|chance|odds|"
+        r"rectif(?:y|ies|ied|ication)|rectified)\b|\d+(?:\.\d+)?\s*%",
+        re.IGNORECASE,
+    )
     prose = [answer.title, *answer.limitations, *answer.followups]
     prose.extend(getattr(claim, "text", "") for claim in answer.claims)
-    if any(term in text.lower() for text in prose for term in forbidden):
+    if any(forbidden.search(text) for text in prose):
         violations.append("probability language and birth-time rectification are prohibited")
     if len(claims) != len(answer.claims):
         violations.append("claim_id values must be unique")
@@ -85,7 +91,9 @@ def validate_answer_contract(
             if "BIRTH_TIME_SENSITIVITY_UNSTABLE" not in claim.caveats or claim.confidence > 0.5:
                 violations.append("central synthesis using unstable evidence requires caveat and confidence <= 0.5")
         if birth_time_confidence == "unknown" and claim.materiality == "major" and any(
-            path.startswith(("d9.", "d10.", "houses.", "ascendant.")) for path in paths
+            path.startswith(("d9.", "d10.", "houses.", "ascendant.",
+                             "bhava.d9.", "bhava.d10.",
+                             "lagnas.d9.", "lagnas.d10.")) for path in paths
         ):
             violations.append("unknown birth time cannot support strong house/varga-sensitive conclusions")
 

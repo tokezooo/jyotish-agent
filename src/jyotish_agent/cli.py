@@ -15,13 +15,12 @@ import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 from pydantic import ValidationError
 
 from .research_models import ResearchBirthProfileRequest
-from .research_store import ResearchStore, RunNotFound, canonical_json, default_data_root
-from .research_service import ReplayError, ResearchService
+from .research_store import ResearchStore, canonical_json, default_data_root
 
 DEFAULT_API_URL = "http://127.0.0.1:8000"
 REQUIRED_V2_BLOCKER = (
@@ -55,6 +54,30 @@ def _get_json(base: str, path: str) -> dict | None:
         return body if isinstance(body, dict) else None
     except (OSError, ValueError, urllib.error.URLError):
         return None
+
+
+def _post_empty_json(base: str, path: str) -> dict:
+    _loopback_address(base)
+    request = urllib.request.Request(
+        f"{base}{path}", data=b"", headers={"Accept": "application/json"}, method="POST"
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        try:
+            problem = json.loads(exc.read().decode("utf-8"))
+        except (ValueError, json.JSONDecodeError):
+            problem = {}
+        code = problem.get("error_code", f"HTTP_{exc.code}")
+        if exc.code == 404:
+            raise CliError(f"research run not found: {path.rsplit('/', 2)[-2]}", 2) from exc
+        raise CliError(f"offline replay failed: {code}", 4) from exc
+    except (OSError, ValueError, urllib.error.URLError) as exc:
+        raise CliError("loopback replay API is unreachable", 3) from exc
+    if not isinstance(body, dict):
+        raise CliError("loopback replay API returned an invalid response", 3)
+    return body
 
 
 def _health(base: str) -> dict | None:
@@ -334,13 +357,9 @@ def _inspect_run(args: argparse.Namespace) -> int:
 
 
 def _replay_run(args: argparse.Namespace) -> int:
-    try:
-        replay = ResearchService(ResearchStore(default_data_root())).replay_run(args.run_id)
-    except RunNotFound as exc:
-        raise CliError(f"research run not found: {args.run_id}", 2) from exc
-    except ReplayError as exc:
-        raise CliError(f"offline replay failed: {exc.error_code}", 4) from exc
-    body = replay.model_dump(mode="json")
+    body = _post_empty_json(
+        _api_base(), f"/v2/research-runs/{quote(args.run_id)}/replay"
+    )
     if args.json:
         print(json.dumps(body, ensure_ascii=False, sort_keys=True))
     else:

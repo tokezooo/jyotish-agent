@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import sqlite3
+import urllib.request
 import uuid
 from pathlib import Path
 
@@ -19,7 +20,7 @@ from jyotish_agent import cli
 from jyotish_agent.models import AnswerContract, FactRef
 from jyotish_agent.research_models import AnswerContractV2
 from jyotish_agent.research_service import ResearchService
-from jyotish_agent.research_store import ResearchStore
+from jyotish_agent.research_store import ResearchStore, canonical_json, sha256_text
 
 
 def _id(prefix: str) -> str:
@@ -52,11 +53,14 @@ def _run_body(*, confidence: str = "exact") -> dict:
     }
 
 
-def _client(tmp_path: Path, monkeypatch, *, confidence: str = "exact") -> tuple[TestClient, ResearchStore, dict]:
+def _client(tmp_path: Path, monkeypatch, *, confidence: str = "exact",
+            contract_version: str = "2.0") -> tuple[TestClient, ResearchStore, dict]:
     store = ResearchStore(tmp_path / "data")
     app.state.research_service = ResearchService(store)
     client = TestClient(app)
-    created = client.post("/v2/research-runs", json=_run_body(confidence=confidence)).json()
+    body = _run_body(confidence=confidence)
+    body["contract_version"] = contract_version
+    created = client.post("/v2/research-runs", json=body).json()
     screened = client.post(
         f"/v2/research-runs/{created['run_id']}/screen",
         json={"operation_id": _id("op_"), "expected_revision": 1},
@@ -251,10 +255,110 @@ def test_offline_replay_reproduces_projection_claims_and_memo(tmp_path: Path, mo
     assert replay["offline"] is True
     assert replay["memo_hash"] == submitted["markdown_sha256"]
     assert len(replay["projection_hash"]) == len(replay["claims_hash"]) == 64
-    monkeypatch.setenv("JYOTISH_AGENT_DATA_ROOT", str(tmp_path / "data"))
+
+    class Response:
+        def __enter__(self): return self
+        def __exit__(self, *args): return None
+        def read(self): return json.dumps(replay).encode()
+
+    def urlopen(request, timeout):
+        assert isinstance(request, urllib.request.Request)
+        assert request.full_url.endswith(f"/v2/research-runs/{calculated['run_id']}/replay")
+        assert request.get_method() == "POST"
+        return Response()
+
+    monkeypatch.setattr(urllib.request, "urlopen", urlopen)
+    monkeypatch.setattr("jyotish_agent.cli.ResearchStore",
+                        lambda *a, **k: pytest.fail("CLI replay bypassed loopback API"))
     assert cli.main(["run", "replay", calculated["run_id"], "--json"]) == 0
     cli_replay = json.loads(capsys.readouterr().out)
     assert cli_replay == replay
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_code"),
+    [
+        ("evidence_hash", "PINNED_PAYLOAD_HASH_MISMATCH"),
+        ("answer_hash", "PINNED_PAYLOAD_HASH_MISMATCH"),
+        ("claim_hash", "PINNED_PAYLOAD_HASH_MISMATCH"),
+        ("evidence_type", "PINNED_CLAIMS_INVALID"),
+        ("missing_support", "MISSING_PINNED_MATERIAL"),
+        ("missing_claim", "MISSING_PINNED_MATERIAL"),
+        ("extra_evidence", "PINNED_ROW_SET_MISMATCH"),
+    ],
+)
+def test_replay_validates_every_pinned_row_and_graph(
+    tmp_path: Path, monkeypatch, mutation, expected_code
+):
+    client, store, calculated = _client(tmp_path, monkeypatch)
+    answer = _answer(calculated["evidence_ids"][0])
+    client.post(
+        f"/v2/research-runs/{calculated['run_id']}/answers",
+        json={"operation_id": _id("op_"), "expected_revision": calculated["revision"],
+              "answer": answer},
+    )
+    with sqlite3.connect(store.database_path) as connection:
+        if mutation == "evidence_hash":
+            connection.execute("DROP TRIGGER evidence_items_no_update")
+            connection.execute("UPDATE evidence_items SET payload_json='{}' WHERE evidence_id=?",
+                               (calculated["evidence_ids"][-1],))
+        elif mutation == "answer_hash":
+            connection.execute("DROP TRIGGER answers_no_update")
+            connection.execute("UPDATE answers SET payload_json='{}' WHERE run_id=?",
+                               (calculated["run_id"],))
+        elif mutation == "claim_hash":
+            connection.execute("DROP TRIGGER claims_no_update")
+            connection.execute("UPDATE claims SET payload_json='{}' WHERE claim_id=?",
+                               (answer["claims"][0]["claim_id"],))
+        elif mutation == "evidence_type":
+            connection.execute("DROP TRIGGER evidence_items_no_update")
+            connection.execute(
+                "UPDATE evidence_items SET evidence_type='source_fragment' WHERE evidence_id=?",
+                (calculated["evidence_ids"][0],),
+            )
+        elif mutation == "missing_support":
+            connection.execute("DROP TRIGGER claim_supports_no_delete")
+            connection.execute("DELETE FROM claim_supports WHERE claim_id=?",
+                               (answer["claims"][0]["claim_id"],))
+        elif mutation == "missing_claim":
+            connection.execute("DROP TRIGGER claims_no_delete")
+            connection.execute("DELETE FROM claims WHERE claim_id=?",
+                               (answer["claims"][0]["claim_id"],))
+        else:
+            payload = {"path": "unreferenced.extra", "value": "x"}
+            connection.execute(
+                "INSERT INTO evidence_items VALUES (?, ?, 'computed_fact', ?, ?, ?)",
+                (_id("evi_"), calculated["run_id"], canonical_json(payload),
+                 sha256_text(canonical_json(payload)), "2026-07-12T00:00:00Z"),
+            )
+    response = client.post(f"/v2/research-runs/{calculated['run_id']}/replay")
+    assert response.status_code == 409
+    assert response.json()["error_code"] == expected_code
+
+
+def test_replay_distinguishes_unsupported_contract_and_version_mismatch(tmp_path: Path, monkeypatch):
+    unsupported_client, _store, calculated = _client(
+        tmp_path / "unsupported", monkeypatch, contract_version="3.0"
+    )
+    unsupported_client.post(
+        f"/v2/research-runs/{calculated['run_id']}/answers",
+        json={"operation_id": _id("op_"), "expected_revision": calculated["revision"],
+              "answer": _answer(calculated["evidence_ids"][0])},
+    )
+    response = unsupported_client.post(f"/v2/research-runs/{calculated['run_id']}/replay")
+    assert response.json()["error_code"] == "UNSUPPORTED_PINNED_VERSION"
+
+    client, store, calculated = _client(tmp_path / "mismatch", monkeypatch)
+    client.post(
+        f"/v2/research-runs/{calculated['run_id']}/answers",
+        json={"operation_id": _id("op_"), "expected_revision": calculated["revision"],
+              "answer": _answer(calculated["evidence_ids"][0])},
+    )
+    with sqlite3.connect(store.database_path) as connection:
+        connection.execute("UPDATE question_plans SET planner_version='other' WHERE run_id=?",
+                           (calculated["run_id"],))
+    response = client.post(f"/v2/research-runs/{calculated['run_id']}/replay")
+    assert response.json()["error_code"] == "PINNED_VERSION_MISMATCH"
 
 
 def test_approximate_birth_time_records_exact_seven_point_sweep(tmp_path: Path, monkeypatch):
@@ -281,6 +385,47 @@ def test_offline_replay_detects_projection_divergence(tmp_path: Path, monkeypatc
     response = client.post(f"/v2/research-runs/{calculated['run_id']}/replay")
     assert response.status_code == 409
     assert response.json()["error_code"] == "PROJECTION_HASH_MISMATCH"
+
+
+@pytest.mark.parametrize("phrase", [
+    "This is likely.", "Likelihood is high.", "There is a 40% chance.",
+    "A rectified time would help.", "After the chart was rectified.",
+    "This is probably relevant.", "That outcome is unlikely.", "The odds are high.",
+])
+def test_answer_policy_rejects_probability_and_rectification_variants(phrase):
+    evidence_id = _id("evi_")
+    payload = _answer(evidence_id)
+    payload["claims"][1]["text"] = phrase
+    answer = AnswerContractV2.model_validate(payload)
+    evidence = [{"evidence_id": evidence_id, "evidence_type": "computed_fact",
+                 "payload": {"path": "d1.Sun.sign", "value": "Aries"}}]
+    assert any("prohibited" in item for item in validate_answer_contract(answer, evidence))
+
+
+@pytest.mark.parametrize("phrase", [
+    "This may be relevant.", "This is possible but uncertain.",
+    "Confidence is limited by the recorded time.",
+])
+def test_answer_policy_allows_nonprobabilistic_uncertainty_language(phrase):
+    evidence_id = _id("evi_")
+    payload = _answer(evidence_id)
+    payload["claims"][1]["text"] = phrase
+    answer = AnswerContractV2.model_validate(payload)
+    evidence = [{"evidence_id": evidence_id, "evidence_type": "computed_fact",
+                 "payload": {"path": "d1.Sun.sign", "value": "Aries"}}]
+    assert validate_answer_contract(answer, evidence) == []
+
+
+@pytest.mark.parametrize("path", [
+    "bhava.d9.10.lord", "bhava.d10.10.sign", "lagnas.d9.sign", "lagnas.d10.sign",
+])
+def test_unknown_time_blocks_all_actual_house_and_varga_path_families(path):
+    evidence_id = _id("evi_")
+    answer = AnswerContractV2.model_validate(_answer(evidence_id))
+    evidence = [{"evidence_id": evidence_id, "evidence_type": "computed_fact",
+                 "payload": {"path": path, "value": "Aries"}}]
+    violations = validate_answer_contract(answer, evidence, birth_time_confidence="unknown")
+    assert any("house/varga" in item for item in violations)
 
 
 def test_one_repair_budget_is_persisted_and_exhausted(tmp_path: Path, monkeypatch):

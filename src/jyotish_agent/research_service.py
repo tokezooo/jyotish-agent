@@ -41,6 +41,7 @@ from .research_models import (
 from .research_store import ResearchStore, RunNotFound, canonical_json, new_id, sha256_text
 from .validation import profile_warnings
 from .timezone_resolution import resolve_fixed, resolve_iana
+from .timezone_resolution import TimezoneResolutionError, timezone_fingerprint
 
 
 class UnsupportedTimezoneMode(ValueError):
@@ -168,21 +169,89 @@ class ResearchService:
         )):
             raise ReplayError("MISSING_PINNED_VERSION")
         plan = self.store.get_question_plan(run_id)
-        answers = self.store.list_answers(run_id)
-        if plan is None or not answers:
+        intent = self.store.get_question_intent(run_id)
+        try:
+            answers = self.store.list_answers(run_id)
+            evidence = self.store.list_evidence(run_id)
+            claims = self.store.list_claims(run_id)
+        except (ValueError, json.JSONDecodeError):
+            raise ReplayError("PINNED_PAYLOAD_HASH_MISMATCH") from None
+        if plan is None or intent is None or not answers:
             raise ReplayError("MISSING_PINNED_MATERIAL")
+        if current["contract_version"] != "2.0" or plan["plan"].get("schema_version") != 1:
+            raise ReplayError("UNSUPPORTED_PINNED_VERSION")
+        if plan["planner_version"] != current["planner_version"]:
+            raise ReplayError("PINNED_VERSION_MISMATCH")
+        if sha256_text(canonical_json(plan["plan"])) != plan["plan_hash"]:
+            raise ReplayError("PINNED_PAYLOAD_HASH_MISMATCH")
+        if sha256_text(canonical_json(intent["intent"])) != intent["intent_hash"]:
+            raise ReplayError("PINNED_PAYLOAD_HASH_MISMATCH")
+        self._validate_replay_timezone_material(current)
+
+        supports = self.store.list_claim_supports(run_id)
+        attempts = self.store.list_answer_attempts(run_id)
+        for row in [*evidence, *answers, *claims]:
+            if sha256_text(canonical_json(row["payload"])) != row["payload_hash"]:
+                raise ReplayError("PINNED_PAYLOAD_HASH_MISMATCH")
+        expected_evidence: set[str] = set()
+        expected_answers: set[str] = set()
+        expected_attempts: set[str] = set()
+        for event in self.store.list_events(run_id):
+            payload = json.loads(event["payload_json"])
+            result = payload.get("result", {})
+            if event["event_type"] == "research_run.calculated":
+                expected_evidence.update(result.get("evidence_ids", []))
+            elif event["event_type"] == "research_run.retrieved":
+                expected_evidence.update(
+                    item["evidence_id"] for item in result.get("results", [])
+                    if item.get("evidence_id")
+                )
+            elif event["event_type"] == "research_run.answer_submitted" and result.get("answer_id"):
+                expected_answers.add(result["answer_id"])
+                expected_attempts.add(event["operation_id"])
+            elif event["event_type"] == "research_run.answer_submitted":
+                expected_attempts.add(event["operation_id"])
+        self._require_exact_row_set(expected_evidence,
+                                    {row["evidence_id"] for row in evidence})
+        self._require_exact_row_set(expected_answers,
+                                    {row["answer_id"] for row in answers})
+        self._require_exact_row_set(expected_attempts,
+                                    {row["attempt_id"] for row in attempts})
         answer_row = answers[-1]
         try:
             answer = AnswerContractV2.model_validate(answer_row["payload"]["contract"])
         except Exception:
             raise ReplayError("UNSUPPORTED_PINNED_VERSION") from None
-        evidence = self.store.list_evidence(run_id)
+        valid_attempts = [row for row in attempts if row["valid"]]
+        if (len(valid_attempts) != 1
+                or valid_attempts[0]["answer_id"] != answer_row["answer_id"]
+                or valid_attempts[0]["contract_hash"] != sha256_text(
+                    canonical_json(answer.model_dump(mode="json"))
+                )):
+            raise ReplayError("PINNED_CLAIMS_INVALID")
         violations = validate_answer_contract(
             answer, evidence,
             birth_time_confidence=current["birth_profile"].get("birth_time_confidence", "exact"),
         )
         if violations:
             raise ReplayError("PINNED_CLAIMS_INVALID")
+        contract_claims = {
+            claim.claim_id: claim.model_dump(mode="json") for claim in answer.claims
+        }
+        actual_claims = {row["claim_id"]: row["payload"] for row in claims}
+        self._require_exact_row_set(set(contract_claims), set(actual_claims))
+        if any(actual_claims[key] != value for key, value in contract_claims.items()):
+            raise ReplayError("PINNED_CLAIMS_INVALID")
+        expected_supports = {
+            (claim.claim_id, evidence_id, claim.claim_type)
+            for claim in answer.claims if claim.claim_type in {"computed", "source"}
+            for evidence_id in claim.supports
+        }
+        actual_supports = {
+            (row["claim_id"], row["evidence_id"], row["support_type"])
+            for row in supports
+        }
+        self._require_exact_row_set(expected_supports, actual_supports)
         rendered = render_answer_markdown(answer, evidence)
         if (rendered.markdown != answer_row["payload"]["markdown"] or
                 rendered.sha256 != answer_row["payload"]["markdown_sha256"]):
@@ -199,6 +268,32 @@ class ResearchService:
             memo_hash=rendered.sha256, answer_id=answer_row["answer_id"],
             source_disagreements=disagreements,
         )
+
+    @staticmethod
+    def _require_exact_row_set(expected: set, actual: set) -> None:
+        if expected - actual:
+            raise ReplayError("MISSING_PINNED_MATERIAL")
+        if actual - expected:
+            raise ReplayError("PINNED_ROW_SET_MISMATCH")
+
+    @staticmethod
+    def _validate_replay_timezone_material(run: dict[str, Any]) -> None:
+        mode = run["timezone_resolution_mode"]
+        if mode == "fixed_offset_legacy":
+            if run["timezone_fingerprint"] != "fixed-offset:v1":
+                raise ReplayError("PINNED_VERSION_MISMATCH")
+            return
+        if mode not in {"iana", "iana_with_asserted_offset"}:
+            raise ReplayError("UNSUPPORTED_PINNED_VERSION")
+        zone_id = run.get("timezone_zone_id")
+        if not zone_id:
+            raise ReplayError("MISSING_PINNED_MATERIAL")
+        try:
+            fingerprint = timezone_fingerprint(zone_id)
+        except TimezoneResolutionError:
+            raise ReplayError("MISSING_PINNED_MATERIAL") from None
+        if fingerprint != run["timezone_fingerprint"]:
+            raise ReplayError("PINNED_TIMEZONE_MATERIAL_MISMATCH")
 
     def screen_run(
         self, run_id: str, request: ResearchOperationRequest
@@ -264,7 +359,9 @@ class ResearchService:
         stored_profile = run["birth_profile"]
         profile_input = json.loads(canonical_json(stored_profile))
         profile_input.pop("birth_time_range", None)
-        profile_input["place"]["timezone"] = run["resolved_offset_minutes"] / 60
+        self._apply_resolved_timezone(run, profile_input,
+                                      dt.datetime.fromisoformat(run["civil_datetime"]),
+                                      validate_pinned=True)
         profile_request = BirthProfileRequest.model_validate(profile_input)
         config_payload = json.loads(canonical_json(run["calculation_config"]))
         plan = persisted_plan["plan"]
@@ -714,6 +811,7 @@ class ResearchService:
                 shifted = base_dt + dt.timedelta(minutes=offset)
                 payload = json.loads(canonical_json(profile_input))
                 payload["date"], payload["time"] = shifted.date().isoformat(), shifted.time().isoformat()
+                ResearchService._apply_resolved_timezone(run, payload, shifted)
                 request = BirthProfileRequest.model_validate(payload)
                 result = compute_chart(request.to_birth_profile(), reference_date=reference,
                                        config=config_request.to_calculation_config())
@@ -727,6 +825,29 @@ class ResearchService:
              "values": [{"offset_minutes": o, "value": samples[o].get(path)} for o in offsets]}
             for path in selected
         ]
+
+    @staticmethod
+    def _apply_resolved_timezone(run: dict[str, Any], payload: dict[str, Any],
+                                 civil: dt.datetime, *, validate_pinned: bool = False) -> None:
+        spec = run["birth_profile"]["place"]["timezone"]
+        if isinstance(spec, dict) and spec.get("kind") in {"iana", "iana_with_asserted_offset"}:
+            resolved = resolve_iana(
+                civil, mode=spec["kind"], zone_id=spec["zone_id"],
+                fold=spec.get("fold"),
+                asserted_offset_hours=spec.get("asserted_offset_hours"),
+                longitude=run["birth_profile"]["place"]["longitude"],
+                expected_fingerprint=run.get("timezone_fingerprint"),
+            )
+            utc_text = resolved.utc_instant.isoformat().replace("+00:00", "Z")
+            if validate_pinned and (
+                resolved.offset_minutes != run["resolved_offset_minutes"]
+                or resolved.fold != run.get("timezone_fold", 0)
+                or utc_text != run["utc_instant"]
+            ):
+                raise TimezoneResolutionError("TIMEZONE_RESOLUTION_MISMATCH")
+            payload["place"]["timezone"] = resolved.offset_minutes / 60
+        else:
+            payload["place"]["timezone"] = run["resolved_offset_minutes"] / 60
 
     @staticmethod
     def _response(run: dict[str, Any]) -> ResearchRunResponse:

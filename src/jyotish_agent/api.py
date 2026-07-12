@@ -352,6 +352,15 @@ async def calculate_research_run(
         )
     except ConfigError as exc:
         raise CalculationError(str(exc)) from exc
+    except TimezoneResolutionError as exc:
+        problem = _research_problem(
+            422, "Timezone resolution failed", exc.error_code,
+            "Restore pinned timezone material or correct the civil time/fold.",
+        )
+        import json as _json
+        content = _json.loads(problem.body)
+        content["error_code"] = exc.error_code
+        return JSONResponse(status_code=422, media_type="application/problem+json", content=content)
 
 
 @app.post(

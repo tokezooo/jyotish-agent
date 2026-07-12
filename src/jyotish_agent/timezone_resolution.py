@@ -26,7 +26,7 @@ class ResolvedTimezone:
     warnings: tuple[str, ...]
 
 
-def _fingerprint(zone_id: str) -> str:
+def timezone_fingerprint(zone_id: str) -> str:
     for root in TZPATH:
         path = Path(root) / zone_id
         if path.is_file():
@@ -50,7 +50,8 @@ def _coordinate_warnings(longitude: float, offset_minutes: int) -> tuple[str, ..
 
 def resolve_iana(civil: dt.datetime, *, mode: str, zone_id: str,
                  fold: int | None, asserted_offset_hours: float | None,
-                 longitude: float) -> ResolvedTimezone:
+                 longitude: float,
+                 expected_fingerprint: str | None = None) -> ResolvedTimezone:
     try:
         zone = ZoneInfo(zone_id)
     except ZoneInfoNotFoundError:
@@ -62,24 +63,31 @@ def resolve_iana(civil: dt.datetime, *, mode: str, zone_id: str,
         utc = aware.astimezone(dt.UTC)
         back = utc.astimezone(zone)
         offset = aware.utcoffset()
-        if back.replace(tzinfo=None) == civil and back.fold == candidate_fold and offset:
+        if (back.replace(tzinfo=None) == civil and back.fold == candidate_fold
+                and offset is not None):
             candidates.append((candidate_fold, utc, offset))
     if not candidates:
         raise TimezoneResolutionError("NONEXISTENT_LOCAL_TIME")
     distinct = {item[2] for item in candidates}
     if len(distinct) > 1 and fold is None:
         raise TimezoneResolutionError("AMBIGUOUS_LOCAL_TIME")
-    selected_fold = 0 if fold is None else fold
+    selected_fold = (0 if fold is None else fold) if len(distinct) > 1 else candidates[0][0]
     selected = next((item for item in candidates if item[0] == selected_fold), None)
     if selected is None:
         raise TimezoneResolutionError("NONEXISTENT_LOCAL_TIME")
-    offset_minutes = round(selected[2].total_seconds() / 60)
+    offset_seconds = selected[2].total_seconds()
+    if offset_seconds % 60:
+        raise TimezoneResolutionError("TIMEZONE_OFFSET_SUBMINUTE_UNSUPPORTED")
+    offset_minutes = int(offset_seconds / 60)
     if asserted_offset_hours is not None:
         asserted_minutes = asserted_offset_hours * 60
         if abs(asserted_minutes - offset_minutes) > 1 + 1e-9:
             raise TimezoneResolutionError("TIMEZONE_OFFSET_MISMATCH")
+    fingerprint = timezone_fingerprint(zone_id)
+    if expected_fingerprint is not None and fingerprint != expected_fingerprint:
+        raise TimezoneResolutionError("TIMEZONE_MATERIAL_MISMATCH")
     return ResolvedTimezone(
-        mode=mode, zone_id=zone_id, tzdb_fingerprint=_fingerprint(zone_id),
+        mode=mode, zone_id=zone_id, tzdb_fingerprint=fingerprint,
         offset_minutes=offset_minutes, utc_instant=selected[1], fold=selected[0],
         warnings=_coordinate_warnings(longitude, offset_minutes),
     )
