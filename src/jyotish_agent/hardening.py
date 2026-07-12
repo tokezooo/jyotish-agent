@@ -67,21 +67,31 @@ def _assert_private_path(path: Path, root: Path) -> None:
     if root.is_symlink():
         raise ValueError("artifact private root is a symlink")
     root_resolved = root.resolve()
+    if ".." in path.parts:
+        raise ValueError("artifact path escapes private root")
     try:
         relative = path.absolute().relative_to(root.absolute())
+    except ValueError:
+        # macOS compatibility aliases such as /var -> /private/var can give
+        # different lexical paths for the same physical private root.
+        relative = None
+    if relative is not None:
+        current = root
+        for part in relative.parts[:-1]:
+            current = current / part
+            if current.is_symlink():
+                raise ValueError("artifact path contains a symlink")
+    try:
+        resolved_relative = path.resolve(strict=False).relative_to(root_resolved)
     except ValueError as exc:
         raise ValueError("artifact path escapes private root") from exc
-    if ".." in relative.parts:
-        raise ValueError("artifact path escapes private root")
+    if relative is None:
+        relative = resolved_relative
     current = root
     for part in relative.parts[:-1]:
         current = current / part
         if current.is_symlink():
             raise ValueError("artifact path contains a symlink")
-    try:
-        path.resolve(strict=False).relative_to(root_resolved)
-    except ValueError as exc:
-        raise ValueError("artifact path escapes private root") from exc
 
 
 def _prepare_private_root(root: Path) -> None:
@@ -113,7 +123,12 @@ def reject_symlink_ancestors(path: Path) -> None:
 
 def _prepare_private_parents(path: Path, root: Path) -> None:
     _prepare_private_root(root)
-    relative = path.parent.absolute().relative_to(root.absolute())
+    if ".." in path.parts:
+        raise ValueError("artifact path escapes private root")
+    try:
+        relative = path.parent.resolve(strict=False).relative_to(root.resolve())
+    except ValueError as exc:
+        raise ValueError("artifact path escapes private root") from exc
     current = root
     for part in relative.parts:
         current = current / part

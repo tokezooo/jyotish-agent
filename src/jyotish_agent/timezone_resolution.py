@@ -26,11 +26,30 @@ class ResolvedTimezone:
     warnings: tuple[str, ...]
 
 
+def _timezone_key_parts(zone_id: str) -> tuple[str, ...]:
+    parts = zone_id.split("/")
+    if (
+        not zone_id
+        or zone_id.startswith(("/", "\\"))
+        or "\\" in zone_id
+        or any(part in {"", ".", ".."} for part in parts)
+    ):
+        raise TimezoneResolutionError("INVALID_TIMEZONE_ID")
+    return tuple(parts)
+
+
 def timezone_fingerprint(zone_id: str) -> str:
+    parts = _timezone_key_parts(zone_id)
     for root in TZPATH:
-        path = Path(root) / zone_id
-        if path.is_file():
-            return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+        root_path = Path(root).resolve()
+        path = root_path.joinpath(*parts)
+        try:
+            resolved = path.resolve(strict=True)
+            resolved.relative_to(root_path)
+        except (FileNotFoundError, ValueError):
+            continue
+        if resolved.is_file():
+            return "sha256:" + hashlib.sha256(resolved.read_bytes()).hexdigest()
     # A loaded zone can come from the tzdata wheel. Its TZif bytes are still
     # the replay-relevant artifact, not the mutable package version label.
     try:
@@ -52,6 +71,9 @@ def resolve_iana(civil: dt.datetime, *, mode: str, zone_id: str,
                  fold: int | None, asserted_offset_hours: float | None,
                  longitude: float,
                  expected_fingerprint: str | None = None) -> ResolvedTimezone:
+    # Validate the key before either ZoneInfo or fingerprint lookup so malformed
+    # client input always fails with a controlled error and never becomes a path.
+    _timezone_key_parts(zone_id)
     try:
         zone = ZoneInfo(zone_id)
     except ZoneInfoNotFoundError:

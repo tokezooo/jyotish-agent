@@ -203,6 +203,42 @@ def test_private_prompt_neutrally_classifies_non_career_question(tmp_path: Path,
     assert "typed career intent" not in prompt
 
 
+def test_private_prompt_preserves_write_error_after_fdopen_owns_descriptor(
+    tmp_path: Path, monkeypatch
+):
+    monkeypatch.setenv("JYOTISH_AGENT_DATA_ROOT", str(tmp_path / "data"))
+    real_fdopen = cli.os.fdopen
+
+    class FailingHandle:
+        def __init__(self, descriptor: int):
+            self.handle = real_fdopen(descriptor, "w", encoding="utf-8")
+
+        def __enter__(self):
+            return self
+
+        def write(self, _value: str):
+            raise RuntimeError("authored write failure")
+
+        def __exit__(self, *_args):
+            self.handle.close()
+
+    monkeypatch.setattr(
+        cli.os,
+        "fdopen",
+        lambda descriptor, *_args, **_kwargs: FailingHandle(descriptor),
+    )
+
+    with pytest.raises(RuntimeError, match="authored write failure"):
+        cli._private_prompt(
+            "Question?",
+            {"name": "Fixture"},
+            run_id="rr_11111111-1111-4111-8111-111111111111",
+            create_operation_id="op_11111111-1111-4111-8111-111111111111",
+        )
+
+    assert list((tmp_path / "data" / "runtime").glob("ask-*.txt")) == []
+
+
 def _run_black_box(
     tmp_path: Path, mode: str, env_overrides: dict[str, str] | None = None
 ) -> tuple[subprocess.CompletedProcess, dict, int]:

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import logging
+import threading
 import time
 from contextvars import ContextVar
 
@@ -87,13 +88,19 @@ app = FastAPI(
     description="Deterministic Vedic-astrology calculations behind typed tools.",
 )
 register_error_handlers(app)
+_RESEARCH_SERVICE_LOCK = threading.Lock()
 
 
 def _research_service(request: Request) -> ResearchService:
     configured = getattr(request.app.state, "research_service", None)
     if configured is not None:
         return configured
-    return ResearchService(ResearchStore(default_data_root()))
+    with _RESEARCH_SERVICE_LOCK:
+        configured = getattr(request.app.state, "research_service", None)
+        if configured is None:
+            configured = ResearchService(ResearchStore(default_data_root()))
+            request.app.state.research_service = configured
+        return configured
 
 
 _RUN_CONTEXT: ContextVar[tuple[str | None, str]] = ContextVar(

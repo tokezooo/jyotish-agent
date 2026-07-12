@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import threading
 import uuid
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -466,8 +467,16 @@ class ResearchStore:
         self.data_root = Path(data_root) if data_root is not None else default_data_root()
         self.database_path = self.data_root / DATABASE_NAME
         self.busy_timeout_ms = busy_timeout_ms
+        self._initialization_lock = threading.RLock()
+        self._initialized = False
 
     def initialize(self) -> None:
+        with self._initialization_lock:
+            self._initialized = False
+            self._initialize_schema()
+            self._initialized = True
+
+    def _initialize_schema(self) -> None:
         from .hardening import reject_symlink_ancestors
 
         try:
@@ -538,7 +547,10 @@ class ResearchStore:
         return connection
 
     def _ready_connection(self) -> sqlite3.Connection:
-        self.initialize()
+        if not self._initialized:
+            with self._initialization_lock:
+                if not self._initialized:
+                    self.initialize()
         return self._connect()
 
     def _backfill_v5_fts(self, connection: sqlite3.Connection) -> None:

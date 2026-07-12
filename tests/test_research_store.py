@@ -72,6 +72,24 @@ def test_restart_persists_run_and_schema(tmp_path: Path):
     } <= tables
 
 
+def test_ready_connections_initialize_store_only_once(tmp_path: Path, monkeypatch):
+    store = ResearchStore(tmp_path / "data")
+    original_initialize = store.initialize
+    calls = 0
+
+    def counted_initialize():
+        nonlocal calls
+        calls += 1
+        original_initialize()
+
+    monkeypatch.setattr(store, "initialize", counted_initialize)
+    for _ in range(2):
+        connection = store._ready_connection()
+        connection.close()
+
+    assert calls == 1
+
+
 @pytest.mark.skipif(os.name != "posix", reason="POSIX permission contract")
 def test_runtime_directory_and_database_are_private(tmp_path: Path):
     store = ResearchStore(tmp_path / "private")

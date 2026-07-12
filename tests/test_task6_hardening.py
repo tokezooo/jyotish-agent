@@ -249,6 +249,23 @@ def test_atomic_private_write_rejects_traversal_and_symlink(tmp_path: Path):
         atomic_write_private(root / "link" / "escape", b"x")
 
 
+def test_atomic_private_write_accepts_macos_var_alias_for_same_physical_root(
+    tmp_path: Path,
+):
+    canonical_tmp = tmp_path.resolve()
+    private_var = Path("/private/var")
+    if not canonical_tmp.is_relative_to(private_var) or not Path("/var").is_symlink():
+        pytest.skip("macOS /var compatibility alias is unavailable")
+    alias_tmp = Path("/var") / canonical_tmp.relative_to(private_var)
+    alias_root = alias_tmp / "private-root"
+    alias_root.mkdir(mode=0o700)
+    canonical_target = alias_root.resolve() / "rr_alias" / "answer.md"
+
+    atomic_write_private(canonical_target, b"private", root=alias_root)
+
+    assert canonical_target.read_bytes() == b"private"
+
+
 def test_redaction_and_retention_deletion_do_not_leak_or_follow_symlinks(tmp_path: Path):
     assert redact_log_value("Ada, 1990-01-01 10:20:30, token=secret") == "[REDACTED]"
     root = tmp_path / "private"

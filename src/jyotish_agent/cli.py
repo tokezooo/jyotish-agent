@@ -201,7 +201,12 @@ def _private_prompt(
         with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
             handle.write(prompt)
     except Exception:
-        os.close(descriptor)
+        try:
+            os.close(descriptor)
+        except OSError:
+            # fdopen transfers ownership to the file object, whose context
+            # manager may already have closed it while propagating the error.
+            pass
         path.unlink(missing_ok=True)
         raise
     return path

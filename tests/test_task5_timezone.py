@@ -12,6 +12,10 @@ from fastapi.testclient import TestClient
 from jyotish_agent.api import app
 from jyotish_agent.research_service import ResearchService
 from jyotish_agent.research_store import ResearchStore
+from jyotish_agent.timezone_resolution import (
+    TimezoneResolutionError,
+    timezone_fingerprint,
+)
 
 
 def _body(zone: dict, *, civil: str = "2024-01-15T12:00:00", longitude=-74.0):
@@ -49,6 +53,31 @@ def test_iana_resolution_persists_replay_inputs(client):
     assert resolution["utc_instant"] == "2024-01-15T17:00:00Z"
     assert resolution["fold"] == 0
     assert resolution["tzdb_fingerprint"].startswith("sha256:")
+
+
+@pytest.mark.parametrize("zone_id", ["../secret", "/etc/passwd", "..\\secret"])
+def test_timezone_fingerprint_rejects_non_iana_paths(tmp_path, monkeypatch, zone_id):
+    zone_root = tmp_path / "zoneinfo"
+    zone_root.mkdir()
+    (tmp_path / "secret").write_bytes(b"private")
+    monkeypatch.setattr(
+        "jyotish_agent.timezone_resolution.TZPATH", (str(zone_root),)
+    )
+
+    with pytest.raises(TimezoneResolutionError) as error:
+        timezone_fingerprint(zone_id)
+
+    assert error.value.error_code == "INVALID_TIMEZONE_ID"
+
+
+def test_unknown_well_formed_timezone_keeps_stable_error(client):
+    response = client.post(
+        "/v2/research-runs",
+        json=_body({"kind": "iana", "zone_id": "Not/A_Real_Zone"}),
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error_code"] == "UNKNOWN_TIMEZONE"
 
 
 @pytest.mark.parametrize(

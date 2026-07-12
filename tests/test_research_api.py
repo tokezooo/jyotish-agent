@@ -9,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+import jyotish_agent.api as api_module
 from jyotish_agent.api import app
 from jyotish_agent.research_models import ResearchPlace
 from jyotish_agent.research_service import ResearchService
@@ -48,6 +49,20 @@ def _client(tmp_path: Path) -> TestClient:
         ResearchStore(tmp_path / "data")
     )
     return TestClient(app)
+
+
+def test_default_research_service_is_cached_per_app(tmp_path: Path, monkeypatch):
+    from types import SimpleNamespace
+
+    state = SimpleNamespace()
+    request = SimpleNamespace(app=SimpleNamespace(state=state))
+    monkeypatch.setattr(api_module, "default_data_root", lambda: tmp_path / "data")
+
+    first = api_module._research_service(request)
+    second = api_module._research_service(request)
+
+    assert first is second
+    assert state.research_service is first
 
 
 def test_create_get_and_list_events_survive_service_restart(tmp_path: Path):
