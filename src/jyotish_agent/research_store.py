@@ -2024,7 +2024,9 @@ class ResearchStore:
         finally:
             connection.close()
 
-    def search_approved_fragments(self, query: str, *, limit: int) -> list[dict[str, Any]]:
+    def search_approved_fragments(
+        self, query: str, *, limit: int, run_id: str | None = None
+    ) -> list[dict[str, Any]]:
         from .corpus import normalize_search_text
 
         terms = [term for term in normalize_search_text(query).split() if term]
@@ -2034,6 +2036,17 @@ class ResearchStore:
         connection = self._ready_connection()
         try:
             self._verify_corpus_integrity(connection)
+            if run_id is not None:
+                broken = connection.execute(
+                    """SELECT 1 FROM run_corpus_artifacts a
+                       LEFT JOIN source_versions s ON s.source_version_id=a.source_version_id
+                       WHERE a.run_id=? AND (
+                         s.source_version_id IS NULL OR s.manifest_checksum != a.manifest_checksum
+                       ) LIMIT 1""",
+                    (run_id,),
+                ).fetchone()
+                if broken is not None:
+                    raise CorpusIntegrityError("pinned corpus artifact is missing or changed")
             rows = connection.execute(
                 """SELECT f.fragment_id, f.source_version_id, s.work_id, s.title,
                           s.source_class, f.locator, f.text AS quote, f.checksum,
@@ -2052,9 +2065,14 @@ class ResearchStore:
                    WHERE source_fragments_fts MATCH ?
                      AND s.approval_status='approved'
                      AND f.approval_status='approved'
+                     AND (? IS NULL OR EXISTS (
+                       SELECT 1 FROM run_corpus_artifacts a
+                       WHERE a.run_id=? AND a.source_version_id=s.source_version_id
+                         AND a.manifest_checksum=s.manifest_checksum
+                     ))
                    ORDER BY bm25(source_fragments_fts), s.source_version_id, f.ordinal
                    LIMIT ?""",
-                (match, limit),
+                (match, run_id, run_id, limit),
             ).fetchall()
             return [dict(row) for row in rows]
         finally:

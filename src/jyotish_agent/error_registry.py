@@ -24,6 +24,12 @@ ERROR_REGISTRY: dict[str, dict[str, Any]] = {
         "cause": "The request does not identify a supported deterministic timezone mode.",
         "fix": "Use a supported IANA or fixed-offset timezone specification.",
     },
+    "INPUT_INVALID": {
+        "retryable": False,
+        "problem": "The run operation payload is invalid or incomplete.",
+        "cause": "One or more required operation fields failed schema validation.",
+        "fix": "Correct the payload for this run stage and resubmit it.",
+    },
     "SQLITE_BUSY": {
         "retryable": True,
         "problem": "The research ledger is temporarily busy.",

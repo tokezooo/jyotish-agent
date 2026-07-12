@@ -138,6 +138,12 @@ def register_error_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation_handler(request: Request, exc: RequestValidationError):
+        run_id, stage = request_run_context(request)
+        if run_id is not None:
+            return registry_problem_response(
+                "INPUT_INVALID", status=422, run_id=run_id, stage=stage,
+                title="Invalid run operation payload",
+            )
         body = exc.body if isinstance(exc.body, dict) else {}
         answer = body.get("answer") if isinstance(body, dict) else None
         schema_version = answer.get("schema_version") if isinstance(answer, dict) else None

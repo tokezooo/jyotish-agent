@@ -12,6 +12,7 @@ text, prompts, tokens, or rendered answers.
 | `MISSING_PINNED_VERSION` | a checksummed engine/planner/corpus/contract dependency is absent or changed | no; restore artifact |
 | `MEMO_HASH_MISMATCH` | replayed memo bytes differ from the committed artifact | no; reject artifact |
 | `UNEXPECTED_INTERNAL` | privacy-safe unexpected failure | once |
+| `INPUT_INVALID` | malformed run-stage operation payload | no; correct payload |
 
 Endpoint-specific codes such as `TIMEZONE_OFFSET_MISMATCH`,
 `AMBIGUOUS_LOCAL_TIME`, `NONEXISTENT_LOCAL_TIME`, `PINNED_VERSION_MISMATCH`, and

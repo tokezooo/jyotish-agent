@@ -283,4 +283,41 @@ def test_ingestion_and_retrieval_http_boundaries_enforce_review_gate(tmp_path: P
         },
     )
     assert retrieved.status_code == 200, retrieved.text
-    assert retrieved.json()["results"][0]["content_role"] == "quoted_source_data"
+    # The approval happened after this run's immutable corpus snapshot, so it
+    # must not enter the existing run's evidence.
+    assert retrieved.json()["results"] == []
+
+    new_run = client.post(
+            "/v2/research-runs",
+            json={
+                "operation_id": op(), "expected_revision": 0,
+                "question": "What career factors matter?",
+                "birth_profile": {
+                    "name": "HTTP Fixture", "date": "1990-01-01", "time": "12:30:00",
+                    "place": {"name": "Chennai", "latitude": 13.0827,
+                              "longitude": 80.2707, "timezone": 5.5},
+                },
+                "model_version": "test", "planner_version": "test",
+                "corpus_version": "test", "contract_version": "2.0",
+            },
+    ).json()
+    new_screened = client.post(
+            f"/v2/research-runs/{new_run['run_id']}/screen",
+            json={"operation_id": op(), "expected_revision": new_run["revision"]},
+    ).json()
+    new_planned = client.post(
+            f"/v2/research-runs/{new_run['run_id']}/plan",
+            json={
+                "operation_id": op(), "expected_revision": new_screened["revision"],
+                "intent": {"family": "career_factors_and_timing"},
+                "classifier": {"classifier_model": "fixture", "classifier_version": "1",
+                               "prompt_hash": hashlib.sha256(b"fixture").hexdigest()},
+            },
+    ).json()
+    new_retrieved = client.post(
+            f"/v2/research-runs/{new_run['run_id']}/retrieve",
+            json={"operation_id": op(), "expected_revision": new_planned["revision"],
+                  "query": "career karma sthana"},
+    )
+    assert new_retrieved.status_code == 200, new_retrieved.text
+    assert new_retrieved.json()["results"][0]["content_role"] == "quoted_source_data"

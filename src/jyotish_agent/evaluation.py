@@ -80,7 +80,7 @@ def run_fixture_specs(
         raise ValueError("fixture specs must contain groups")
     by_id: dict[str, dict[str, Any]] = {}
     for group in groups:
-        if set(group) != {"case_ids", "boundary", "assertion", "mode"}:
+        if set(group) != {"case_ids", "boundary", "scenario", "assertion", "mode"}:
             raise ValueError("fixture spec group has an invalid schema")
         for case_id in group["case_ids"]:
             if case_id in by_id:
@@ -94,7 +94,11 @@ def run_fixture_specs(
     for case in cases:
         spec = by_id[case["id"]]
         if spec["mode"] == "manual_not_scored":
-            if spec["boundary"] is not None or not spec["assertion"].get("reason"):
+            if (
+                spec["boundary"] is not None
+                or spec["scenario"] is not None
+                or not spec["assertion"].get("reason")
+            ):
                 raise ValueError(f"manual fixture {case['id']} lacks a not-scored reason")
             manual += 1
             continue
@@ -103,6 +107,15 @@ def run_fixture_specs(
         boundary = spec["boundary"]
         if not isinstance(boundary, str) or not boundary:
             raise ValueError(f"fixture {case['id']} lacks a production boundary")
+        if spec["scenario"] != {
+            "input": "case.prompt", "profile": "case.profile_id", "action": boundary
+        } and not (
+            boundary == "safety_screen"
+            and spec["scenario"] == {
+                "input": "case.prompt", "profile": "case.profile_id", "action": "screen_question"
+            }
+        ):
+            raise ValueError(f"fixture {case['id']} lacks an explicit scenario")
         if spec["assertion"] != {"equals": "case.expected"}:
             raise ValueError(f"fixture {case['id']} lacks an exact outcome assertion")
         automated += 1

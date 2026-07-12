@@ -541,7 +541,7 @@ class ResearchService:
             raise InvalidRunTransition("retrieval requires a supported plan")
         if run["revision"] != request.expected_revision:
             raise InvalidRunTransition("expected revision does not match current revision")
-        found = self.search_corpus(request.query, limit=request.limit)
+        found = self.search_corpus(request.query, limit=request.limit, run_id=run_id)
         results = []
         evidence = []
         for item in found:
@@ -628,10 +628,14 @@ class ResearchService:
             expected_revision=review.expected_revision,
         )
 
-    def search_corpus(self, query: str, *, limit: int) -> list[RetrievedCorpusFragment]:
+    def search_corpus(
+        self, query: str, *, limit: int, run_id: str | None = None
+    ) -> list[RetrievedCorpusFragment]:
         return [
             RetrievedCorpusFragment.model_validate(row)
-            for row in self.store.search_approved_fragments(query, limit=limit)
+            for row in self.store.search_approved_fragments(
+                query, limit=limit, run_id=run_id
+            )
         ]
 
     def submit_answer(

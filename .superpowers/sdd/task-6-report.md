@@ -109,8 +109,8 @@ The Task 6 review findings were closed in a follow-up commit based on `1605267`:
   reaches the real memo mismatch. Both branches are exercised through service/API
   tests and the subprocess CLI replay path.
 - Physically separate `tuning-specs.json` / `held-out-specs.json` and checksum
-  manifests map all 60 IDs to reviewed specifications: 28 exact automated
-  production setups and 32 honest `manual_not_scored` cases. Every automated probe
+  manifests map all 60 IDs to reviewed specifications: 7 case-ID-independent
+  automated safety setups and 53 honest `manual_not_scored` cases. Every automated probe
   consumes its exact profile, prompt, and expected outcome; a
   mutation regression proves the exact case fails. Tuning succeeds even when all
   held-out case/spec/manifest files are physically absent.
@@ -145,15 +145,15 @@ The Task 6 review findings were closed in a follow-up commit based on `1605267`:
 - Focused Python (`test_task6_hardening`, AnswerContract v2, CLI, corpus migration):
   **75 passed**.
 - Exact black-box plus both CLI replay registry branches: **3 passed in 8.62s**.
-- Full Python after final external-review remediation: **363 passed, 2 skipped in
-  95.35s** (only Swiss-ephemeris tests).
-- Tuning runner: **17 automated passed, 23 manual_not_scored, 40 total**.
-- Explicit held-out runner: **11 automated passed, 9 manual_not_scored, 20 total**.
+- Full Python after final external-review remediation: **365 passed, 2 skipped in
+  92.31s** (only Swiss-ephemeris tests).
+- Tuning runner: **4 automated passed, 36 manual_not_scored, 40 total**.
+- Explicit held-out runner: **3 automated passed, 17 manual_not_scored, 20 total**.
 - Bun: **45 passed, 0 failed, 144 assertions**.
 - TypeScript `tsc --noEmit`: **passed**.
 - `compileall`: **passed**.
 - Both repository-local skills: **valid**.
-- Split SHA-256 manifests: **all five unique files OK**; 60 cases across 13 groups.
+- Split SHA-256 manifests: **all five unique files OK**; 60 cases across 4 groups.
 - `git diff --check`: **passed**.
 
 External limitations are unchanged: no live Pi/Gemini call without credentials and

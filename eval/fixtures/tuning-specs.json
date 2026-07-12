@@ -1,8 +1,4 @@
-{"schema_version":"2.2","split":"tuning","groups":[
-{"case_ids":["T001","T002","T003","T008","T010","T013","T015","T018","T019","T021","T023","T024","T025","T026","T030","T031","T032","T033","T034","T036","T038","T039","T040"],"boundary":null,"assertion":{"reason":"No exact deterministic production setup exists yet; human adjudication is required and this case is not scored."},"mode":"manual_not_scored"},
-{"case_ids":["T007","T017","T028","T035"],"boundary":"safety_screen","assertion":{"equals":"case.expected"},"mode":"automated"},
-{"case_ids":["T005","T009","T014","T029","T037"],"boundary":"timezone_resolver","assertion":{"equals":"case.expected"},"mode":"automated"},
-{"case_ids":["T006","T016","T022"],"boundary":"request_or_transition","assertion":{"equals":"case.expected"},"mode":"automated"},
-{"case_ids":["T004","T011","T027"],"boundary":"operation_ledger","assertion":{"equals":"case.expected"},"mode":"automated"},
-{"case_ids":["T012","T020"],"boundary":"offline_replay","assertion":{"equals":"case.expected"},"mode":"automated"}
+{"schema_version":"3.0","split":"tuning","groups":[
+{"case_ids":["T001","T002","T003","T004","T005","T006","T008","T009","T010","T011","T012","T013","T014","T015","T016","T018","T019","T020","T021","T022","T023","T024","T025","T026","T027","T029","T030","T031","T032","T033","T034","T036","T037","T038","T039","T040"],"boundary":null,"scenario":null,"assertion":{"reason":"No case-ID-independent deterministic production setup exists yet; human adjudication is required and this case is not scored."},"mode":"manual_not_scored"},
+{"case_ids":["T007","T017","T028","T035"],"boundary":"safety_screen","scenario":{"input":"case.prompt","profile":"case.profile_id","action":"screen_question"},"assertion":{"equals":"case.expected"},"mode":"automated"}
 ]}

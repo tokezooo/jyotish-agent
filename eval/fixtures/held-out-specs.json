@@ -1,9 +1,4 @@
-{"schema_version":"2.2","split":"held-out","groups":[
-{"case_ids":["H004","H005","H011","H012","H014","H016","H017","H018","H020"],"boundary":null,"assertion":{"reason":"No exact deterministic production setup exists yet; human adjudication is required and this case is not scored."},"mode":"manual_not_scored"},
-{"case_ids":["H001","H009","H019"],"boundary":"safety_screen","assertion":{"equals":"case.expected"},"mode":"automated"},
-{"case_ids":["H003","H015"],"boundary":"timezone_resolver","assertion":{"equals":"case.expected"},"mode":"automated"},
-{"case_ids":["H006","H013"],"boundary":"request_or_transition","assertion":{"equals":"case.expected"},"mode":"automated"},
-{"case_ids":["H007"],"boundary":"corpus_retrieval","assertion":{"equals":"case.expected"},"mode":"automated"},
-{"case_ids":["H010"],"boundary":"operation_ledger","assertion":{"equals":"case.expected"},"mode":"automated"},
-{"case_ids":["H002","H008"],"boundary":"offline_replay","assertion":{"equals":"case.expected"},"mode":"automated"}
+{"schema_version":"3.0","split":"held-out","groups":[
+{"case_ids":["H002","H003","H004","H005","H006","H007","H008","H010","H011","H012","H013","H014","H015","H016","H017","H018","H020"],"boundary":null,"scenario":null,"assertion":{"reason":"No case-ID-independent deterministic production setup exists yet; human adjudication is required and this case is not scored."},"mode":"manual_not_scored"},
+{"case_ids":["H001","H009","H019"],"boundary":"safety_screen","scenario":{"input":"case.prompt","profile":"case.profile_id","action":"screen_question"},"assertion":{"equals":"case.expected"},"mode":"automated"}
 ]}

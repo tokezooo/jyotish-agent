@@ -605,4 +605,7 @@ def test_unknown_major_schema_version_has_stable_error_code(tmp_path: Path, monk
         },
     )
     assert response.status_code == 422
-    assert response.json()["error_code"] == "UNSUPPORTED_SCHEMA_VERSION"
+    body = response.json()
+    assert body["error_code"] == "INPUT_INVALID"
+    assert body["run_id"] == calculated["run_id"]
+    assert body["stage"] == "answer"

@@ -34,7 +34,7 @@ rights/provenance URL, and reviewer; never copy the system-under-test output.
 
 `fixtures/tuning-specs.json` and `fixtures/held-out-specs.json` map every case to
 either an exact production-boundary probe or an explicit `manual_not_scored`
-reason. There are 28 deterministic automated cases and 32 manual cases. A case is
+reason. There are 7 case-ID-independent automated safety cases and 53 manual cases. A case is
 never called automated merely because a related generic test passes. Run the
 40-case tuning split with:
 

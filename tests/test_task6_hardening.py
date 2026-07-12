@@ -24,6 +24,7 @@ from jyotish_agent.evaluation import (
     validate_fixture_corpus,
     validate_fixture_spec_coverage,
 )
+from jyotish_agent.evaluation_probes import execute_case_probe
 from jyotish_agent.errors import register_error_handlers, request_run_context
 from starlette.requests import Request
 from jyotish_agent.hardening import (
@@ -419,11 +420,11 @@ def test_all_fixture_specs_are_runnable_or_explicitly_manual_and_checksum_frozen
     fixtures = ROOT / "eval" / "fixtures"
     summary = validate_fixture_checksums(fixtures)
     assert summary == {"files": 5, "algorithm": "sha256"}
-    assert validate_fixture_spec_coverage(fixtures) == {"cases": 60, "groups": 13}
+    assert validate_fixture_spec_coverage(fixtures) == {"cases": 60, "groups": 4}
     result = run_fixture_specs(fixtures, split="tuning", execute=False)
-    assert result == {"total": 40, "automated": 17, "manual_not_scored": 23}
+    assert result == {"total": 40, "automated": 4, "manual_not_scored": 36}
     held_out = run_fixture_specs(fixtures, split="held-out", execute=False, allow_held_out=True)
-    assert held_out == {"total": 20, "automated": 11, "manual_not_scored": 9}
+    assert held_out == {"total": 20, "automated": 3, "manual_not_scored": 17}
     with pytest.raises(ValueError, match="held-out"):
         run_fixture_specs(fixtures, split="held-out", execute=False)
 
@@ -451,7 +452,7 @@ def test_tuning_runner_works_with_held_out_files_physically_absent(tmp_path: Pat
         shutil.copy2(source / name, isolated / name)
 
     assert run_fixture_specs(isolated, split="tuning", execute=False) == {
-        "total": 40, "automated": 17, "manual_not_scored": 23
+        "total": 40, "automated": 4, "manual_not_scored": 36
     }
 
 
@@ -462,7 +463,7 @@ def test_runner_fails_the_exact_case_when_expected_outcome_is_mutated(tmp_path: 
     for name in ("profiles.json", "tuning.jsonl", "tuning-specs.json"):
         shutil.copy2(source / name, isolated / name)
     lines = (isolated / "tuning.jsonl").read_text(encoding="utf-8").splitlines()
-    index = next(i for i, line in enumerate(lines) if json.loads(line)["id"] == "T004")
+    index = next(i for i, line in enumerate(lines) if json.loads(line)["id"] == "T007")
     first_automated = json.loads(lines[index])
     first_automated["expected"] = {"outcome": "mutated-impossible-outcome"}
     lines[index] = json.dumps(first_automated, separators=(",", ":"))
@@ -475,14 +476,13 @@ def test_runner_fails_the_exact_case_when_expected_outcome_is_mutated(tmp_path: 
         encoding="utf-8",
     )
 
-    with pytest.raises(RuntimeError, match=r"fixture T004 failed"):
+    with pytest.raises(RuntimeError, match=r"fixture T007 failed"):
         run_fixture_specs(isolated, split="tuning", execute=True)
 
 
 @pytest.mark.parametrize(
     ("split", "case_id"),
-    [("tuning", "T007"), ("tuning", "T005"), ("tuning", "T006"),
-     ("tuning", "T004"), ("tuning", "T012"), ("held-out", "H007")],
+    [("tuning", "T007"), ("held-out", "H009")],
 )
 def test_expected_mutation_fails_each_automated_probe_family(
     tmp_path: Path, split: str, case_id: str
@@ -509,6 +509,22 @@ def test_expected_mutation_fails_each_automated_probe_family(
         run_fixture_specs(
             isolated, split=split, execute=True, allow_held_out=split == "held-out"
         )
+
+
+def test_automated_probe_result_is_invariant_to_case_id_rename():
+    fixtures = ROOT / "eval" / "fixtures"
+    case = next(
+        json.loads(line) for line in (fixtures / "tuning.jsonl").read_text().splitlines()
+        if json.loads(line)["id"] == "T007"
+    )
+    profile = next(
+        item for item in json.loads((fixtures / "profiles.json").read_text())["profiles"]
+        if item["id"] == case["profile_id"]
+    )
+    renamed = {**case, "id": "RENAMED_WITHOUT_SEMANTIC_EFFECT"}
+    assert execute_case_probe(case, profile, "safety_screen") == execute_case_probe(
+        renamed, profile, "safety_screen"
+    ) == case["expected"]
 
 
 def test_retention_rejects_symlinked_artifact_root_without_external_deletion(
@@ -605,32 +621,59 @@ def test_whole_store_purge_requires_verified_backup_and_explicit_confirmation(tm
 
 
 def test_run_corpus_snapshot_ignores_later_sources_but_detects_pinned_corruption(tmp_path: Path):
-    from jyotish_agent.evaluation_probes import _request
+    from jyotish_agent.research_models import CreateResearchRunRequest
     from jyotish_agent.research_service import ResearchService
 
     store = ResearchStore(tmp_path / "data")
     store.seed_source_for_testing(
         source_version_id="src_pinned", title="Pinned", rights_note="Fixture",
-        fragments=[{"fragment_id": "sf_pinned", "locator": "1", "text": "career"}],
+        fragments=[{"fragment_id": "sf_pinned", "locator": "1", "text": "career snapshot"}],
     )
+    with sqlite3.connect(store.database_path) as connection:
+        connection.execute(
+            "INSERT INTO source_fragments_fts (fragment_id, normalized_text, aliases_text) VALUES (?, ?, '')",
+            ("sf_pinned", "career snapshot"),
+        )
     profile = json.loads((ROOT / "eval/fixtures/profiles.json").read_text())["profiles"][0]
-    created = ResearchService(store).create_run(_request(profile, "career"))
+    request = CreateResearchRunRequest.model_validate({
+        "operation_id": f"op_{uuid.uuid4()}", "expected_revision": 0,
+        "question": "career", "birth_profile": {
+            "name": profile["label"], "date": profile["date"], "time": profile["time"],
+            "place": profile["place"],
+        },
+        "model_version": "eval-model", "planner_version": "eval-planner",
+        "corpus_version": "eval-corpus", "contract_version": "2.0",
+    })
+    created = ResearchService(store).create_run(request)
     expected = {
         "engine": created.engine_version, "planner": created.planner_version,
         "corpus": created.corpus_version, "contract": created.contract_version,
     }
     assert store.pinned_versions_available(created.run_id, expected)
+    assert {row["source_version_id"] for row in store.search_approved_fragments(
+        "career", limit=8, run_id=created.run_id
+    )} == {"src_pinned"}
     store.seed_source_for_testing(
         source_version_id="src_later", title="Later", rights_note="Fixture",
-        fragments=[{"fragment_id": "sf_later", "locator": "1", "text": "later"}],
+        fragments=[{"fragment_id": "sf_later", "locator": "1", "text": "career later"}],
     )
+    with sqlite3.connect(store.database_path) as connection:
+        connection.execute(
+            "INSERT INTO source_fragments_fts (fragment_id, normalized_text, aliases_text) VALUES (?, ?, '')",
+            ("sf_later", "career later"),
+        )
     assert store.pinned_versions_available(created.run_id, expected)
+    assert {row["source_version_id"] for row in store.search_approved_fragments(
+        "career", limit=8, run_id=created.run_id
+    )} == {"src_pinned"}
     with sqlite3.connect(store.database_path) as connection:
         connection.execute(
             "UPDATE source_versions SET manifest_checksum=? WHERE source_version_id='src_pinned'",
             ("0" * 64,),
         )
     assert not store.pinned_versions_available(created.run_id, expected)
+    with pytest.raises(CorpusIntegrityError, match="pinned corpus"):
+        store.search_approved_fragments("career", limit=8, run_id=created.run_id)
 
 
 @pytest.mark.parametrize(
@@ -675,3 +718,20 @@ def test_error_registry_contract_across_every_run_stage(path: str, run_id: str |
     assert body["run_id"] == run_id
     assert body["stage"] == stage
     assert set(("retryable", "problem", "cause", "fix")) <= set(body)
+
+
+@pytest.mark.parametrize(
+    ("suffix", "stage"),
+    [("screen", "screen"), ("plan", "plan"), ("calculate", "calculate"),
+     ("retrieve", "retrieve"), ("answers", "answer")],
+)
+def test_malformed_run_payload_uses_input_registry_with_route_context(
+    suffix: str, stage: str
+):
+    run_id = "rr_00000000-0000-4000-8000-000000000000"
+    response = TestClient(app).post(f"/v2/research-runs/{run_id}/{suffix}", json={})
+    body = response.json()
+    assert response.status_code == 422
+    assert body["error_code"] == "INPUT_INVALID"
+    assert body["run_id"] == run_id
+    assert body["stage"] == stage
