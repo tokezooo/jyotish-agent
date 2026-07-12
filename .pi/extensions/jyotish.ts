@@ -13,7 +13,7 @@
  * Start it with: uv run uvicorn jyotish_agent.api:app
  */
 
-import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { ExtensionRunner, type ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 
@@ -1013,23 +1013,63 @@ export class ResearchRuntime {
   }
 }
 
-type SemanticHandshakeResult = {
-  toolCallBlocked: boolean;
-  toolResultMarker: string;
-  messageReplacementMarker: string;
-};
-
-type SemanticHandshakeHost = {
-  verifyExtensionSemantics?: (canary: {
-    marker: string;
-    toolCallResult: { block: true; reason: string };
-    toolResultResult: { content: Array<{ type: "text"; text: string }>; details: { marker: string } };
-    messageEndResult: { message: { role: "assistant"; content: Array<{ type: "text"; text: string }> } };
-  }) => SemanticHandshakeResult | Promise<SemanticHandshakeResult>;
-};
+async function verifyInstalledRunnerSemantics(marker: string): Promise<boolean> {
+  const extension = {
+    path: "<jyotish-capability-probe>",
+    resolvedPath: "<jyotish-capability-probe>",
+    sourceInfo: { path: "<jyotish-capability-probe>", type: "extension" },
+    handlers: new Map<string, Array<(event: any) => unknown>>([
+      ["tool_call", [() => ({ block: true, reason: marker })]],
+      ["tool_result", [() => ({
+        content: [{ type: "text", text: marker }],
+        details: { marker },
+      })]],
+      ["message_end", [(event: any) => ({
+        message: { ...event.message, content: [{ type: "text", text: marker }] },
+      })]],
+    ]),
+    tools: new Map(),
+    messageRenderers: new Map(),
+    commands: new Map(),
+    flags: new Map(),
+    shortcuts: new Map(),
+  };
+  try {
+    const runner = new ExtensionRunner(
+      [extension as any],
+      {} as any,
+      process.cwd(),
+      {} as any,
+      {} as any,
+    );
+    const blocked = await runner.emitToolCall({
+      type: "tool_call", toolCallId: marker, toolName: "jyotish_capability_probe", input: {},
+    });
+    const modified = await runner.emitToolResult({
+      type: "tool_result", toolCallId: marker, toolName: "jyotish_capability_probe",
+      input: {}, content: [{ type: "text", text: "original" }], details: {}, isError: false,
+    });
+    const replaced = await runner.emitMessageEnd({
+      type: "message_end",
+      message: { role: "assistant", content: [{ type: "text", text: "original" }] },
+    } as any);
+    const replacementMarker = replaced?.role === "assistant"
+      && replaced.content[0]?.type === "text"
+      ? replaced.content[0].text
+      : undefined;
+    return blocked?.block === true
+      && blocked.reason === marker
+      && modified?.content?.[0]?.type === "text"
+      && modified.content[0].text === marker
+      && (modified.details as { marker?: string } | undefined)?.marker === marker
+      && replacementMarker === marker;
+  } catch {
+    return false;
+  }
+}
 
 export async function probeResearchRuntimeCapabilities(
-  pi: Pick<ExtensionAPI, "appendEntry"> & SemanticHandshakeHost,
+  pi: Pick<ExtensionAPI, "appendEntry">,
   sessionManager: { getBranch?: unknown; getLeafId?: unknown },
   registeredHooks?: ReadonlySet<string>,
 ): Promise<boolean> {
@@ -1040,22 +1080,9 @@ export async function probeResearchRuntimeCapabilities(
     typeof sessionManager.getLeafId === "function" &&
     (!registeredHooks || requiredHooks.every((hook) => registeredHooks.has(hook)))
   );
-  if (!structurallyAvailable || typeof pi.verifyExtensionSemantics !== "function") return false;
+  if (!structurallyAvailable) return false;
   const marker = `jyotish-capability-${Date.now()}-${Math.random()}`;
-  const observed = await pi.verifyExtensionSemantics({
-    marker,
-    toolCallResult: { block: true, reason: marker },
-    toolResultResult: {
-      content: [{ type: "text", text: marker }],
-      details: { marker },
-    },
-    messageEndResult: {
-      message: { role: "assistant", content: [{ type: "text", text: marker }] },
-    },
-  });
-  return observed?.toolCallBlocked === true
-    && observed.toolResultMarker === marker
-    && observed.messageReplacementMarker === marker;
+  return verifyInstalledRunnerSemantics(marker);
 }
 
 // --- extension --------------------------------------------------------------
@@ -1071,7 +1098,7 @@ export default function (pi: ExtensionAPI) {
   };
 
   pi.on("session_start", async (_event, ctx) => {
-    if (!(await probeResearchRuntimeCapabilities(pi as ExtensionAPI & SemanticHandshakeHost, ctx.sessionManager, registeredHooks))) {
+    if (!(await probeResearchRuntimeCapabilities(pi, ctx.sessionManager, registeredHooks))) {
       researchRuntime.disable("required append/branch/leaf hooks are unavailable");
       ctx.ui.notify("Jyotish research runtime disabled: required Pi hook semantics are unavailable.", "error");
     } else {
