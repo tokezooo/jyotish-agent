@@ -163,7 +163,7 @@ def test_claim_dag_validates_support_types_cycles_and_leaf_termination():
     assert any("terminate" in item for item in violations)
 
 
-def test_renderer_uses_structured_computed_evidence_and_is_deterministic():
+def test_renderer_hides_internal_evidence_and_is_deterministic():
     evidence_id = _id("evi_")
     answer = AnswerContractV2.model_validate(_answer(evidence_id))
     evidence = [{
@@ -174,10 +174,45 @@ def test_renderer_uses_structured_computed_evidence_and_is_deterministic():
     first = render_answer_markdown(answer, evidence)
     second = render_answer_markdown(answer, evidence)
     assert first == second
-    assert "# Career research memo" in first.markdown
-    assert "`ascendant.sign` = `Pisces`" in first.markdown
+    assert first.markdown.startswith("# Career research memo\n\n")
     assert "The computed ascendant can frame" in first.markdown
+    assert "## Важно" in first.markdown
+    assert "## Что можно уточнить" in first.markdown
+    for internal in ("## Claims", "Computed", "confidence", "ascendant.sign", "evi_"):
+        assert internal not in first.markdown
     assert first.sha256 == hashlib.sha256(first.markdown.encode()).hexdigest()
+
+
+def test_renderer_preserves_synthesis_contract_order():
+    evidence_id = _id("evi_")
+    payload = _answer(evidence_id)
+    first_synthesis = payload["claims"][1]
+    second_synthesis = {
+        **first_synthesis,
+        "claim_id": _id("cl_"),
+        "text": "Then turn the interpretation into a practical next step.",
+    }
+    payload["claims"].append(second_synthesis)
+    answer = AnswerContractV2.model_validate(payload)
+    rendered = render_answer_markdown(answer, [])
+    assert rendered.markdown.index(first_synthesis["text"]) < rendered.markdown.index(
+        second_synthesis["text"]
+    )
+
+
+def test_contract_without_synthesis_is_rejected():
+    evidence_id = _id("evi_")
+    payload = _answer(evidence_id)
+    payload["claims"] = [payload["claims"][0]]
+    answer = AnswerContractV2.model_validate(payload)
+    evidence = [{
+        "evidence_id": evidence_id,
+        "evidence_type": "computed_fact",
+        "payload": {"path": "ascendant.sign", "value": "Pisces", "value_type": "string"},
+    }]
+    assert "answer requires at least one synthesis claim" in validate_answer_contract(
+        answer, evidence
+    )
 
 
 def test_v1_adapter_only_emits_legacy_computed_claim_with_missing_provenance():
