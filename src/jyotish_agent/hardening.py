@@ -37,6 +37,7 @@ def prune_private_artifacts(
     if isinstance(retention_seconds, bool) or retention_seconds < 0:
         raise ValueError("retention_seconds must be non-negative")
     data_root = Path(data_root)
+    reject_symlink_ancestors(data_root)
     if data_root.is_symlink():
         raise ValueError("configured data root is a symlink")
     root = data_root / "artifacts"
@@ -85,12 +86,29 @@ def _assert_private_path(path: Path, root: Path) -> None:
 
 def _prepare_private_root(root: Path) -> None:
     """Create a configured private root without accepting a symlink anchor."""
+    reject_symlink_ancestors(root)
     if root.is_symlink():
         raise ValueError("configured data root is a symlink")
     root.mkdir(mode=0o700, parents=True, exist_ok=True)
     if root.is_symlink():
         raise ValueError("configured data root is a symlink")
     os.chmod(root, 0o700)
+
+
+def reject_symlink_ancestors(path: Path) -> None:
+    """Reject an existing symlink at any component of a configured private path."""
+    absolute = Path(path).absolute()
+    current = Path(absolute.anchor)
+    for part in absolute.parts[1:]:
+        current = current / part
+        if os.path.lexists(current) and current.is_symlink():
+            # macOS exposes these immutable OS compatibility aliases. They are
+            # trusted platform anchors, not user-configured path components.
+            if str(current) in {"/var", "/tmp"} and str(current.resolve()) in {
+                "/private/var", "/private/tmp"
+            }:
+                continue
+            raise ValueError(f"configured private path has symlink ancestor: {current}")
 
 
 def _prepare_private_parents(path: Path, root: Path) -> None:

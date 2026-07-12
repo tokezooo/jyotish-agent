@@ -103,6 +103,14 @@ def test_fixture_validation_rejects_held_out_leakage():
 
 def test_adjudication_record_requires_human_reviewer_and_is_private(tmp_path: Path):
     output = tmp_path / "reviews" / "T001.json"
+    metadata = {
+        "run_id": "rr_00000000-0000-4000-8000-000000000000",
+        "runtime_versions": {"engine": "1", "planner": "1", "corpus": "1", "contract": "2.0"},
+        "duration_ms": 123,
+        "artifact_hashes": {"memo": "a" * 64, "ledger": "b" * 64},
+        "started_at": "2026-07-12T00:00:00Z",
+        "finished_at": "2026-07-12T00:00:01Z",
+    }
     record_human_adjudication(
         output,
         case_id="T001",
@@ -118,10 +126,13 @@ def test_adjudication_record_requires_human_reviewer_and_is_private(tmp_path: Pa
         },
         material_rewrite=False,
         evidence="Reviewed canonical answer and run ledger.",
+        **metadata,
     )
     body = json.loads(output.read_text(encoding="utf-8"))
     assert body["reviewer"] == "human:reviewer-1"
     assert body["decision"] == "pass"
+    assert body["runtime_versions"] == metadata["runtime_versions"]
+    assert body["artifact_hashes"] == metadata["artifact_hashes"]
     assert output.stat().st_mode & 0o777 == 0o600
 
     with pytest.raises(ValueError, match="human reviewer"):
@@ -132,6 +143,7 @@ def test_adjudication_record_requires_human_reviewer_and_is_private(tmp_path: Pa
             scores=body["scores"],
             material_rewrite=False,
             evidence="model-only",
+            **metadata,
         )
 
 
@@ -409,9 +421,9 @@ def test_all_fixture_specs_are_runnable_or_explicitly_manual_and_checksum_frozen
     assert summary == {"files": 5, "algorithm": "sha256"}
     assert validate_fixture_spec_coverage(fixtures) == {"cases": 60, "groups": 13}
     result = run_fixture_specs(fixtures, split="tuning", execute=False)
-    assert result == {"total": 40, "automated": 19, "manual_not_scored": 21}
+    assert result == {"total": 40, "automated": 17, "manual_not_scored": 23}
     held_out = run_fixture_specs(fixtures, split="held-out", execute=False, allow_held_out=True)
-    assert held_out == {"total": 20, "automated": 12, "manual_not_scored": 8}
+    assert held_out == {"total": 20, "automated": 11, "manual_not_scored": 9}
     with pytest.raises(ValueError, match="held-out"):
         run_fixture_specs(fixtures, split="held-out", execute=False)
 
@@ -439,7 +451,7 @@ def test_tuning_runner_works_with_held_out_files_physically_absent(tmp_path: Pat
         shutil.copy2(source / name, isolated / name)
 
     assert run_fixture_specs(isolated, split="tuning", execute=False) == {
-        "total": 40, "automated": 19, "manual_not_scored": 21
+        "total": 40, "automated": 17, "manual_not_scored": 23
     }
 
 
@@ -465,6 +477,38 @@ def test_runner_fails_the_exact_case_when_expected_outcome_is_mutated(tmp_path: 
 
     with pytest.raises(RuntimeError, match=r"fixture T004 failed"):
         run_fixture_specs(isolated, split="tuning", execute=True)
+
+
+@pytest.mark.parametrize(
+    ("split", "case_id"),
+    [("tuning", "T007"), ("tuning", "T005"), ("tuning", "T006"),
+     ("tuning", "T004"), ("tuning", "T012"), ("held-out", "H007")],
+)
+def test_expected_mutation_fails_each_automated_probe_family(
+    tmp_path: Path, split: str, case_id: str
+):
+    source = ROOT / "eval" / "fixtures"
+    isolated = tmp_path / "fixtures"
+    isolated.mkdir()
+    case_name = f"{split}.jsonl"
+    specs_name = f"{split}-specs.json"
+    for name in ("profiles.json", case_name, specs_name):
+        shutil.copy2(source / name, isolated / name)
+    lines = (isolated / case_name).read_text(encoding="utf-8").splitlines()
+    index = next(i for i, line in enumerate(lines) if json.loads(line)["id"] == case_id)
+    case = json.loads(lines[index])
+    case["expected"] = {"outcome": "mutated-impossible-outcome"}
+    lines[index] = json.dumps(case, separators=(",", ":"))
+    (isolated / case_name).write_text("\n".join(lines) + "\n", encoding="utf-8")
+    files = {name: hashlib.sha256((isolated / name).read_bytes()).hexdigest()
+             for name in ("profiles.json", case_name, specs_name)}
+    (isolated / f"{split}-checksums.json").write_text(
+        json.dumps({"algorithm": "sha256", "split": split, "files": files}), encoding="utf-8"
+    )
+    with pytest.raises(RuntimeError, match=rf"fixture {case_id} failed"):
+        run_fixture_specs(
+            isolated, split=split, execute=True, allow_held_out=split == "held-out"
+        )
 
 
 def test_retention_rejects_symlinked_artifact_root_without_external_deletion(
@@ -506,11 +550,25 @@ def test_private_artifacts_reject_symlinked_configured_data_root(tmp_path: Path)
     configured = tmp_path / "configured"
     configured.symlink_to(outside, target_is_directory=True)
 
-    with pytest.raises(ValueError, match="data root is a symlink"):
+    with pytest.raises(ValueError, match="symlink"):
         persist_private_artifact(configured, run_id="rr_safe", name="answer.md", data=b"no")
-    with pytest.raises(ValueError, match="data root is a symlink"):
+    with pytest.raises(ValueError, match="symlink"):
         prune_private_artifacts(configured, retention_seconds=0)
-    with pytest.raises(Exception, match="data root"):
+    with pytest.raises(Exception, match="symlink"):
+        ResearchStore(configured).initialize()
+    assert list(outside.iterdir()) == []
+
+
+def test_private_store_rejects_symlink_ancestor_without_external_side_effect(tmp_path: Path):
+    outside = tmp_path / "outside-parent"
+    outside.mkdir()
+    link_parent = tmp_path / "linked-parent"
+    link_parent.symlink_to(outside, target_is_directory=True)
+    configured = link_parent / "data"
+
+    with pytest.raises(ValueError, match="symlink ancestor"):
+        persist_private_artifact(configured, run_id="rr_safe", name="answer.md", data=b"no")
+    with pytest.raises(Exception, match="symlink ancestor"):
         ResearchStore(configured).initialize()
     assert list(outside.iterdir()) == []
 
@@ -544,6 +602,35 @@ def test_whole_store_purge_requires_verified_backup_and_explicit_confirmation(tm
     with sqlite3.connect(backup) as connection:
         assert connection.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
     assert not store.database_path.exists()
+
+
+def test_run_corpus_snapshot_ignores_later_sources_but_detects_pinned_corruption(tmp_path: Path):
+    from jyotish_agent.evaluation_probes import _request
+    from jyotish_agent.research_service import ResearchService
+
+    store = ResearchStore(tmp_path / "data")
+    store.seed_source_for_testing(
+        source_version_id="src_pinned", title="Pinned", rights_note="Fixture",
+        fragments=[{"fragment_id": "sf_pinned", "locator": "1", "text": "career"}],
+    )
+    profile = json.loads((ROOT / "eval/fixtures/profiles.json").read_text())["profiles"][0]
+    created = ResearchService(store).create_run(_request(profile, "career"))
+    expected = {
+        "engine": created.engine_version, "planner": created.planner_version,
+        "corpus": created.corpus_version, "contract": created.contract_version,
+    }
+    assert store.pinned_versions_available(created.run_id, expected)
+    store.seed_source_for_testing(
+        source_version_id="src_later", title="Later", rights_note="Fixture",
+        fragments=[{"fragment_id": "sf_later", "locator": "1", "text": "later"}],
+    )
+    assert store.pinned_versions_available(created.run_id, expected)
+    with sqlite3.connect(store.database_path) as connection:
+        connection.execute(
+            "UPDATE source_versions SET manifest_checksum=? WHERE source_version_id='src_pinned'",
+            ("0" * 64,),
+        )
+    assert not store.pinned_versions_available(created.run_id, expected)
 
 
 @pytest.mark.parametrize(

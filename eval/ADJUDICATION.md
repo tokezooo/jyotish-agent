@@ -7,6 +7,9 @@ summarize artifacts but must never be the sole adjudicator.
 
 Score each dimension from 0 to 3 and record evidence, reviewer identity, UTC time,
 runtime versions, duration, and whether a material rewrite was required.
+The persisted record schema requires `run_id`, `started_at`, `finished_at`,
+`duration_ms`, exact `engine`/`planner`/`corpus`/`contract` versions, and SHA-256
+`artifact_hashes`; incomplete metadata is rejected.
 
 | Dimension | 0 | 1 | 2 | 3 |
 |---|---|---|---|---|
@@ -31,7 +34,7 @@ rights/provenance URL, and reviewer; never copy the system-under-test output.
 
 `fixtures/tuning-specs.json` and `fixtures/held-out-specs.json` map every case to
 either an exact production-boundary probe or an explicit `manual_not_scored`
-reason. There are 31 deterministic automated cases and 29 manual cases. A case is
+reason. There are 28 deterministic automated cases and 32 manual cases. A case is
 never called automated merely because a related generic test passes. Run the
 40-case tuning split with:
 

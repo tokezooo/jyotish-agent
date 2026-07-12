@@ -14,6 +14,9 @@ restore the last verified backup into a new `0700` root; start the exact compati
 version; run migrations; inspect affected run IDs; offline-replay them; compare
 projection/claims/memo hashes; then switch the configured data root. Missing pinned
 corpus or planner versions must be restored before replay.
+Each run snapshots the exact approved corpus source-version IDs and manifest
+checksums. Later unrelated approvals do not invalidate old runs; removal or checksum
+drift of a source pinned by that run fails replay closed.
 
 Validated exports are written by the CLI through `persist_private_artifact`, which
 uses a same-directory fsync and atomic replace. Retention deletion must remain inside

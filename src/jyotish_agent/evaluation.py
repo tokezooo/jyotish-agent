@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -187,6 +188,12 @@ def record_human_adjudication(
     scores: dict[str, int],
     material_rewrite: bool,
     evidence: str,
+    run_id: str,
+    runtime_versions: dict[str, str],
+    duration_ms: int,
+    artifact_hashes: dict[str, str],
+    started_at: str,
+    finished_at: str,
 ) -> None:
     """Persist one private human decision using the published rubric."""
     if not reviewer.startswith("human:") or len(reviewer) <= len("human:"):
@@ -205,6 +212,19 @@ def record_human_adjudication(
         for score in scores.values()
     ):
         raise ValueError("scores must contain every rubric dimension on a 0-3 scale")
+    if set(runtime_versions) != {"engine", "planner", "corpus", "contract"} or not all(
+        isinstance(value, str) and value for value in runtime_versions.values()
+    ):
+        raise ValueError("all pinned runtime versions are required")
+    if not run_id.startswith("rr_") or isinstance(duration_ms, bool) or duration_ms < 0:
+        raise ValueError("run_id and non-negative duration_ms are required")
+    if not artifact_hashes or any(
+        not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value)
+        for value in artifact_hashes.values()
+    ):
+        raise ValueError("artifact SHA-256 hashes are required")
+    for timestamp in (started_at, finished_at):
+        dt.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
     passed = (
         scores["unsupported_claims"] == 3
         and scores["traceability"] >= 2
@@ -219,6 +239,12 @@ def record_human_adjudication(
         "scores": scores,
         "material_rewrite": material_rewrite,
         "evidence": evidence,
+        "run_id": run_id,
+        "runtime_versions": runtime_versions,
+        "duration_ms": duration_ms,
+        "artifact_hashes": artifact_hashes,
+        "started_at": started_at,
+        "finished_at": finished_at,
         "decision": "pass" if passed else "fail",
     }
     atomic_write_private(

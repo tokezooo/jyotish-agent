@@ -109,8 +109,8 @@ The Task 6 review findings were closed in a follow-up commit based on `1605267`:
   reaches the real memo mismatch. Both branches are exercised through service/API
   tests and the subprocess CLI replay path.
 - Physically separate `tuning-specs.json` / `held-out-specs.json` and checksum
-  manifests map all 60 IDs to reviewed specifications: 31 exact automated
-  production setups and 29 honest `manual_not_scored` cases. Every automated probe
+  manifests map all 60 IDs to reviewed specifications: 28 exact automated
+  production setups and 32 honest `manual_not_scored` cases. Every automated probe
   consumes its exact profile, prompt, and expected outcome; a
   mutation regression proves the exact case fails. Tuning succeeds even when all
   held-out case/spec/manifest files are physically absent.
@@ -123,6 +123,9 @@ The Task 6 review findings were closed in a follow-up commit based on `1605267`:
 - The malicious-source regression now crosses create → screen → plan → corpus
   retrieval → structured `quoted_source_data` → fake-Pi rendering with
   tool/model/subprocess canaries and proves no source-derived side effect.
+  A Bun harness also imports and registers the real TypeScript extension, invokes
+  its registered retrieval tool on the adversarial typed envelope, and verifies the
+  injected tool/model/process canaries remain untouched.
 - Retention rejects a symlinked artifact root before `exists`/`iterdir`, anchors the
   resolved root under `data_root`, and unlinks nested symlinks without following
   them. The exact external-victim deletion reproduction is now a regression test.
@@ -142,11 +145,11 @@ The Task 6 review findings were closed in a follow-up commit based on `1605267`:
 - Focused Python (`test_task6_hardening`, AnswerContract v2, CLI, corpus migration):
   **75 passed**.
 - Exact black-box plus both CLI replay registry branches: **3 passed in 8.62s**.
-- Full Python after external-review remediation: **355 passed, 2 skipped in
-  92.67s** (only Swiss-ephemeris tests).
-- Tuning runner: **19 automated passed, 21 manual_not_scored, 40 total**.
-- Explicit held-out runner: **12 automated passed, 8 manual_not_scored, 20 total**.
-- Bun: **44 passed, 0 failed, 137 assertions**.
+- Full Python after final external-review remediation: **363 passed, 2 skipped in
+  95.35s** (only Swiss-ephemeris tests).
+- Tuning runner: **17 automated passed, 23 manual_not_scored, 40 total**.
+- Explicit held-out runner: **11 automated passed, 9 manual_not_scored, 20 total**.
+- Bun: **45 passed, 0 failed, 144 assertions**.
 - TypeScript `tsc --noEmit`: **passed**.
 - `compileall`: **passed**.
 - Both repository-local skills: **valid**.

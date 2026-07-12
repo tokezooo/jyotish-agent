@@ -25,3 +25,5 @@ messages are never copied into public envelopes. Replay returns the real run ID 
 the exact `MISSING_PINNED_VERSION` and `MEMO_HASH_MISMATCH` branches.
 Run-scoped handlers preserve a known run ID and the requested `screen`, `plan`,
 `calculate`, `retrieve`, `answer`, or `replay` stage.
+`RUN_NOT_FOUND`, `OPERATION_CONFLICT`, and `UNSUPPORTED_TIMEZONE` use the same
+controlled registry envelope; route-local problem builders do not invent codes.

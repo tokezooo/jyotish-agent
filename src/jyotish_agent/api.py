@@ -13,13 +13,20 @@ from __future__ import annotations
 import datetime as _dt
 import logging
 import time
+from contextvars import ContextVar
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from . import ENGINE_VERSION
 from .config import ConfigError
-from .errors import CalculationError, register_error_handlers, registry_problem_response
+from .error_registry import ERROR_REGISTRY
+from .errors import (
+    CalculationError,
+    register_error_handlers,
+    registry_problem_response,
+    request_run_context,
+)
 from .interpretations import redirect_message, screen_question, validate_answer
 from .models import (
     ChartComputeRequest,
@@ -82,7 +89,26 @@ def _research_service(request: Request) -> ResearchService:
     return ResearchService(ResearchStore(default_data_root()))
 
 
+_RUN_CONTEXT: ContextVar[tuple[str | None, str]] = ContextVar(
+    "jyotish_run_context", default=(None, "request")
+)
+
+
 def _research_problem(status: int, title: str, problem: str, fix: str) -> JSONResponse:
+    run_id, stage = _RUN_CONTEXT.get()
+    error_code = (
+        "RUN_NOT_FOUND"
+        if status == 404
+        else "UNSUPPORTED_TIMEZONE"
+        if status == 422 and "timezone" in title.lower()
+        else "OPERATION_CONFLICT"
+        if status == 409
+        else "UNEXPECTED_INTERNAL"
+    )
+    if error_code in ERROR_REGISTRY:
+        return registry_problem_response(
+            error_code, status=status, run_id=run_id, stage=stage, title=title
+        )
     return JSONResponse(
         status_code=status,
         media_type="application/problem+json",
@@ -104,6 +130,7 @@ def _research_problem(status: int, title: str, problem: str, fix: str) -> JSONRe
 
 @app.middleware("http")
 async def _access_log(request: Request, call_next):
+    context_token = _RUN_CONTEXT.set(request_run_context(request))
     start = time.monotonic()
     status = 500  # if call_next raises, we still log the failure as a 500
     try:
@@ -111,6 +138,7 @@ async def _access_log(request: Request, call_next):
         status = response.status_code
         return response
     finally:
+        _RUN_CONTEXT.reset(context_token)
         duration_ms = round((time.monotonic() - start) * 1000, 1)
         # No request/response body: birth data must not reach the logs.
         logger.info(

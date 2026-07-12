@@ -16,7 +16,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 DATABASE_NAME = "research.sqlite3"
 
 
@@ -389,6 +389,19 @@ _MIGRATION_9 = """
 ALTER TABLE available_versions ADD COLUMN artifact_checksum TEXT;
 """
 
+_MIGRATION_10 = """
+CREATE TABLE run_corpus_artifacts (
+    run_id TEXT NOT NULL REFERENCES research_runs(run_id) ON DELETE CASCADE,
+    source_version_id TEXT NOT NULL,
+    manifest_checksum TEXT NOT NULL,
+    PRIMARY KEY (run_id, source_version_id)
+);
+INSERT INTO run_corpus_artifacts (run_id, source_version_id, manifest_checksum)
+SELECT r.run_id, s.source_version_id, s.manifest_checksum
+FROM research_runs r CROSS JOIN source_versions s
+WHERE s.approval_status='approved';
+"""
+
 _MIGRATIONS: dict[int, str] = {
     1: _MIGRATION_1,
     2: _MIGRATION_2,
@@ -399,6 +412,7 @@ _MIGRATIONS: dict[int, str] = {
     7: _MIGRATION_7,
     8: _MIGRATION_8,
     9: _MIGRATION_9,
+    10: _MIGRATION_10,
 }
 
 
@@ -454,6 +468,12 @@ class ResearchStore:
         self.busy_timeout_ms = busy_timeout_ms
 
     def initialize(self) -> None:
+        from .hardening import reject_symlink_ancestors
+
+        try:
+            reject_symlink_ancestors(self.data_root)
+        except ValueError as exc:
+            raise ResearchStoreError(str(exc)) from exc
         if self.data_root.is_symlink():
             raise ResearchStoreError("configured data root must not be a symlink")
         self.data_root.mkdir(mode=0o700, parents=True, exist_ok=True)
@@ -989,6 +1009,12 @@ class ResearchStore:
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 self._run_values(run_data),
             )
+            connection.execute(
+                """INSERT INTO run_corpus_artifacts (run_id, source_version_id, manifest_checksum)
+                   SELECT ?, source_version_id, manifest_checksum FROM source_versions
+                   WHERE approval_status='approved'""",
+                (run_data["run_id"],),
+            )
             dependencies = {
                 "engine": run_data["engine_version"],
                 "planner": run_data["planner_version"],
@@ -999,7 +1025,7 @@ class ResearchStore:
                 "INSERT INTO available_versions (run_id, version_type, version, artifact_checksum) VALUES (?, ?, ?, ?)",
                 [
                     (run_data["run_id"], kind, version,
-                     self._dependency_checksum(connection, kind, version))
+                     self._dependency_checksum(connection, kind, version, run_data["run_id"]))
                     for kind, version in dependencies.items()
                 ],
             )
@@ -1064,19 +1090,29 @@ class ResearchStore:
                 return False
             return all(
                 row["artifact_checksum"]
-                == self._dependency_checksum(connection, row["version_type"], row["version"])
+                == self._dependency_checksum(
+                    connection, row["version_type"], row["version"], run_id
+                )
                 for row in rows if row["version_type"] != "model"
             )
         finally:
             connection.close()
 
     def _dependency_checksum(
-        self, connection: sqlite3.Connection, version_type: str, version: str
+        self, connection: sqlite3.Connection, version_type: str, version: str,
+        run_id: str,
     ) -> str:
         if version_type == "corpus":
-            manifests = [row[0] for row in connection.execute(
-                "SELECT manifest_checksum FROM source_versions WHERE approval_status='approved' ORDER BY source_version_id"
-            )]
+            snapshots = connection.execute(
+                """SELECT a.source_version_id, a.manifest_checksum, s.manifest_checksum
+                   FROM run_corpus_artifacts a
+                   LEFT JOIN source_versions s ON s.source_version_id=a.source_version_id
+                   WHERE a.run_id=? ORDER BY a.source_version_id""",
+                (run_id,),
+            ).fetchall()
+            if any(row[2] is None or row[1] != row[2] for row in snapshots):
+                return "corrupt-or-missing-corpus-artifact"
+            manifests = [(row[0], row[1]) for row in snapshots]
             material = canonical_json({"version": version, "approved_manifests": manifests})
             return sha256_text(material)
         filename = {
