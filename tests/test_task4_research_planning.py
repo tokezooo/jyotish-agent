@@ -183,32 +183,24 @@ def test_planned_calculation_executes_exact_plan_not_creation_modules(tmp_path: 
     assert {item["payload"]["config_hash"] for item in evidence} == {executed_hash}
 
 
-def test_legacy_calculated_run_without_persisted_plan_cannot_retrieve(tmp_path: Path):
+def test_screened_safe_run_without_persisted_plan_cannot_calculate(tmp_path: Path):
     client = _client(tmp_path)
     run = client.post("/v2/research-runs", json=_create_body()).json()
     screened = client.post(
         f"/v2/research-runs/{run['run_id']}/screen",
         json={"operation_id": _op(), "expected_revision": run["revision"]},
     ).json()
-    calculated = client.post(
-        f"/v2/research-runs/{run['run_id']}/calculate",
-        json={"operation_id": _op(), "expected_revision": screened["revision"]},
-    ).json()
     before_events = app.state.research_service.store.list_events(run["run_id"])
 
     response = client.post(
-        f"/v2/research-runs/{run['run_id']}/retrieve",
-        json={
-            "operation_id": _op(),
-            "expected_revision": calculated["revision"],
-            "query": "career timing",
-            "limit": 8,
-        },
+        f"/v2/research-runs/{run['run_id']}/calculate",
+        json={"operation_id": _op(), "expected_revision": screened["revision"]},
     )
 
     assert response.status_code == 409
-    assert "supported plan" in response.json()["detail"]
+    assert response.json()["detail"] == "Calculation is stale or invalid for the run's current state."
     assert app.state.research_service.store.list_events(run["run_id"]) == before_events
+    assert app.state.research_service.store.list_evidence(run["run_id"]) == []
 
 
 def test_cli_run_inspect_has_human_and_json_output(tmp_path: Path, monkeypatch, capsys):

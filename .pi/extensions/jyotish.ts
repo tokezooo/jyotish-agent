@@ -746,8 +746,8 @@ export class ResearchRuntime {
         if (this.current.status === "refused_unsafe") {
           return { block: true, reason: "The unsafe refusal branch is terminal; calculation is blocked." };
         }
-        if (this.current.status !== "screened_safe" && this.current.status !== "planned") {
-          return { block: true, reason: "Calculation requires a safely screened run." };
+        if (this.current.status !== "planned" || !this.supportedPlanKnown) {
+          return { block: true, reason: "Calculation requires a supported deterministic plan." };
         }
       }
       if (

@@ -438,6 +438,8 @@ class ResearchStore:
                     connection.execute("BEGIN IMMEDIATE")
                     for statement in _migration_statements(script):
                         connection.execute(statement)
+                    if target_version == 5:
+                        self._backfill_v5_fts(connection)
                     if target_version == 6:
                         self._backfill_v6(connection)
                     connection.execute(f"PRAGMA user_version = {target_version}")
@@ -477,6 +479,25 @@ class ResearchStore:
     def _ready_connection(self) -> sqlite3.Connection:
         self.initialize()
         return self._connect()
+
+    def _backfill_v5_fts(self, connection: sqlite3.Connection) -> None:
+        """Index every pre-v5 fragment before committing schema version 5."""
+        from .corpus import normalize_search_text
+
+        rows = connection.execute(
+            "SELECT fragment_id, text, aliases_text FROM source_fragments"
+        ).fetchall()
+        for row in rows:
+            connection.execute(
+                """INSERT INTO source_fragments_fts (
+                    fragment_id, normalized_text, aliases_text
+                ) VALUES (?, ?, ?)""",
+                (
+                    row["fragment_id"],
+                    normalize_search_text(row["text"]),
+                    normalize_search_text(row["aliases_text"]),
+                ),
+            )
 
     def _backfill_v6(self, connection: sqlite3.Connection) -> None:
         """Reconstruct v5 corpus actions before committing schema version 6."""

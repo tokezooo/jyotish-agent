@@ -52,6 +52,27 @@ def _create(client: TestClient, question: str = "Which career factors?") -> dict
     return response.json()
 
 
+def _plan(client: TestClient, run_id: str, expected_revision: int) -> dict:
+    response = client.post(
+        f"/v2/research-runs/{run_id}/plan",
+        json={
+            "operation_id": _operation_id(),
+            "expected_revision": expected_revision,
+            "intent": {
+                "family": "career_factors_and_timing",
+                "explicit_annual_scope": False,
+            },
+            "classifier": {
+                "classifier_model": "test-classifier",
+                "classifier_version": "1",
+                "prompt_hash": "a" * 64,
+            },
+        },
+    )
+    assert response.status_code == 200, response.text
+    return response.json()
+
+
 def test_screen_is_idempotent_and_stale_new_operation_conflicts(tmp_path: Path):
     client, store = _client(tmp_path)
     run = _create(client)
@@ -132,6 +153,7 @@ def test_calculation_persists_typed_immutable_evidence_once(tmp_path: Path, monk
         f"/v2/research-runs/{run['run_id']}/screen",
         json={"operation_id": _operation_id(), "expected_revision": 1},
     ).json()
+    planned = _plan(client, run["run_id"], screened["revision"])
 
     calls = 0
 
@@ -152,7 +174,7 @@ def test_calculation_persists_typed_immutable_evidence_once(tmp_path: Path, monk
 
     monkeypatch.setattr("jyotish_agent.research_service.compute_chart", fake_compute)
     operation_id = _operation_id()
-    body = {"operation_id": operation_id, "expected_revision": screened["revision"]}
+    body = {"operation_id": operation_id, "expected_revision": planned["revision"]}
     first = client.post(f"/v2/research-runs/{run['run_id']}/calculate", json=body)
     second = client.post(f"/v2/research-runs/{run['run_id']}/calculate", json=body)
 
@@ -160,8 +182,8 @@ def test_calculation_persists_typed_immutable_evidence_once(tmp_path: Path, monk
     assert first.json() == second.json()
     result = first.json()
     assert result["status"] == "calculated"
-    assert result["revision"] == 3
-    assert result["backend_seq"] == 3
+    assert result["revision"] == 4
+    assert result["backend_seq"] == 4
     assert result["facts"]["ascendant"]["sign"] == "Pisces"
     assert calls == 1
 

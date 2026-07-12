@@ -192,8 +192,13 @@ class ResearchService:
             return ResearchCalculationResponse(**prior)
 
         run = self._require_run(run_id)
-        if run["status"] not in {"screened_safe", "planned"}:
-            raise InvalidRunTransition("calculation requires a safely screened run")
+        persisted_plan = self.store.get_question_plan(run_id)
+        if (
+            run["status"] != "planned"
+            or persisted_plan is None
+            or persisted_plan["plan"].get("outcome") != "supported"
+        ):
+            raise InvalidRunTransition("calculation requires a supported plan")
         if run["revision"] != request.expected_revision:
             raise InvalidRunTransition("expected revision does not match current revision")
 
@@ -202,15 +207,9 @@ class ResearchService:
         profile_input["place"]["timezone"] = run["resolved_offset_minutes"] / 60
         profile_request = BirthProfileRequest.model_validate(profile_input)
         config_payload = json.loads(canonical_json(run["calculation_config"]))
-        if run["status"] == "planned":
-            persisted_plan = self.store.get_question_plan(run_id)
-            if persisted_plan is None:
-                raise InvalidRunTransition("planned run is missing its persisted plan")
-            plan = persisted_plan["plan"]
-            if plan.get("outcome") != "supported":
-                raise InvalidRunTransition("only a supported plan can be calculated")
-            config_payload["charts"] = plan["charts"]
-            config_payload["modules"] = plan["modules"]
+        plan = persisted_plan["plan"]
+        config_payload["charts"] = plan["charts"]
+        config_payload["modules"] = plan["modules"]
         config_request = CalculationConfigRequest.model_validate(config_payload)
         reference = (
             config_request.reference_date.year,

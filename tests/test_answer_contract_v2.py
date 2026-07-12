@@ -58,6 +58,22 @@ def _client(tmp_path: Path, monkeypatch) -> tuple[TestClient, ResearchStore, dic
         f"/v2/research-runs/{created['run_id']}/screen",
         json={"operation_id": _id("op_"), "expected_revision": 1},
     ).json()
+    planned = client.post(
+        f"/v2/research-runs/{created['run_id']}/plan",
+        json={
+            "operation_id": _id("op_"),
+            "expected_revision": screened["revision"],
+            "intent": {
+                "family": "career_factors_and_timing",
+                "explicit_annual_scope": False,
+            },
+            "classifier": {
+                "classifier_model": "test-classifier",
+                "classifier_version": "1",
+                "prompt_hash": "a" * 64,
+            },
+        },
+    ).json()
 
     def fake_compute(_profile, *, reference_date, config):
         return {
@@ -72,7 +88,7 @@ def _client(tmp_path: Path, monkeypatch) -> tuple[TestClient, ResearchStore, dic
         f"/v2/research-runs/{created['run_id']}/calculate",
         json={
             "operation_id": _id("op_"),
-            "expected_revision": screened["revision"],
+            "expected_revision": planned["revision"],
         },
     ).json()
     return client, store, calculated

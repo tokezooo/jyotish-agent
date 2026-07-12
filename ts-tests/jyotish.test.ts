@@ -599,6 +599,21 @@ describe("ResearchRuntime", () => {
     ).toContain("supported deterministic plan");
   });
 
+  test("blocks v2 calculation from screened-safe state without a supported plan", () => {
+    const runtime = new ResearchRuntime();
+    runtime.restore([mirror("screened_safe", screenOp, 2)]);
+    runtime.beginAssistantMessage("calculate-without-plan");
+
+    expect(
+      runtime.reserve(
+        "calculate-call",
+        "jyotish_calculate_research_run",
+        { run_id: runId, operation_id: calculateOp, expected_revision: 2 },
+        () => {},
+      )?.reason,
+    ).toContain("supported deterministic plan");
+  });
+
   test("restored successful plan sequence authorizes later calculated retrieval", () => {
     const runtime = new ResearchRuntime();
     runtime.restore([
@@ -622,7 +637,7 @@ describe("ResearchRuntime", () => {
     ).toBeUndefined();
   });
 
-  test("successful supported-plan settlement authorizes retrieval", () => {
+  test("successful supported-plan settlement authorizes calculation and retrieval", () => {
     const runtime = new ResearchRuntime();
     runtime.restore([mirror("screened_safe", screenOp, 2)]);
     runtime.beginAssistantMessage("plan-leaf");
@@ -647,13 +662,34 @@ describe("ResearchRuntime", () => {
       },
       () => {},
     );
+    runtime.beginAssistantMessage("calculate-leaf");
+    expect(
+      runtime.reserve(
+        "calculate-call",
+        "jyotish_calculate_research_run",
+        { run_id: runId, operation_id: calculateOp, expected_revision: 3 },
+        () => {},
+      ),
+    ).toBeUndefined();
+    runtime.settle(
+      "calculate-call",
+      false,
+      {
+        run_id: runId,
+        operation_id: calculateOp,
+        backend_seq: 4,
+        event_hash: hash2,
+        status: "calculated",
+      },
+      () => {},
+    );
     runtime.beginAssistantMessage("retrieve-leaf");
 
     expect(
       runtime.reserve(
         "retrieve-call",
         "jyotish_retrieve_research_run",
-        { run_id: runId, operation_id: retrieveOp, expected_revision: 3 },
+        { run_id: runId, operation_id: retrieveOp, expected_revision: 4 },
         () => {},
       ),
     ).toBeUndefined();

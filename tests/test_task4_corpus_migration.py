@@ -30,6 +30,18 @@ def _v5_store(tmp_path: Path, monkeypatch) -> ResearchStore:
     return store
 
 
+def _v4_store(tmp_path: Path, monkeypatch) -> ResearchStore:
+    import jyotish_agent.research_store as store_module
+
+    store = ResearchStore(tmp_path / "data")
+    with monkeypatch.context() as patcher:
+        patcher.setattr(store_module, "SCHEMA_VERSION", 4)
+        store.initialize()
+    with sqlite3.connect(store.database_path) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 4
+    return store
+
+
 def _insert_v5_source(
     store: ResearchStore,
     source: dict,
@@ -134,6 +146,64 @@ def test_v5_builtin_upgrade_backfills_replay_and_review_history(tmp_path: Path, 
         assert connection.execute(
             "SELECT COUNT(*) FROM corpus_operations"
         ).fetchone()[0] == operation_count
+
+
+def test_v4_upgrade_atomically_backfills_normalized_fragment_search(
+    tmp_path: Path, monkeypatch
+):
+    store = _v4_store(tmp_path, monkeypatch)
+    text = "Śani governs karma sthāna"
+    with sqlite3.connect(store.database_path) as connection:
+        connection.execute(
+            """INSERT INTO source_versions (
+                source_version_id, title, source_class, rights_note, checksum,
+                approval_status, metadata_json, created_at
+            ) VALUES (?, ?, ?, ?, ?, 'pending', '{}', ?)""",
+            (
+                "sv_v4_search",
+                "V4 transliteration fixture",
+                "original_text",
+                "Authored fixture dedicated to the public domain.",
+                hashlib.sha256(b"legacy-placeholder").hexdigest(),
+                "2026-07-12T10:00:00Z",
+            ),
+        )
+        connection.execute(
+            """INSERT INTO source_fragments (
+                fragment_id, source_version_id, ordinal, locator, text, checksum
+            ) VALUES (?, ?, 1, ?, ?, ?)""",
+            (
+                "sf_v4_search_1",
+                "sv_v4_search",
+                "chapter 1, verse 1",
+                text,
+                hashlib.sha256(text.encode()).hexdigest(),
+            ),
+        )
+        connection.commit()
+
+    store.initialize()
+    with sqlite3.connect(store.database_path) as connection:
+        assert connection.execute("PRAGMA user_version").fetchone()[0] == 6
+        assert connection.execute(
+            "SELECT COUNT(*) FROM source_fragments_fts WHERE fragment_id=?",
+            ("sf_v4_search_1",),
+        ).fetchone()[0] == 1
+
+    review = {
+        "status": "approved",
+        "reviewer": "migration-reviewer",
+        "note": "approved authored migration fixture",
+    }
+    store.review_source_version(
+        "sv_v4_search", review, operation_id=_op(), expected_revision=2
+    )
+    store.review_source_fragment(
+        "sf_v4_search_1", review, operation_id=_op(), expected_revision=1
+    )
+
+    found = store.search_approved_fragments("sani karma sthana", limit=5)
+    assert [row["fragment_id"] for row in found] == ["sf_v4_search_1"]
 
 
 def test_v5_builtin_source_pending_upgrade_can_finish_seed_idempotently(
