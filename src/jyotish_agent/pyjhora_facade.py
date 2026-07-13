@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Callable, Generic, TypeVar
 
 from . import ENGINE_VERSION, names
 from .config import ENGINE_LOCK, CalculationConfig, ConfigError, apply_config, ephemeris_mode
@@ -44,8 +45,48 @@ class BirthProfile:
     timezone: float  # offset in hours, e.g. 5.5 for IST
 
 
+@dataclass(frozen=True)
+class _EnginePosition:
+    """Immutable normalized engine position; ``None`` identifies Lagna."""
+
+    planet_index: int | None
+    sign_index: int
+    degrees: float
+
+
+@dataclass(frozen=True)
+class _EngineSnapshot:
+    """Domain-safe D1/D9 primitives captured under one applied configuration."""
+
+    config: CalculationConfig
+    d1: tuple[_EnginePosition, ...]
+    d9: tuple[_EnginePosition, ...]
+
+
+_DomainT = TypeVar("_DomainT")
+
+
+@dataclass(frozen=True)
+class _EngineSessionResult(Generic[_DomainT]):
+    natal: dict
+    snapshot: _EngineSnapshot
+    domain: _DomainT | None
+
+
 def _round_deg(value: float) -> float:
     return round(float(value), _DEG_PRECISION)
+
+
+def _immutable_positions(chart) -> tuple[_EnginePosition, ...]:
+    """Copy a mutable PyJHora chart into a stable immutable representation."""
+    return tuple(
+        _EnginePosition(
+            planet_index=None if body == "L" else int(body),
+            sign_index=int(pos[0]),
+            degrees=_round_deg(pos[1]),
+        )
+        for body, pos in chart
+    )
 
 
 def _placements(chart) -> list[dict]:
@@ -577,17 +618,18 @@ def _vimshottari_current(ref_jd, jd, place) -> dict:
     return levels
 
 
-def compute_chart(
+def _run_engine_session(
     profile: BirthProfile,
     reference_date: DateTuple,
     config: CalculationConfig | None = None,
-) -> dict:
-    """Compute the MVP fact set for a birth profile at a reference date.
+    domain_callback: Callable[[_EngineSnapshot], _DomainT] | None = None,
+) -> _EngineSessionResult[_DomainT]:
+    """Own one apply+compute lock and expose only immutable domain primitives.
 
-    Returns a deterministic, JSON-serializable dict: ascendant, D1, D9, panchanga
-    basics, current Vimshottari period, plus the config and provenance used. Holds
-    ENGINE_LOCK across the whole apply+compute so concurrent callers cannot swap
-    PyJHora's global ayanamsa mid-computation.
+    The callback runs while the same lock and applied PyJHora configuration are
+    active. It receives copied D1/D9 positions, never mutable engine charts. The
+    natal result is assembled in the session too, so raw engine structures cannot
+    escape the lock-owning function.
     """
     config = config or CalculationConfig()
     # Pure config validation happens BEFORE acquiring the lock: an invalid request
@@ -606,10 +648,23 @@ def compute_chart(
         # Anchor the reference at local noon to avoid date-boundary ambiguity.
         ref_jd = utils.julian_day_number(reference_date, (12, 0, 0))
 
+        # D1/D9 are the shared domain primitives even when a natal caller elects
+        # not to publish D9. Additional requested charts retain their resolved
+        # order in the natal response below.
+        kernel_charts = dict(resolved)
+        kernel_charts.setdefault("D9", 9)
         raw_charts = {
             name: charts.divisional_chart(jd, place, divisional_chart_factor=factor)
-            for name, factor in resolved.items()
+            for name, factor in kernel_charts.items()
         }
+        snapshot = _EngineSnapshot(
+            config=applied,
+            d1=_immutable_positions(raw_charts["D1"]),
+            d9=_immutable_positions(raw_charts["D9"]),
+        )
+        domain_result = (
+            domain_callback(snapshot) if domain_callback is not None else None
+        )
         panchanga = _panchanga(jd, place)
         vimshottari = _vimshottari_current(ref_jd, jd, place)
         module_facts: dict[str, dict] = {}
@@ -654,61 +709,74 @@ def compute_chart(
             for planet in module_facts["transits"]["planets"].values():
                 planet["sav_points"] = sav[planet["sign"]]
 
-    # Each divisional chart becomes a lowercase fact key (d1, d9, d10, ...). The
-    # ascendant is taken from D1, which resolved_charts guarantees is present.
-    divisional_facts = {name.lower(): _placements(chart) for name, chart in raw_charts.items()}
-    ascendant = _ascendant(raw_charts["D1"])
-    yogas = detect_yogas(divisional_facts["d1"])  # narrow geometric set, D1 only
-    if "yogas_engine" in module_facts:
-        # Two-tier cross-check, run after BOTH tiers exist so it never depends on
-        # module execution order. Always present (possibly empty) so the agent can
-        # rely on the field; strings are context to surface, deliberately NOT atoms.
-        module_facts["yogas_engine"]["mismatches"] = _yoga_tier_mismatches(
-            yogas, module_facts["yogas_engine"]
-        )
-    # D1 ascendant/houses are retained as top-level aliases for back-compat; the
-    # general per-chart forms are `lagnas` and `bhava` (which include D1). Keys are
-    # lowercased (d1, d9, ...) to match the divisional placement key convention.
-    houses = _houses(raw_charts["D1"])
-    lagnas = {name.lower(): _ascendant(chart) for name, chart in raw_charts.items()}
-    bhava = {name.lower(): _houses(chart) for name, chart in raw_charts.items()}
-    aspects = _aspects(raw_charts["D1"], applied.node_aspects)
+        # Each divisional chart becomes a lowercase fact key (d1, d9, d10, ...). The
+        # ascendant is taken from D1, which resolved_charts guarantees is present.
+        divisional_facts = {
+            name.lower(): _placements(raw_charts[name]) for name in resolved
+        }
+        ascendant = _ascendant(raw_charts["D1"])
+        yogas = detect_yogas(divisional_facts["d1"])  # narrow geometric set, D1 only
+        if "yogas_engine" in module_facts:
+            # Two-tier cross-check, run after BOTH tiers exist so it never depends on
+            # module execution order. Always present (possibly empty) so the agent can
+            # rely on the field; strings are context to surface, deliberately NOT atoms.
+            module_facts["yogas_engine"]["mismatches"] = _yoga_tier_mismatches(
+                yogas, module_facts["yogas_engine"]
+            )
+        # D1 ascendant/houses are retained as top-level aliases for back-compat; the
+        # general per-chart forms are `lagnas` and `bhava` (which include D1). Keys are
+        # lowercased (d1, d9, ...) to match the divisional placement key convention.
+        houses = _houses(raw_charts["D1"])
+        lagnas = {name.lower(): _ascendant(raw_charts[name]) for name in resolved}
+        bhava = {name.lower(): _houses(raw_charts[name]) for name in resolved}
+        aspects = _aspects(raw_charts["D1"], applied.node_aspects)
 
-    return {
-        "normalized_input": {
-            "name": profile.name,
-            "date": list(profile.date),
-            "time": list(profile.time),
-            "latitude": profile.latitude,
-            "longitude": profile.longitude,
-            "timezone": profile.timezone,
-            "reference_date": list(reference_date),
-        },
-        "calculation_config": {
-            "ayanamsa": applied.ayanamsa,
-            "rahu_ketu": applied.rahu_ketu,
-            "node_aspects": applied.node_aspects,
-            "charts": list(resolved),
-            "modules": sorted(modules),
-            # reference_date drives the running Vimshottari period; surfaced here so a
-            # quoted/cached result is fully reproducible from calculation_config alone.
-            "reference_date": list(reference_date),
-        },
-        "facts": {
-            "ascendant": ascendant,
-            "houses": houses,
-            "lagnas": lagnas,
-            "bhava": bhava,
-            "aspects": aspects,
-            "yogas": yogas,
-            **divisional_facts,
-            **module_facts,
-            "panchanga": panchanga,
-            "vimshottari": vimshottari,
-        },
-        "provenance": {
-            "engine": "PyJHora",
-            "engine_version": ENGINE_VERSION,
-            "ephemeris_mode": ephemeris_mode(),
-        },
-    }
+        natal = {
+            "normalized_input": {
+                "name": profile.name,
+                "date": list(profile.date),
+                "time": list(profile.time),
+                "latitude": profile.latitude,
+                "longitude": profile.longitude,
+                "timezone": profile.timezone,
+                "reference_date": list(reference_date),
+            },
+            "calculation_config": {
+                "ayanamsa": applied.ayanamsa,
+                "rahu_ketu": applied.rahu_ketu,
+                "node_aspects": applied.node_aspects,
+                "charts": list(resolved),
+                "modules": sorted(modules),
+                # reference_date drives the running Vimshottari period; surfaced here so a
+                # quoted/cached result is fully reproducible from calculation_config alone.
+                "reference_date": list(reference_date),
+            },
+            "facts": {
+                "ascendant": ascendant,
+                "houses": houses,
+                "lagnas": lagnas,
+                "bhava": bhava,
+                "aspects": aspects,
+                "yogas": yogas,
+                **divisional_facts,
+                **module_facts,
+                "panchanga": panchanga,
+                "vimshottari": vimshottari,
+            },
+            "provenance": {
+                "engine": "PyJHora",
+                "engine_version": ENGINE_VERSION,
+                "ephemeris_mode": ephemeris_mode(),
+            },
+        }
+
+    return _EngineSessionResult(natal=natal, snapshot=snapshot, domain=domain_result)
+
+
+def compute_chart(
+    profile: BirthProfile,
+    reference_date: DateTuple,
+    config: CalculationConfig | None = None,
+) -> dict:
+    """Compute the deterministic natal fact set through the locked engine session."""
+    return _run_engine_session(profile, reference_date, config).natal
