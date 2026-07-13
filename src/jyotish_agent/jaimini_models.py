@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime as dt
 from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import (
     BaseModel,
@@ -42,11 +43,19 @@ class JaiminiPlace(_StrictModel):
     latitude: float = Field(ge=-90, le=90, description="Decimal degrees north")
     longitude: float = Field(ge=-180, le=180, description="Decimal degrees east")
     timezone: str = Field(
-        min_length=1,
         max_length=100,
         description="IANA timezone identifier; fixed or inferred offsets are not accepted",
         examples=["Asia/Kolkata"],
     )
+
+    @field_validator("timezone")
+    @classmethod
+    def valid_iana_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ValueError, ZoneInfoNotFoundError) as exc:
+            raise ValueError("timezone must be a real IANA timezone identifier") from exc
+        return value
 
 
 class ExactJaiminiBirthInput(_StrictModel):
@@ -160,6 +169,16 @@ class _JaiminiResultBase(_StrictModel):
     interpretation_status: InterpretationStatus
     provenance: JaiminiProvenance
 
+    @model_validator(mode="after")
+    def interpretation_fails_closed(self) -> "_JaiminiResultBase":
+        status = getattr(self, "status", None)
+        if self.interpretation_status == "available":
+            if status != "completed":
+                raise ValueError("interpretation is available only for completed results")
+            if self.provenance.source_review_status != "approved":
+                raise ValueError("available interpretation requires approved source review")
+        return self
+
 
 class JaiminiCompletedResult(_JaiminiResultBase):
     status: Literal["completed"]
@@ -252,16 +271,16 @@ class ReviewMetadata(_FrozenStrictModel):
 
     @model_validator(mode="after")
     def approved_requires_reviewer(self) -> "ReviewMetadata":
-        if self.status == "approved" and not self.reviewer:
-            raise ValueError("approved review metadata requires a reviewer")
+        if self.status == "approved" and (not self.reviewer or not self.reviewer_role):
+            raise ValueError("approved review metadata requires reviewer identity and role")
         return self
 
 
 class RuleSourceMapping(_FrozenStrictModel):
     rule_id: str
     school: str
-    fragment_id: str | None
-    fragment_sha256: str | None
+    fragment_id: str | None = Field(default=None, pattern=r"^sf_[a-z0-9_]+$")
+    fragment_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
     source_status: ReviewStatus
 
     @model_validator(mode="after")
@@ -279,9 +298,22 @@ class JaiminiSourceMap(_FrozenStrictModel):
     rule_profile_version: Literal["1.0.0"]
     rule_profile_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     calculation_status: Literal["available"]
-    interpretation_status: Literal["unavailable"]
+    interpretation_status: InterpretationStatus
     review: ReviewMetadata
     rules: tuple[RuleSourceMapping, ...]
+
+    @model_validator(mode="after")
+    def approved_gate_binds_every_rule(self) -> "JaiminiSourceMap":
+        every_rule_approved = bool(self.rules) and all(
+            rule.source_status == "approved" for rule in self.rules
+        )
+        if self.review.status == "approved" and not every_rule_approved:
+            raise ValueError("approved source review requires every rule to be approved and bound")
+        if self.interpretation_status == "available" and (
+            self.review.status != "approved" or not every_rule_approved
+        ):
+            raise ValueError("available interpretation requires an approved, fully bound source map")
+        return self
 
 
 class JaiminiFixture(_FrozenStrictModel):

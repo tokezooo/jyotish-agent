@@ -109,3 +109,62 @@ available fallback in this environment.
 - The frozen doctrinal/time choices are executable project choices, not a claim of
   source correctness. Changing them after adjudication requires a new profile
   version and migration note rather than mutating v1.
+
+## Review-fix follow-up
+
+Implemented all Critical and Important review findings and the feasible timezone
+Minor without adding geometry or a new public surface:
+
+- Result validation now couples `status`, `interpretation_status`, and
+  `provenance.source_review_status`. Only a `completed` result backed by approved
+  source review may claim available interpretation. All other combinations fail
+  closed during Pydantic validation.
+- The committed package-data regression now builds a wheel into `tmp_path`, checks
+  its members, creates an isolated venv, installs the wheel without dependencies,
+  and reads all three JSON resources from the installed package via
+  `importlib.resources`.
+- The fixture loader recomputes the actual profile and source-map SHA-256 hashes.
+  It rejects either tampered file, validates every fixture hash against the bytes,
+  and also binds each fixture to the source map's profile ID.
+- Approved review metadata now requires both reviewer identity and reviewer role.
+  Approved rule mappings require an admitted `sf_...` fragment ID shape and a
+  lowercase 64-hex SHA-256. An overall approved source map requires every rule to
+  be approved and bound; available interpretation additionally requires that fully
+  approved map.
+- `JaiminiPlace.timezone` now resolves through the standard-library IANA tzdb
+  (`zoneinfo.ZoneInfo`) and rejects invented/fixed-offset labels.
+
+### Review-fix RED
+
+Tests were added before the fixes:
+
+```text
+$ uv run pytest -q tests/test_task1_jaimini_contracts.py
+......FFFF..FFF...FFF.. [100%]
+10 failed, 13 passed in 0.39s
+```
+
+The failures were the expected missing guards: non-completed/unsourced available
+interpretation did not raise, tampered profile/source bytes did not raise, approved
+metadata accepted no reviewer role, and non-IANA timezone labels were accepted.
+The newly committed wheel build/install test passed in this RED run, demonstrating
+that packaging behavior already existed while its automated installed-artifact
+regression did not.
+
+### Review-fix GREEN
+
+```text
+$ uv run pytest -q tests/test_task1_jaimini_contracts.py
+....................... [100%]
+23 passed in 0.43s
+```
+
+Final suite (run once after all review fixes):
+
+```text
+$ git diff --check && uv run pytest -q
+417 passed, 2 skipped in 88.74s
+```
+
+The two skips remain the environment's pre-existing Swiss-ephemeris-only golden
+checks. No additional warning or regression appeared.
