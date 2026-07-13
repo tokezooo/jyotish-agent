@@ -5,12 +5,14 @@ from __future__ import annotations
 import concurrent.futures
 import dataclasses
 import json
+import threading
 
 import pytest
 
 pytest.importorskip("jhora", reason="PyJHora not installed; run `uv sync`")
 
-from jyotish_agent.config import CalculationConfig  # noqa: E402
+import jyotish_agent.pyjhora_facade as facade  # noqa: E402
+from jyotish_agent.config import CalculationConfig, apply_config  # noqa: E402
 from jyotish_agent.pyjhora_facade import (  # noqa: E402
     BirthProfile,
     _run_engine_session,
@@ -65,6 +67,9 @@ def test_session_owns_one_lock_and_runs_callback_inside_it(monkeypatch):
 
 
 def test_session_snapshot_is_immutable_normalized_d1_d9_without_raw_charts():
+    requested_charts = ["D1"]
+    requested_modules: list[str] = []
+
     def inspect(snapshot):
         assert isinstance(snapshot.d1, tuple)
         assert isinstance(snapshot.d9, tuple)
@@ -76,35 +81,113 @@ def test_session_snapshot_is_immutable_normalized_d1_d9_without_raw_charts():
         assert all(isinstance(p.degrees, float) for p in (*snapshot.d1, *snapshot.d9))
         with pytest.raises(dataclasses.FrozenInstanceError):
             snapshot.d1[0].sign_index = 1
+        assert snapshot.config.charts == ("D1",)
+        assert snapshot.config.modules == ()
+        with pytest.raises(AttributeError):
+            snapshot.config.charts.append("D10")
         return snapshot
 
     result = _run_engine_session(
         _PROFILE,
         _REFERENCE,
-        CalculationConfig(charts=("D1",)),
+        CalculationConfig(charts=requested_charts, modules=requested_modules),
         domain_callback=inspect,
     )
+
+    requested_charts.append("D10")
+    requested_modules.append("shadbala")
 
     # D9 is an internal primitive for domain callbacks, not an additive natal fact.
     assert result.domain is result.snapshot
     assert result.natal["calculation_config"]["charts"] == ["D1"]
     assert "d9" not in result.natal["facts"]
     assert not hasattr(result.snapshot, "raw_charts")
+    assert result.snapshot.config.charts == ("D1",)
+    assert result.snapshot.config.modules == ()
 
 
-def test_session_natal_result_is_byte_identical_to_public_compute_chart():
-    config = CalculationConfig(
-        ayanamsa="RAMAN",
-        node_aspects="jupiter_like",
-        charts=("D1", "D9", "D10"),
-        modules=("shadbala",),
+def test_same_thread_session_reentry_fails_promptly_without_reentrant_lock(monkeypatch):
+    lock = _TrackingLock()
+    monkeypatch.setattr("jyotish_agent.pyjhora_facade.ENGINE_LOCK", lock)
+
+    def reenter(_snapshot):
+        compute_chart(_PROFILE, reference_date=_REFERENCE)
+
+    with pytest.raises(
+        facade._EngineSessionReentryError,
+        match="engine session re-entry is not allowed",
+    ):
+        _run_engine_session(_PROFILE, _REFERENCE, domain_callback=reenter)
+
+    assert (lock.enters, lock.exits, lock.active) == (1, 1, False)
+
+
+def test_callback_cannot_corrupt_completed_natal_engine_reads():
+    baseline = compute_chart(_PROFILE, reference_date=_REFERENCE)
+
+    result = _run_engine_session(
+        _PROFILE,
+        _REFERENCE,
+        CalculationConfig(ayanamsa="LAHIRI"),
+        domain_callback=lambda _snapshot: apply_config(
+            CalculationConfig(ayanamsa="RAMAN")
+        ),
     )
-    session = _run_engine_session(_PROFILE, _REFERENCE, config)
-    public = compute_chart(_PROFILE, reference_date=_REFERENCE, config=config)
 
-    assert json.dumps(session.natal, sort_keys=True) == json.dumps(
-        public, sort_keys=True
+    assert json.dumps(result.natal, sort_keys=True) == json.dumps(baseline, sort_keys=True)
+
+
+def test_pure_natal_assembly_runs_after_engine_lock_release(monkeypatch):
+    lock = _TrackingLock()
+    monkeypatch.setattr("jyotish_agent.pyjhora_facade.ENGINE_LOCK", lock)
+
+    for name in ("_placements", "_houses", "_aspects", "detect_yogas"):
+        original = getattr(facade, name)
+
+        def checked(*args, _original=original, **kwargs):
+            assert not lock.active
+            return _original(*args, **kwargs)
+
+        monkeypatch.setattr(facade, name, checked)
+
+    _run_engine_session(_PROFILE, _REFERENCE)
+
+
+def test_callback_exception_releases_lock_for_next_session(monkeypatch):
+    lock = _TrackingLock()
+    monkeypatch.setattr("jyotish_agent.pyjhora_facade.ENGINE_LOCK", lock)
+
+    def fail(_snapshot):
+        raise LookupError("domain callback failed")
+
+    with pytest.raises(LookupError, match="domain callback failed"):
+        _run_engine_session(_PROFILE, _REFERENCE, domain_callback=fail)
+    assert (lock.enters, lock.exits, lock.active) == (1, 1, False)
+
+    _run_engine_session(_PROFILE, _REFERENCE)
+    assert (lock.enters, lock.exits, lock.active) == (2, 2, False)
+
+
+def test_d1_only_session_engine_chart_cost_is_three_divisional_calls(monkeypatch):
+    from jhora.horoscope.chart import charts
+
+    original = charts.divisional_chart
+    factors: list[int] = []
+
+    def counted(*args, divisional_chart_factor=1, **kwargs):
+        factors.append(divisional_chart_factor)
+        return original(
+            *args, divisional_chart_factor=divisional_chart_factor, **kwargs
+        )
+
+    monkeypatch.setattr(charts, "divisional_chart", counted)
+
+    _run_engine_session(
+        _PROFILE, _REFERENCE, CalculationConfig(charts=("D1",))
     )
+
+    # Explicit D1 + internal callback D9 + PyJHora's D1 dasha lookup.
+    assert factors == [1, 9, 1]
 
 
 def test_concurrent_session_callbacks_keep_mixed_configs_isolated():
@@ -114,7 +197,9 @@ def test_concurrent_session_callbacks_keep_mixed_configs_isolated():
         CalculationConfig(ayanamsa="KP", rahu_ketu="true_nodes", charts=("D1",)),
     ]
 
-    def compute(config: CalculationConfig) -> str:
+    def compute(config: CalculationConfig, start: threading.Event | None = None) -> str:
+        if start is not None:
+            assert start.wait(timeout=5)
         result = _run_engine_session(
             _PROFILE,
             _REFERENCE,
@@ -129,8 +214,10 @@ def test_concurrent_session_callbacks_keep_mixed_configs_isolated():
         return json.dumps(result.domain, sort_keys=True)
 
     baselines = [compute(config) for config in configs]
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-        futures = [pool.submit(compute, config) for config in configs * 3]
+    start = threading.Event()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=9) as pool:
+        futures = [pool.submit(compute, config, start) for config in configs * 3]
+        start.set()
         concurrent_results = [future.result() for future in futures]
 
     assert concurrent_results == baselines * 3

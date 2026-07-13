@@ -13,6 +13,7 @@ That is what makes the golden-fixture test meaningful.
 from __future__ import annotations
 
 import re
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Callable, Generic, TypeVar
@@ -55,10 +56,21 @@ class _EnginePosition:
 
 
 @dataclass(frozen=True)
+class _EngineConfigSnapshot:
+    """Deeply immutable effective configuration exposed to domain callbacks."""
+
+    ayanamsa: str
+    rahu_ketu: str
+    node_aspects: str
+    charts: tuple[str, ...]
+    modules: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class _EngineSnapshot:
     """Domain-safe D1/D9 primitives captured under one applied configuration."""
 
-    config: CalculationConfig
+    config: _EngineConfigSnapshot
     d1: tuple[_EnginePosition, ...]
     d9: tuple[_EnginePosition, ...]
 
@@ -71,6 +83,13 @@ class _EngineSessionResult(Generic[_DomainT]):
     natal: dict
     snapshot: _EngineSnapshot
     domain: _DomainT | None
+
+
+class _EngineSessionReentryError(RuntimeError):
+    """The current thread tried to enter the non-reentrant engine session twice."""
+
+
+_ENGINE_SESSION_LOCAL = threading.local()
 
 
 def _round_deg(value: float) -> float:
@@ -628,8 +647,8 @@ def _run_engine_session(
 
     The callback runs while the same lock and applied PyJHora configuration are
     active. It receives copied D1/D9 positions, never mutable engine charts. The
-    natal result is assembled in the session too, so raw engine structures cannot
-    escape the lock-owning function.
+    Raw engine structures remain local to this function. Engine reads and the
+    callback run under the lock; pure natal normalization/assembly runs afterward.
     """
     config = config or CalculationConfig()
     # Pure config validation happens BEFORE acquiring the lock: an invalid request
@@ -637,138 +656,146 @@ def _run_engine_session(
     resolved = config.resolved_charts()  # {name: factor}, always includes D1
     modules = config.resolved_modules()
 
-    with ENGINE_LOCK:
-        from jhora import utils
-        from jhora.horoscope.chart import charts
-        from jhora.panchanga import drik
+    if getattr(_ENGINE_SESSION_LOCAL, "active", False):
+        raise _EngineSessionReentryError("engine session re-entry is not allowed")
 
-        applied = apply_config(config)
-        place = drik.Place(profile.name, profile.latitude, profile.longitude, profile.timezone)
-        jd = utils.julian_day_number(profile.date, profile.time)
-        # Anchor the reference at local noon to avoid date-boundary ambiguity.
-        ref_jd = utils.julian_day_number(reference_date, (12, 0, 0))
+    _ENGINE_SESSION_LOCAL.active = True
+    try:
+        with ENGINE_LOCK:
+            from jhora import utils
+            from jhora.horoscope.chart import charts
+            from jhora.panchanga import drik
 
-        # D1/D9 are the shared domain primitives even when a natal caller elects
-        # not to publish D9. Additional requested charts retain their resolved
-        # order in the natal response below.
-        kernel_charts = dict(resolved)
-        kernel_charts.setdefault("D9", 9)
-        raw_charts = {
-            name: charts.divisional_chart(jd, place, divisional_chart_factor=factor)
-            for name, factor in kernel_charts.items()
-        }
-        snapshot = _EngineSnapshot(
-            config=applied,
-            d1=_immutable_positions(raw_charts["D1"]),
-            d9=_immutable_positions(raw_charts["D9"]),
+            applied = apply_config(config)
+            place = drik.Place(
+                profile.name, profile.latitude, profile.longitude, profile.timezone
+            )
+            jd = utils.julian_day_number(profile.date, profile.time)
+            # Anchor the reference at local noon to avoid date-boundary ambiguity.
+            ref_jd = utils.julian_day_number(reference_date, (12, 0, 0))
+
+            # D1/D9 are the shared domain primitives even when a natal caller elects
+            # not to publish D9. Additional requested charts retain their resolved
+            # order in the natal response below.
+            kernel_charts = dict(resolved)
+            kernel_charts.setdefault("D9", 9)
+            raw_charts = {
+                name: charts.divisional_chart(
+                    jd, place, divisional_chart_factor=factor
+                )
+                for name, factor in kernel_charts.items()
+            }
+            panchanga = _panchanga(jd, place)
+            vimshottari = _vimshottari_current(ref_jd, jd, place)
+            module_facts: dict[str, dict] = {}
+            if "shadbala" in modules:
+                module_facts["shadbala"] = _shadbala(jd, place)
+            if "ashtakavarga" in modules:
+                module_facts["ashtakavarga"] = _ashtakavarga(raw_charts["D1"])
+            if "transits" in modules:
+                module_facts["transits"] = _transits(
+                    ref_jd,
+                    place,
+                    natal_moon_sign=_planet_sign(raw_charts["D1"], 1),  # Moon = index 1
+                    natal_lagna_sign=_lagna_sign(raw_charts["D1"]),
+                    reference_date=reference_date,
+                    timezone=profile.timezone,
+                )
+            if "varshaphal" in modules:
+                module_facts["varshaphal"] = _varshaphal(
+                    jd,
+                    place,
+                    ref_jd,
+                    natal_lagna_sign=_lagna_sign(raw_charts["D1"]),
+                    birth_date=profile.date,
+                    reference_date=reference_date,
+                )
+            if "yogas_engine" in modules:
+                # The ONLY module allowed to degrade instead of failing the compute: it
+                # dispatches ~284 unaudited engine functions, any of which may raise
+                # under a particular ephemeris/date; the rest of the chart must survive.
+                try:
+                    module_facts["yogas_engine"] = _yogas_engine(jd, place, resolved)
+                except ConfigError:
+                    raise  # a config defect is a caller error, never "engine unavailable"
+                except Exception:
+                    module_facts["yogas_engine"] = dict(_YOGAS_ENGINE_UNAVAILABLE)
+
+            snapshot = _EngineSnapshot(
+                config=_EngineConfigSnapshot(
+                    ayanamsa=applied.ayanamsa,
+                    rahu_ketu=applied.rahu_ketu,
+                    node_aspects=applied.node_aspects,
+                    charts=tuple(resolved),
+                    modules=tuple(sorted(modules)),
+                ),
+                d1=_immutable_positions(raw_charts["D1"]),
+                d9=_immutable_positions(raw_charts["D9"]),
+            )
+            # Last action under the lock: no callback-side config mutation can alter
+            # engine-dependent values already captured for the natal response.
+            domain_result = (
+                domain_callback(snapshot) if domain_callback is not None else None
+            )
+    finally:
+        _ENGINE_SESSION_LOCAL.active = False
+
+    # Cross-module joins and all natal normalization are pure over captured values.
+    if "transits" in module_facts and "ashtakavarga" in module_facts:
+        sav = module_facts["ashtakavarga"]["sav"]
+        for planet in module_facts["transits"]["planets"].values():
+            planet["sav_points"] = sav[planet["sign"]]
+
+    divisional_facts = {
+        name.lower(): _placements(raw_charts[name]) for name in resolved
+    }
+    ascendant = _ascendant(raw_charts["D1"])
+    yogas = detect_yogas(divisional_facts["d1"])
+    if "yogas_engine" in module_facts:
+        module_facts["yogas_engine"]["mismatches"] = _yoga_tier_mismatches(
+            yogas, module_facts["yogas_engine"]
         )
-        domain_result = (
-            domain_callback(snapshot) if domain_callback is not None else None
-        )
-        panchanga = _panchanga(jd, place)
-        vimshottari = _vimshottari_current(ref_jd, jd, place)
-        module_facts: dict[str, dict] = {}
-        if "shadbala" in modules:
-            module_facts["shadbala"] = _shadbala(jd, place)
-        if "ashtakavarga" in modules:
-            module_facts["ashtakavarga"] = _ashtakavarga(raw_charts["D1"])
-        if "transits" in modules:
-            module_facts["transits"] = _transits(
-                ref_jd,
-                place,
-                natal_moon_sign=_planet_sign(raw_charts["D1"], 1),  # Moon = index 1
-                natal_lagna_sign=_lagna_sign(raw_charts["D1"]),
-                reference_date=reference_date,
-                timezone=profile.timezone,
-            )
-        if "varshaphal" in modules:
-            module_facts["varshaphal"] = _varshaphal(
-                jd,
-                place,
-                ref_jd,
-                natal_lagna_sign=_lagna_sign(raw_charts["D1"]),
-                birth_date=profile.date,
-                reference_date=reference_date,
-            )
-        if "yogas_engine" in modules:
-            # The ONLY module allowed to degrade instead of failing the compute: it
-            # dispatches ~284 unaudited engine functions, any of which may raise
-            # under a particular ephemeris/date; the rest of the chart must survive.
-            try:
-                module_facts["yogas_engine"] = _yogas_engine(jd, place, resolved)
-            except ConfigError:
-                raise  # a config defect is a caller error, never "engine unavailable"
-            except Exception:
-                module_facts["yogas_engine"] = dict(_YOGAS_ENGINE_UNAVAILABLE)
+    houses = _houses(raw_charts["D1"])
+    lagnas = {name.lower(): _ascendant(raw_charts[name]) for name in resolved}
+    bhava = {name.lower(): _houses(raw_charts[name]) for name in resolved}
+    aspects = _aspects(raw_charts["D1"], applied.node_aspects)
 
-        # Cross-module joins run AFTER all modules are computed so they never depend
-        # on module execution order. Gochara×SAV: each transit planet gets the SAV
-        # bindus of its transited sign (classical transit strength).
-        if "transits" in module_facts and "ashtakavarga" in module_facts:
-            sav = module_facts["ashtakavarga"]["sav"]
-            for planet in module_facts["transits"]["planets"].values():
-                planet["sav_points"] = sav[planet["sign"]]
-
-        # Each divisional chart becomes a lowercase fact key (d1, d9, d10, ...). The
-        # ascendant is taken from D1, which resolved_charts guarantees is present.
-        divisional_facts = {
-            name.lower(): _placements(raw_charts[name]) for name in resolved
-        }
-        ascendant = _ascendant(raw_charts["D1"])
-        yogas = detect_yogas(divisional_facts["d1"])  # narrow geometric set, D1 only
-        if "yogas_engine" in module_facts:
-            # Two-tier cross-check, run after BOTH tiers exist so it never depends on
-            # module execution order. Always present (possibly empty) so the agent can
-            # rely on the field; strings are context to surface, deliberately NOT atoms.
-            module_facts["yogas_engine"]["mismatches"] = _yoga_tier_mismatches(
-                yogas, module_facts["yogas_engine"]
-            )
-        # D1 ascendant/houses are retained as top-level aliases for back-compat; the
-        # general per-chart forms are `lagnas` and `bhava` (which include D1). Keys are
-        # lowercased (d1, d9, ...) to match the divisional placement key convention.
-        houses = _houses(raw_charts["D1"])
-        lagnas = {name.lower(): _ascendant(raw_charts[name]) for name in resolved}
-        bhava = {name.lower(): _houses(raw_charts[name]) for name in resolved}
-        aspects = _aspects(raw_charts["D1"], applied.node_aspects)
-
-        natal = {
-            "normalized_input": {
-                "name": profile.name,
-                "date": list(profile.date),
-                "time": list(profile.time),
-                "latitude": profile.latitude,
-                "longitude": profile.longitude,
-                "timezone": profile.timezone,
-                "reference_date": list(reference_date),
-            },
-            "calculation_config": {
-                "ayanamsa": applied.ayanamsa,
-                "rahu_ketu": applied.rahu_ketu,
-                "node_aspects": applied.node_aspects,
-                "charts": list(resolved),
-                "modules": sorted(modules),
-                # reference_date drives the running Vimshottari period; surfaced here so a
-                # quoted/cached result is fully reproducible from calculation_config alone.
-                "reference_date": list(reference_date),
-            },
-            "facts": {
-                "ascendant": ascendant,
-                "houses": houses,
-                "lagnas": lagnas,
-                "bhava": bhava,
-                "aspects": aspects,
-                "yogas": yogas,
-                **divisional_facts,
-                **module_facts,
-                "panchanga": panchanga,
-                "vimshottari": vimshottari,
-            },
-            "provenance": {
-                "engine": "PyJHora",
-                "engine_version": ENGINE_VERSION,
-                "ephemeris_mode": ephemeris_mode(),
-            },
-        }
+    natal = {
+        "normalized_input": {
+            "name": profile.name,
+            "date": list(profile.date),
+            "time": list(profile.time),
+            "latitude": profile.latitude,
+            "longitude": profile.longitude,
+            "timezone": profile.timezone,
+            "reference_date": list(reference_date),
+        },
+        "calculation_config": {
+            "ayanamsa": applied.ayanamsa,
+            "rahu_ketu": applied.rahu_ketu,
+            "node_aspects": applied.node_aspects,
+            "charts": list(resolved),
+            "modules": sorted(modules),
+            "reference_date": list(reference_date),
+        },
+        "facts": {
+            "ascendant": ascendant,
+            "houses": houses,
+            "lagnas": lagnas,
+            "bhava": bhava,
+            "aspects": aspects,
+            "yogas": yogas,
+            **divisional_facts,
+            **module_facts,
+            "panchanga": panchanga,
+            "vimshottari": vimshottari,
+        },
+        "provenance": {
+            "engine": "PyJHora",
+            "engine_version": ENGINE_VERSION,
+            "ephemeris_mode": ephemeris_mode(),
+        },
+    }
 
     return _EngineSessionResult(natal=natal, snapshot=snapshot, domain=domain_result)
 
