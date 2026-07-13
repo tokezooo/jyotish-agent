@@ -14,6 +14,13 @@ text, prompts, tokens, or rendered answers.
 | `UNEXPECTED_INTERNAL` | privacy-safe unexpected failure | once |
 | `INPUT_INVALID` | malformed run-stage operation payload | no; correct payload |
 | `UNSUPPORTED_CONTRACT_VERSION` | create requested a contract other than server-owned 2.0 | no; omit it or use 2.0 |
+| `EVENT_TIME_REQUIRED` | explicit timezone-aware event time is absent | no; `confirm_anchor` |
+| `EVENT_PLACE_REQUIRED` | event latitude/longitude is absent | no; `provide_event_place` |
+| `ANCHOR_MISMATCH` | follow-up anchor differs from the active anchor | no; `create_new_anchor` |
+| `SEARCH_RANGE_TOO_LARGE` | bounded search maximum was exceeded | no; `narrow_search_range` |
+| `RULE_PROFILE_UNSUPPORTED` | no exact versioned profile matches | no; select a supported profile |
+| `ENGINE_CROSSCHECK_FAILED` | an invariant or independent check failed | once; inspect by request ID |
+| `BIRTH_TIME_RANGE_REQUIRED` | approximate birth range is absent, reversed, or over 120 minutes | no; `provide_birth_range` |
 
 Endpoint-specific codes such as `TIMEZONE_OFFSET_MISMATCH`,
 `AMBIGUOUS_LOCAL_TIME`, `NONEXISTENT_LOCAL_TIME`, `PINNED_VERSION_MISMATCH`, and
@@ -29,3 +36,6 @@ Run-scoped handlers preserve a known run ID and the requested `screen`, `plan`,
 `calculate`, `retrieve`, `answer`, or `replay` stage.
 `RUN_NOT_FOUND`, `OPERATION_CONFLICT`, and `UNSUPPORTED_TIMEZONE` use the same
 controlled registry envelope; route-local problem builders do not invent codes.
+New domain records add `request_id`, `mode`, `next_action`, `invalid_fields`, and
+`supported_values` only when applicable. Legacy registry calls retain their exact
+seven-field envelope.

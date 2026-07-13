@@ -6,6 +6,55 @@ from typing import Any
 
 
 ERROR_REGISTRY: dict[str, dict[str, Any]] = {
+    "EVENT_TIME_REQUIRED": {
+        "retryable": False,
+        "problem": "An explicit timezone-aware event time is required.",
+        "cause": "The event anchor is missing a time, timezone, or both.",
+        "fix": "Confirm an explicit event instant and timezone.",
+        "next_action": "confirm_anchor",
+    },
+    "EVENT_PLACE_REQUIRED": {
+        "retryable": False,
+        "problem": "An event place is required.",
+        "cause": "The request has no validated event latitude and longitude.",
+        "fix": "Provide the event place before calculating the chart.",
+        "next_action": "provide_event_place",
+    },
+    "ANCHOR_MISMATCH": {
+        "retryable": False,
+        "problem": "The follow-up does not match the stored event anchor.",
+        "cause": "The supplied anchor identity differs from the active question anchor.",
+        "fix": "Create a new anchor for this question.",
+        "next_action": "create_new_anchor",
+    },
+    "SEARCH_RANGE_TOO_LARGE": {
+        "retryable": False,
+        "problem": "The requested search range exceeds the supported maximum.",
+        "cause": "The bounded search cannot evaluate this many calendar candidates.",
+        "fix": "Narrow the requested search range to a supported value.",
+        "next_action": "narrow_search_range",
+    },
+    "RULE_PROFILE_UNSUPPORTED": {
+        "retryable": False,
+        "problem": "The requested rule profile is unsupported.",
+        "cause": "No exact versioned profile matches the supplied identifier.",
+        "fix": "Select one of the explicitly supported rule profiles.",
+        "next_action": "select_supported_rule_profile",
+    },
+    "ENGINE_CROSSCHECK_FAILED": {
+        "retryable": True,
+        "problem": "A calculation invariant or independent cross-check failed.",
+        "cause": "The affected facts could not be verified consistently.",
+        "fix": "Retry once, then inspect private diagnostics using the request ID.",
+        "next_action": "retry_calculation",
+    },
+    "BIRTH_TIME_RANGE_REQUIRED": {
+        "retryable": False,
+        "problem": "A bounded approximate birth-time range is required.",
+        "cause": "The range is missing, reversed, or exceeds 120 minutes.",
+        "fix": "Provide earliest and latest times no more than 120 minutes apart.",
+        "next_action": "provide_birth_range",
+    },
     "RUN_NOT_FOUND": {
         "retryable": False,
         "problem": "The requested research run does not exist.",
@@ -80,10 +129,15 @@ def error_record(
     *,
     run_id: str | None,
     stage: str,
+    request_id: str | None = None,
+    mode: str | None = None,
+    invalid_fields: list[str] | None = None,
+    supported_values: list[str] | None = None,
+    next_action: str | None = None,
 ) -> dict[str, Any]:
     """Build an actionable envelope from controlled registry text only."""
     definition = ERROR_REGISTRY[error_code]
-    return {
+    record = {
         "error_code": error_code,
         "run_id": run_id,
         "stage": stage,
@@ -92,3 +146,12 @@ def error_record(
         "cause": definition["cause"],
         "fix": definition["fix"],
     }
+    optional = {
+        "request_id": request_id,
+        "mode": mode,
+        "invalid_fields": invalid_fields,
+        "supported_values": supported_values,
+        "next_action": next_action or definition.get("next_action"),
+    }
+    record.update({key: value for key, value in optional.items() if value is not None})
+    return record

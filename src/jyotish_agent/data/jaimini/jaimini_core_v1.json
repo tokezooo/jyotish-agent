@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "profile_id": "jaimini_core_v1",
+  "version": "1.0.0",
+  "school": "project-canonical-jaimini-v1",
+  "karakas": {
+    "schemes": [7, 8],
+    "seven_karakas": ["AK", "AmK", "BK", "MK", "PK", "GK", "DK"],
+    "eight_karaka_addition": "PiK",
+    "rahu_treatment": "reverse_within_sign",
+    "longitude_precision_arcseconds": 1,
+    "exact_tie_policy": "error_requires_adjudication",
+    "near_tie_threshold_arcseconds": 60,
+    "near_tie_policy": "flag_without_reordering"
+  },
+  "arudha": {
+    "counting": "inclusive_sign_count",
+    "exception": "same_or_seventh_moves_to_tenth"
+  },
+  "co_lords": {
+    "scorpio": ["Mars", "Ketu"],
+    "aquarius": ["Saturn", "Rahu"],
+    "resolution": "greater_rashi_duration_then_degree_then_fixed_order",
+    "fixed_order": ["Mars", "Ketu", "Saturn", "Rahu"]
+  },
+  "chara_dasha": {
+    "progression": "odd_forward_even_reverse",
+    "duration": "inclusive_count_to_lord_minus_one_minimum_one",
+    "antardasha": "same_direction_from_next_sign",
+    "gender_semantics": "required_binary_for_progression_seed",
+    "supported_gender_values": ["female", "male"]
+  },
+  "time": {
+    "year_length_days": 365.2425,
+    "rounding": "microsecond_half_even",
+    "interval_bounds": "[start,end)"
+  }
+}
