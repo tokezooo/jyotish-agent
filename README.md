@@ -1,7 +1,8 @@
 # Jyotish Agent
 
-Agentic Jyotish assistant built around deterministic Vedic astrology calculations from
-PyJHora and a Pi-based agent harness.
+Local Jyotish assistant built around deterministic Vedic astrology calculations from
+PyJHora. Ordinary use is through Codex with a local stdio MCP server and skill; the
+FastAPI, CLI, and Pi integrations remain available as compatibility/operator paths.
 
 The first milestone is deliberately narrow:
 
@@ -12,7 +13,7 @@ The first milestone is deliberately narrow:
 
 ## Current State
 
-All five MVP phases are in place: Python 3.12 project, headless PyJHora deps pinned,
+All six MVP phases are in place: Python 3.12 project, headless PyJHora deps pinned,
 ephemeris/data check, the calculation facade (`compute_chart()` → deterministic
 ascendant, D1, D9, panchanga basics, current Vimshottari period, golden-tested),
 a FastAPI service, a Pi extension exposing the tools, and the fact-citation answer
@@ -31,6 +32,62 @@ uv sync --extra dev                       # creates .venv on Python 3.12, instal
 uv run python scripts/check_pyjhora_data.py   # verify PyJHora + ephemeris data
 uv run pytest                             # run the test suite
 ```
+
+## Talk to the agent through Codex
+
+After the one-time local setup, open a normal Codex task and talk naturally. Влад's
+private profile is selected by default. Focused questions use stateless calculations;
+only broad analyses such as “сделай глубокий разбор карьеры” create a ResearchRun.
+Follow-up questions stay in the same conversation and do not automatically create a
+new run.
+
+The MCP server itself needs no separately managed FastAPI or Pi process:
+
+```bash
+codex mcp add jyotish \
+  --env JYOTISH_AGENT_DATA_ROOT="$HOME/.local/share/jyotish-agent" \
+  --env JYOTISH_DEFAULT_PROFILE_PATH="$HOME/.local/share/jyotish-agent/profiles/vlad.json" \
+  -- uv --directory /absolute/path/to/jyotish-agent run jyotish-mcp
+codex mcp get jyotish
+```
+
+Install `.agents/skills/jyotish-consultant` under `~/.agents/skills` (a symlink is
+supported for local development), then restart Codex so it reloads the MCP and skill.
+Use `/mcp` in Codex CLI to confirm that `jyotish` is enabled. To ask about another
+person, state that explicitly and provide their birth date, exact/approximate time,
+place or coordinates, and timezone; this never overwrites Влад's default profile.
+
+Available MCP tools are `get_profile`, `calculate`, `search_sources`, `research`,
+`finalize_research`, and `inspect_research`. They are implementation details: normal
+answers should be conversational and hide claim graphs, evidence IDs, hashes, and
+state-machine output.
+
+## Golden path: governed ResearchRun v2
+
+```bash
+uv run jyotish doctor
+uv run jyotish ask "What career factors and timing are supported?" \
+  --chart examples/demo-profile.json --json
+uv run jyotish run inspect <rr_id> --json
+uv run jyotish run replay <rr_id> --json
+```
+
+`ask` starts the loopback API when needed, invokes Pi with only the six governed
+research tools, and prints only a backend-validated AnswerContract 2.0 artifact.
+The command blocks if Pi fails, the assigned run ID is not validated, or the
+canonical Markdown hash differs. SQLite is authoritative; inspect is served by a
+typed supervised loopback FastAPI endpoint and replay uses that same API boundary.
+Neither command opens or migrates SQLite directly, and neither trusts a Pi transcript
+mirror.
+
+Operator references:
+
+- [state and run model](docs/run-model.md)
+- [AnswerContract v2](docs/answer-contract-v2.md)
+- [corpus governance](docs/corpus-governance.md)
+- [debugging and error codes](docs/debugging-error-codes.md)
+- [migration, backup, and recovery](docs/migration-backup-recovery.md)
+- [evaluation rubric and frozen 40/20 split](eval/ADJUDICATION.md)
 
 ### Ephemeris (optional)
 
@@ -76,6 +133,20 @@ uv run uvicorn jyotish_agent.api:app --reload   # http://127.0.0.1:8000 (docs at
 Errors are RFC 7807 `application/problem+json` with `problem` / `cause` / `fix`
 fields. Birth data is never logged or echoed into error bodies.
 
+Validated memos are atomically persisted below the private data root as
+`artifacts/<rr_id>/answer.md` (directories `0700`, files `0600`). The default
+retention window is seven days and can be configured with
+`JYOTISH_ARTIFACT_RETENTION_SECONDS`; operators can run
+`uv run jyotish artifacts prune --retention-seconds <seconds>` explicitly.
+
+Run the frozen deterministic tuning specifications and checksum gate with:
+
+```bash
+uv run python -m jyotish_agent.evaluation tuning
+```
+
+Held-out fixtures stay separate and require the runner's explicit final-review gate.
+
 Set `JYOTISH_SIGNING_KEY` to a fixed secret in any multi-process or multi-restart
 deployment so `facts_token`s verify across workers (a random per-process key is used
 if unset).
@@ -118,4 +189,3 @@ guard, and the HTTP path via a mocked `fetch`).
 
 - PyJHora: https://github.com/naturalstupid/PyJHora
 - Pi: https://pi.dev/docs/latest
-

@@ -1,0 +1,12 @@
+{
+  "name": "Jyotish Demo Fixture",
+  "date": "1990-01-01",
+  "time": "12:30:00",
+  "place": {
+    "name": "Chennai",
+    "latitude": 13.0827,
+    "longitude": 80.2707,
+    "timezone": 5.5
+  },
+  "birth_time_confidence": "exact"
+}

@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "privacy": "Synthetic public-safe profiles only; names are labels, not people.",
+  "profiles": [
+    {"id":"P01","label":"Chennai baseline","date":"1990-01-01","time":"12:00:00","place":{"name":"Chennai","latitude":13.0827,"longitude":80.2707,"timezone":{"kind":"iana","zone_id":"Asia/Kolkata"}}},
+    {"id":"P02","label":"London DST spring","date":"2024-03-31","time":"01:30:00","place":{"name":"London","latitude":51.5074,"longitude":-0.1278,"timezone":{"kind":"iana","zone_id":"Europe/London"}}},
+    {"id":"P03","label":"New York DST fall","date":"2024-11-03","time":"01:30:00","place":{"name":"New York","latitude":40.7128,"longitude":-74.0060,"timezone":{"kind":"iana","zone_id":"America/New_York","fold":1}}},
+    {"id":"P04","label":"Kathmandu quarter offset","date":"1988-06-15","time":"08:45:00","place":{"name":"Kathmandu","latitude":27.7172,"longitude":85.3240,"timezone":{"kind":"iana","zone_id":"Asia/Kathmandu"}}},
+    {"id":"P05","label":"Sydney DST","date":"1975-12-10","time":"22:10:00","place":{"name":"Sydney","latitude":-33.8688,"longitude":151.2093,"timezone":{"kind":"iana","zone_id":"Australia/Sydney"}}},
+    {"id":"P06","label":"Reykjavik UTC","date":"2001-02-03","time":"04:05:06","place":{"name":"Reykjavik","latitude":64.1466,"longitude":-21.9426,"timezone":{"kind":"iana","zone_id":"Atlantic/Reykjavik"}}},
+    {"id":"P07","label":"Dubai fixed zone","date":"1995-09-21","time":"17:20:00","place":{"name":"Dubai","latitude":25.2048,"longitude":55.2708,"timezone":{"kind":"iana","zone_id":"Asia/Dubai"}}},
+    {"id":"P08","label":"Los Angeles DST","date":"1982-07-04","time":"09:15:00","place":{"name":"Los Angeles","latitude":34.0522,"longitude":-118.2437,"timezone":{"kind":"iana","zone_id":"America/Los_Angeles"}}},
+    {"id":"P09","label":"Tokyo no DST","date":"1964-10-10","time":"10:10:00","place":{"name":"Tokyo","latitude":35.6762,"longitude":139.6503,"timezone":{"kind":"iana","zone_id":"Asia/Tokyo"}}},
+    {"id":"P10","label":"Sao Paulo historical DST","date":"2018-11-04","time":"00:30:00","place":{"name":"Sao Paulo","latitude":-23.5505,"longitude":-46.6333,"timezone":{"kind":"iana","zone_id":"America/Sao_Paulo"}}}
+  ]
+}

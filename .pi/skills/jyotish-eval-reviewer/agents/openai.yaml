@@ -1,0 +1,4 @@
+interface:
+  display_name: "Jyotish Eval Reviewer"
+  short_description: "Run fixtures and record human adjudication"
+  default_prompt: "Use $jyotish-eval-reviewer to run the frozen fixture suite and record a human adjudication."

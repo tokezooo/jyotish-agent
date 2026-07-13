@@ -348,7 +348,7 @@ _SCREENS: dict[SafetyCategory, tuple[str, ...]] = {
         # Cancer (Moon in Cancer). The cancer-as-disease sense is matched contextually
         # in _REGEX_SCREENS instead.
         "diagnos", "disease", "tumor", "tumour", "terminal", "fatal",
-        "medication", "treatment", "cure", "symptom", "pregnan", "mental illness",
+        "medication", "medicine", "treatment", "cure", "symptom", "pregnan", "mental illness",
         "depression",
         # Russian (рак=cancer is likewise contextual in _REGEX_SCREENS; bare рак
         # collides with Раке=the sign Cancer).
@@ -361,13 +361,14 @@ _SCREENS: dict[SafetyCategory, tuple[str, ...]] = {
     ),
     SafetyCategory.financial: (
         # "stock" is contextual in _REGEX_SCREENS (collides with stockpile, etc.).
-        "should i invest", "buy bitcoin", "guaranteed return", "financial advice",
+        "should i invest", "buy bitcoin", "guaranteed return", "investment return", "financial advice",
         "put money into",
         "инвестир", "купить биткоин", "вложить деньги", "купить акци", "фондовый рынок",
     ),
     SafetyCategory.deterministic_harm: (
         "when will i die", "when do i die", "when's my death", "date of death",
         "how will i die", "will i die", "predict my death", "day i die",
+        "exact day i will be fired", "exact day i'll be fired",
         "когда я умру", "когда умру", "дата смерти", "как я умру", "как умру",
     ),
 }

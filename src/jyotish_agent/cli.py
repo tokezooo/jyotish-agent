@@ -1,0 +1,479 @@
+"""Thin argparse golden path over FastAPI and Pi print mode."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.error
+import urllib.request
+import uuid
+from pathlib import Path
+from urllib.parse import quote, urlparse
+
+from pydantic import ValidationError
+
+from .hardening import backup_and_purge_store, persist_private_artifact, prune_private_artifacts
+from .research_models import ResearchBirthProfileRequest
+from .research_store import canonical_json, default_data_root
+
+DEFAULT_API_URL = "http://127.0.0.1:8000"
+REQUIRED_V2_BLOCKER = (
+    "Jyotish research answer blocked: no backend-validated final answer is available."
+)
+PI_TOOLS = (
+    "jyotish_create_research_run",
+    "jyotish_screen_research_run",
+    "jyotish_plan_research_run",
+    "jyotish_calculate_research_run",
+    "jyotish_retrieve_research_run",
+    "jyotish_submit_answer",
+)
+DEFAULT_ARTIFACT_RETENTION_SECONDS = 7 * 24 * 60 * 60
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+class CliError(RuntimeError):
+    def __init__(self, message: str, exit_code: int):
+        super().__init__(message)
+        self.exit_code = exit_code
+
+
+def _api_base() -> str:
+    return os.environ.get("JYOTISH_API_URL", DEFAULT_API_URL).rstrip("/")
+
+
+def _get_json(base: str, path: str) -> dict | None:
+    try:
+        with urllib.request.urlopen(f"{base}{path}", timeout=2) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        return body if isinstance(body, dict) else None
+    except (OSError, ValueError, urllib.error.URLError):
+        return None
+
+
+def _get_required_json(base: str, path: str) -> dict:
+    _loopback_address(base)
+    try:
+        with urllib.request.urlopen(f"{base}{path}", timeout=20) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            raise CliError(f"research run not found: {path.split('/')[-2]}", 2) from exc
+        raise CliError("loopback inspect API failed", 3) from exc
+    except (OSError, ValueError, urllib.error.URLError) as exc:
+        raise CliError("loopback inspect API is unreachable", 3) from exc
+    if not isinstance(body, dict):
+        raise CliError("loopback inspect API returned an invalid response", 3)
+    return body
+
+
+def _post_empty_json(base: str, path: str) -> dict:
+    _loopback_address(base)
+    request = urllib.request.Request(
+        f"{base}{path}", data=b"", headers={"Accept": "application/json"}, method="POST"
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            body = json.loads(response.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        try:
+            problem = json.loads(exc.read().decode("utf-8"))
+        except (ValueError, json.JSONDecodeError):
+            problem = {}
+        code = problem.get("error_code", f"HTTP_{exc.code}")
+        if exc.code == 404:
+            raise CliError(f"research run not found: {path.rsplit('/', 2)[-2]}", 2) from exc
+        raise CliError(f"offline replay failed: {code}", 4) from exc
+    except (OSError, ValueError, urllib.error.URLError) as exc:
+        raise CliError("loopback replay API is unreachable", 3) from exc
+    if not isinstance(body, dict):
+        raise CliError("loopback replay API returned an invalid response", 3)
+    return body
+
+
+def _health(base: str) -> dict | None:
+    health = _get_json(base, "/health")
+    if (
+        health
+        and health.get("status") == "ok"
+        and health.get("research_api_version") == "2.0"
+    ):
+        return health
+    return None
+
+
+def _loopback_address(base: str) -> tuple[str, int]:
+    parsed = urlparse(base)
+    if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}:
+        raise CliError("JYOTISH_API_URL must be a loopback HTTP URL", 3)
+    return parsed.hostname, parsed.port or 80
+
+
+def _start_api(base: str) -> subprocess.Popen[bytes]:
+    host, port = _loopback_address(base)
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "jyotish_agent.api:app",
+            "--host",
+            host,
+            "--port",
+            str(port),
+            "--log-level",
+            "warning",
+        ],
+        cwd=PROJECT_ROOT,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        if _health(base):
+            return process
+        if process.poll() is not None:
+            break
+        time.sleep(0.05)
+    _stop_process(process)
+    raise CliError("FastAPI failed to start on the configured loopback URL", 3)
+
+
+def _stop_process(process: subprocess.Popen[bytes] | None) -> None:
+    if process is None or process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
+
+
+def _load_profile(path: Path) -> dict:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise CliError("could not read profile JSON", 2) from exc
+    if not isinstance(value, dict):
+        raise CliError("profile JSON must be an object", 2)
+    try:
+        ResearchBirthProfileRequest.model_validate(value)
+    except ValidationError as exc:
+        raise CliError("profile JSON does not match the birth-profile contract", 2) from exc
+    return value
+
+
+def _private_prompt(
+    question: str,
+    profile: dict,
+    *,
+    run_id: str,
+    create_operation_id: str,
+) -> Path:
+    runtime = default_data_root() / "runtime"
+    runtime.mkdir(mode=0o700, parents=True, exist_ok=True)
+    os.chmod(runtime, 0o700)
+    cli_request = {
+        "run_id": run_id,
+        "create_operation_id": create_operation_id,
+        "question": question,
+        "birth_profile": profile,
+    }
+    prompt = (
+        "Use only the Jyotish research tools. Create a v2 run, screen it, and neutrally "
+        "classify the user's actual question as career_factors_and_timing, unknown, "
+        "composite, or unsupported. Persist that exact typed intent and deterministic "
+        "plan. Calculate and retrieve approved sources only when the plan outcome is "
+        "supported, then construct "
+        "AnswerContract 2.0, and submit it. The final response must be "
+        "the backend canonical Markdown. Use the exact assigned run_id and create "
+        "operation_id below; do not substitute another identity.\n\n"
+        f"CLI request JSON: {canonical_json(cli_request)}\n"
+        f"Question: {question}\n"
+        f"Birth profile JSON: {canonical_json(profile)}\n"
+    )
+    descriptor, raw_path = tempfile.mkstemp(prefix="ask-", suffix=".txt", dir=runtime)
+    path = Path(raw_path)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(prompt)
+    except Exception:
+        try:
+            os.close(descriptor)
+        except OSError:
+            # fdopen transfers ownership to the file object, whose context
+            # manager may already have closed it while propagating the error.
+            pass
+        path.unlink(missing_ok=True)
+        raise
+    return path
+
+
+def _validated_artifact(base: str, run_id: str) -> str | None:
+    run = _get_json(base, f"/v2/research-runs/{run_id}")
+    event_body = _get_json(base, f"/v2/research-runs/{run_id}/events")
+    if not run or run.get("run_id") != run_id or run.get("status") != "validated":
+        return None
+    events = event_body.get("events") if isinstance(event_body, dict) else None
+    if not isinstance(events, list) or not events:
+        return None
+    latest = events[-1]
+    if not isinstance(latest, dict) or latest.get("event_type") != "research_run.answer_submitted":
+        return None
+    payload = latest.get("payload")
+    result = payload.get("result") if isinstance(payload, dict) else None
+    if not isinstance(result, dict):
+        return None
+    markdown = result.get("markdown")
+    claimed_hash = result.get("markdown_sha256")
+    if (
+        result.get("run_id") != run_id
+        or result.get("status") != "validated"
+        or result.get("valid") is not True
+        or not isinstance(result.get("answer_id"), str)
+        or not result["answer_id"].startswith("ans_")
+        or not isinstance(markdown, str)
+        or not markdown
+        or not isinstance(claimed_hash, str)
+    ):
+        return None
+    actual_hash = hashlib.sha256(markdown.encode("utf-8")).hexdigest()
+    return markdown if actual_hash == claimed_hash else None
+
+
+def _emit_required_v2_blocker(as_json: bool) -> int:
+    if as_json:
+        print(
+            json.dumps(
+                {
+                    "answer": REQUIRED_V2_BLOCKER,
+                    "error_code": "VALIDATED_ARTIFACT_REQUIRED",
+                },
+                sort_keys=True,
+            )
+        )
+    else:
+        print(REQUIRED_V2_BLOCKER)
+    return 5
+
+
+def _doctor(_args: argparse.Namespace) -> int:
+    base = _api_base()
+    _loopback_address(base)
+    health = _health(base)
+    pi = shutil.which("pi")
+    print(f"FastAPI: {'ok' if health else 'unreachable'} ({base})")
+    print(f"Pi: {pi or 'not found'}")
+    return 0 if health and pi else 1
+
+
+def _dev(_args: argparse.Namespace) -> int:
+    base = _api_base()
+    _loopback_address(base)
+    if _health(base):
+        print(f"FastAPI already running at {base}")
+        return 0
+    process = _start_api(base)
+    print(f"FastAPI running at {base}; press Ctrl-C to stop")
+    try:
+        return process.wait()
+    except KeyboardInterrupt:
+        return 0
+    finally:
+        _stop_process(process)
+
+
+def _ask(args: argparse.Namespace) -> int:
+    profile = _load_profile(Path(args.chart))
+    pi = shutil.which("pi")
+    if not pi:
+        raise CliError("Pi executable not found on PATH", 4)
+    base = _api_base()
+    _loopback_address(base)
+    child = None
+    prompt_path = None
+    run_id = f"rr_{uuid.uuid4()}"
+    create_operation_id = f"op_{uuid.uuid4()}"
+    try:
+        retention = int(
+            os.environ.get(
+                "JYOTISH_ARTIFACT_RETENTION_SECONDS",
+                str(DEFAULT_ARTIFACT_RETENTION_SECONDS),
+            )
+        )
+        prune_private_artifacts(default_data_root(), retention_seconds=retention)
+        if not _health(base):
+            child = _start_api(base)
+        prompt_path = _private_prompt(
+            args.question,
+            profile,
+            run_id=run_id,
+            create_operation_id=create_operation_id,
+        )
+        command = [
+            pi,
+            "--print",
+            "--no-session",
+            "--no-builtin-tools",
+            "--tools",
+            ",".join(PI_TOOLS),
+            "--no-extensions",
+            "--extension",
+            str(PROJECT_ROOT / ".pi" / "extensions" / "jyotish.ts"),
+            "--no-skills",
+            "--skill",
+            str(PROJECT_ROOT / ".pi" / "skills" / "jyotish-reading" / "SKILL.md"),
+            "--no-context-files",
+            f"@{prompt_path}",
+        ]
+        completed = subprocess.run(
+            command,
+            cwd=PROJECT_ROOT,
+            env={
+                **os.environ,
+                "JYOTISH_API_URL": base,
+                "JYOTISH_REQUIRE_V2": "1",
+            },
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        answer = _validated_artifact(base, run_id)
+        if completed.returncode != 0 or answer is None:
+            return _emit_required_v2_blocker(args.json)
+        persist_private_artifact(
+            default_data_root(), run_id=run_id, name="answer.md",
+            data=answer.encode("utf-8"),
+        )
+        if args.json:
+            print(json.dumps({"answer": answer}, ensure_ascii=False, sort_keys=True))
+        else:
+            print(answer)
+        return 0
+    finally:
+        if prompt_path is not None:
+            prompt_path.unlink(missing_ok=True)
+        _stop_process(child)
+
+
+def _inspect_run(args: argparse.Namespace) -> int:
+    base = _api_base()
+    _loopback_address(base)
+    child = None if _health(base) else _start_api(base)
+    try:
+        body = _get_required_json(
+            base, f"/v2/research-runs/{quote(args.run_id)}/inspect"
+        )
+        run = body["run"]
+        events = body["events"]
+        if args.json:
+            print(json.dumps(body, ensure_ascii=False, sort_keys=True))
+        else:
+            print(f"run_id: {run['run_id']}")
+            print(f"status: {run['status']}")
+            print(f"revision: {run['revision']}")
+            print(f"events: {len(events)}")
+            print(f"evidence: {len(body['evidence'])}")
+            if body["plan"] is not None:
+                print(f"plan_hash: {body['plan']['plan_hash']}")
+        return 0
+    finally:
+        _stop_process(child)
+
+
+def _replay_run(args: argparse.Namespace) -> int:
+    body = _post_empty_json(
+        _api_base(), f"/v2/research-runs/{quote(args.run_id)}/replay"
+    )
+    if args.json:
+        print(json.dumps(body, ensure_ascii=False, sort_keys=True))
+    else:
+        print(f"run_id: {body['run_id']}")
+        print("status: replayed (offline)")
+        print(f"projection_hash: {body['projection_hash']}")
+        print(f"claims_hash: {body['claims_hash']}")
+        print(f"memo_hash: {body['memo_hash']}")
+    return 0
+
+
+def _prune_artifacts(args: argparse.Namespace) -> int:
+    removed = prune_private_artifacts(
+        default_data_root(), retention_seconds=args.retention_seconds
+    )
+    print(json.dumps({"removed": removed}, sort_keys=True) if args.json else f"removed: {removed}")
+    return 0
+
+
+def _purge_store(args: argparse.Namespace) -> int:
+    backup = backup_and_purge_store(
+        default_data_root(), backup_path=Path(args.backup), confirmation=args.confirm
+    )
+    print(json.dumps({"backup": str(backup), "purged": True}, sort_keys=True))
+    return 0
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="jyotish")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    doctor = subparsers.add_parser("doctor", help="check FastAPI and Pi availability")
+    doctor.set_defaults(handler=_doctor)
+    dev = subparsers.add_parser("dev", help="run loopback FastAPI until interrupted")
+    dev.set_defaults(handler=_dev)
+    ask = subparsers.add_parser("ask", help="run the v2 research workflow through Pi")
+    ask.add_argument("question")
+    ask.add_argument("--chart", required=True, help="birth profile JSON path")
+    ask.add_argument("--json", action="store_true", help="wrap canonical output in JSON")
+    ask.set_defaults(handler=_ask)
+    run = subparsers.add_parser("run", help="inspect persisted research runs")
+    run_subparsers = run.add_subparsers(dest="run_command", required=True)
+    inspect = run_subparsers.add_parser("inspect", help="inspect a persisted run ledger")
+    inspect.add_argument("run_id")
+    inspect.add_argument("--json", action="store_true", help="emit canonical JSON")
+    inspect.set_defaults(handler=_inspect_run)
+    replay = run_subparsers.add_parser("replay", help="offline replay from pinned ledger")
+    replay.add_argument("run_id")
+    replay.add_argument("--json", action="store_true", help="emit canonical JSON")
+    replay.set_defaults(handler=_replay_run)
+    artifacts = subparsers.add_parser("artifacts", help="manage private answer artifacts")
+    artifact_subparsers = artifacts.add_subparsers(dest="artifact_command", required=True)
+    prune = artifact_subparsers.add_parser("prune", help="delete artifacts older than the retention window")
+    prune.add_argument(
+        "--retention-seconds", type=int,
+        default=DEFAULT_ARTIFACT_RETENTION_SECONDS,
+    )
+    prune.add_argument("--json", action="store_true")
+    prune.set_defaults(handler=_prune_artifacts)
+    store = subparsers.add_parser("store", help="manage the authoritative private ledger")
+    store_subparsers = store.add_subparsers(dest="store_command", required=True)
+    purge = store_subparsers.add_parser("backup-and-purge", help="backup, verify, and purge the whole ledger")
+    purge.add_argument("--backup", required=True)
+    purge.add_argument("--confirm", required=True)
+    purge.set_defaults(handler=_purge_store)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    try:
+        args = build_parser().parse_args(argv)
+        return int(args.handler(args))
+    except CliError as exc:
+        print(str(exc), file=sys.stderr)
+        return exc.exit_code
+
+
+def entrypoint() -> None:
+    raise SystemExit(main())
+
+
+if __name__ == "__main__":
+    entrypoint()

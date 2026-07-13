@@ -69,6 +69,7 @@ def test_health():
     body = r.json()
     assert body["status"] == "ok"
     assert "engine_version" in body
+    assert body["research_api_version"] == "2.0"
 
 
 def test_validate_endpoint():

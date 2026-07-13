@@ -1,0 +1,12 @@
+interface:
+  display_name: "Jyotish Consultant"
+  short_description: "Conversational local Jyotish guidance"
+  default_prompt: "Use $jyotish-consultant to answer my Jyotish question naturally."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "jyotish"
+      description: "Local calculations, governed sources, and optional deep ResearchRuns"
+      transport: "stdio"
+policy:
+  allow_implicit_invocation: true
