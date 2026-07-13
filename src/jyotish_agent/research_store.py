@@ -1461,6 +1461,14 @@ class ResearchStore:
         finally:
             connection.close()
 
+    def count_runs(self) -> int:
+        """Return the authoritative run count for operational invariants."""
+        connection = self._ready_connection()
+        try:
+            return int(connection.execute("SELECT COUNT(*) FROM research_runs").fetchone()[0])
+        finally:
+            connection.close()
+
     @staticmethod
     def _decode_run(row: sqlite3.Row) -> dict[str, Any]:
         data = dict(row)

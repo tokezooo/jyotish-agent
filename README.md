@@ -1,7 +1,8 @@
 # Jyotish Agent
 
-Agentic Jyotish assistant built around deterministic Vedic astrology calculations from
-PyJHora and a Pi-based agent harness.
+Local Jyotish assistant built around deterministic Vedic astrology calculations from
+PyJHora. Ordinary use is through Codex with a local stdio MCP server and skill; the
+FastAPI, CLI, and Pi integrations remain available as compatibility/operator paths.
 
 The first milestone is deliberately narrow:
 
@@ -31,6 +32,35 @@ uv sync --extra dev                       # creates .venv on Python 3.12, instal
 uv run python scripts/check_pyjhora_data.py   # verify PyJHora + ephemeris data
 uv run pytest                             # run the test suite
 ```
+
+## Talk to the agent through Codex
+
+After the one-time local setup, open a normal Codex task and talk naturally. Влад's
+private profile is selected by default. Focused questions use stateless calculations;
+only broad analyses such as “сделай глубокий разбор карьеры” create a ResearchRun.
+Follow-up questions stay in the same conversation and do not automatically create a
+new run.
+
+The MCP server itself needs no separately managed FastAPI or Pi process:
+
+```bash
+codex mcp add jyotish \
+  --env JYOTISH_AGENT_DATA_ROOT="$HOME/.local/share/jyotish-agent" \
+  --env JYOTISH_DEFAULT_PROFILE_PATH="$HOME/.local/share/jyotish-agent/profiles/vlad.json" \
+  -- uv --directory /absolute/path/to/jyotish-agent run jyotish-mcp
+codex mcp get jyotish
+```
+
+Install `.agents/skills/jyotish-consultant` under `~/.agents/skills` (a symlink is
+supported for local development), then restart Codex so it reloads the MCP and skill.
+Use `/mcp` in Codex CLI to confirm that `jyotish` is enabled. To ask about another
+person, state that explicitly and provide their birth date, exact/approximate time,
+place or coordinates, and timezone; this never overwrites Влад's default profile.
+
+Available MCP tools are `get_profile`, `calculate`, `search_sources`, `research`,
+`finalize_research`, and `inspect_research`. They are implementation details: normal
+answers should be conversational and hide claim graphs, evidence IDs, hashes, and
+state-machine output.
 
 ## Golden path: governed ResearchRun v2
 
