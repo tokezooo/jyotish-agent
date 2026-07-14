@@ -4,9 +4,10 @@
 
 Integrated natural RU/EN routing for the three additive MCP tools, published strict
 tool-schema drift snapshots and per-domain operational docs, added a pure privacy-safe
-operation-metric projection, and produced reproducible benchmark, stdio-matrix, and
-90-requirement audit artifacts. Existing natal/API/Pi/ResearchRun surfaces were not
-expanded. All new tools remain stateless, read-only/idempotent, and fail closed.
+operation-metric projection, and produced reproducible benchmark, mixed
+release-evidence matrix, and 90-requirement audit artifacts. Existing
+natal/API/Pi/ResearchRun surfaces were not expanded. All new tools remain stateless,
+read-only/idempotent, and fail closed.
 
 The release is intentionally calculation-only. Jaimini governed doctrine, Prashna
 doctrinal judgement, Muhurta doctrinal eligibility/ranking and natal personalization,
@@ -94,15 +95,19 @@ completed with source status pending, and below 512 KiB. The machine artifact is
 `docs/release-benchmark-v1.json`; `.superpowers/sdd/task-7-benchmark.json` binds it by
 checksum.
 
-## Stdio and requirement audit
+## Mixed release evidence and requirement audit
 
-The process-level matrix records 17 privacy-safe cases across RU/EN Jaimini exact/
-approximate/inspection/tie/boundary, Prashna explicit/capture/retry/clarification/
-mismatch/unsafe/invalid-secret, and Muhurta one-day/multi-day/empty/oversized/
-cancellation/deadline/high-stakes. Existing real `ClientSession` stdio tests execute
-the public transport. Focused signing/checker tests assert artifact substitution and
+The mixed release-evidence matrix records 17 privacy-safe cases. Its `process_stdio`
+subset is exactly 11 cases: Jaimini RU exact and EN approximate; Prashna RU explicit,
+EN capture/clarification, material mismatch, and invalid-secret wire input; Muhurta RU
+one-day, EN multi-day, successful empty, oversized range, and high-stakes activity.
+Those cases run through real `ClientSession` stdio public transport. Four cases are
+explicitly `facade` evidence (Jaimini tie and inspection, Prashna high-stakes, Muhurta
+cancel/deadline), and two are `pure_core` evidence (Jaimini half-open boundary and
+checker). Every case maps its own assertions to evidence; there is no blanket
+process-level claim. Focused signing/checker tests assert artifact substitution and
 unsupported prose fail closed. Data-root snapshots/counts prove no ResearchRun or
-domain persistence.
+domain persistence where that assertion is attached.
 
 The final requirement audit has 90 stable IDs: 62 `met`, 19
 `intentionally_unavailable`, 9 `not_in_scope`, and zero `gap` rows. A separately named
@@ -160,6 +165,11 @@ The first Task 7 review requested changes. The following fixes landed test-first
    communication/ownership theme from literal factors while source review was pending.
    It is retained as an excluded failed attempt. Commit `75e16b0` added explicit skill
    and server guards; the original normal prompt then passed without practical inference.
+   Each counted smoke and the excluded failure now has a canonical privacy-safe execution
+   record under `docs/evidence/codex-smokes/`, including client/version, completion time,
+   read-only sandbox, path-free MCP command identity, ordered thread/tool/final events,
+   complete sanitized natural output, redaction policy, and raw untracked JSONL SHA-256.
+   The index binds every record by a second SHA-256; tests recompute both layers.
 5. A genuinely held-out static calculation/trust fixture now drives 15 adversarial cases:
    Jaimini tie/approximate/source-prose/substitution, Prashna anchor/retry/privacy/safety/
    source state, and Muhurta skipped-date/stale-window/cancel/deadline/payload/source state.
@@ -173,15 +183,18 @@ Task 7 focused tests:
 - private uppercase error codes were accepted by the metric projector
 - the matrix falsely declared mixed facade/core cases as stdio
 - the pending-source practical-inference guard was absent from skill/server instructions
+- no durable, independently hash-bound execution records existed for the six counted
+  Codex smokes or the excluded pre-guard failure
 ```
 
 Review-fix GREEN evidence:
 
 ```text
-tests/test_task7_release.py: 12 passed
+tests/test_task7_release.py: 13 passed
 Held-out calculation/trust eval: 15 passed, 0 failed
-Task 7 release + MCP focused suite: 23 passed in 21.07s
-Full Python suite: 577 passed, 2 Swiss-only skipped in 160.17s
+Task 7 release + MCP focused suite: 24 passed in 17.35s
+Full Python suite: 578 passed, 2 Swiss-only skipped in 156.70s
+Codex smoke privacy scan: clean
 Ruff: All checks passed
 git diff --check: clean
 Wheel: built successfully; all nine domain governance assets present

@@ -210,7 +210,8 @@ def test_real_codex_smokes_cover_quick_and_inspection_for_every_domain() -> None
         assert case["passed"] is True and case["failure"] is None
         assert all(case["checks"].values())
         assert len(case["tool_routing"]) == 1
-        assert len(case["evidence_sha256"]) == 64
+        assert len(case["raw_transcript_sha256"]) == 64
+        assert len(case["execution_record_sha256"]) == 64
         by_route.setdefault(case["tool_routing"][0], set()).add(case["flow"])
     assert by_route == {
         "jaimini": {"quick", "inspection"},
@@ -222,12 +223,81 @@ def test_real_codex_smokes_cover_quick_and_inspection_for_every_domain() -> None
         "prompt": "RU quick obstacle question produced unsupported practical inference",
         "output_redacted": "The pre-fix answer hid internals but inferred a practical communication or ownership theme from computed factors while source review was pending.",
         "failure": "Source-gate honesty failed: practical meaning was inferred from literal chart facts.",
-        "evidence_sha256": "544a6265959aa52e0cd75dac5b06b1a298531b8e9dd9f187c86869eba419dd94",
+        "raw_transcript_sha256": "544a6265959aa52e0cd75dac5b06b1a298531b8e9dd9f187c86869eba419dd94",
+        "execution_record": "docs/evidence/codex-smokes/cs_failed_prashna_pre_guard_inference.json",
+        "execution_record_sha256": "1a2fb4547ed8c0cc7481999a365341e06adc229ce364631c289136ef779d19c5",
         "counted": False,
         "corrective_commit": "75e16b0",
     }]
     serialized = json.dumps(artifact, sort_keys=True).lower()
     assert not any(marker in serialized for marker in ("artifact_token", "question_fingerprint", "jya_", "sha256:"))
+
+
+def test_codex_smoke_execution_records_are_canonical_durable_evidence() -> None:
+    index = json.loads((ROOT / "docs" / "release-codex-conversational-smokes-v1.json").read_text())
+    records = sorted((ROOT / "docs" / "evidence" / "codex-smokes").glob("*.json"))
+    assert len(records) == 7
+    loaded: dict[str, dict] = {}
+    for path in records:
+        raw = path.read_bytes()
+        record = json.loads(raw)
+        canonical = json.dumps(
+            record, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ).encode() + b"\n"
+        assert raw == canonical
+        assert record["client_version"] == "codex-cli 0.144.0"
+        assert record["exit_code"] == 0
+        assert record["sandbox"] == "read-only"
+        assert record["mcp_command_identity"] == "uv --directory <current-worktree> run jyotish-mcp"
+        assert [event["event"] for event in record["ordered_events"]] == [
+            "thread_started", "tool_call", "final_agent_message", "turn_completed",
+        ]
+        tool = record["ordered_events"][1]
+        assert tool["server"] == "jyotish" and tool["status"] == "completed"
+        assert tool["tool"] in {"jaimini", "prashna", "muhurta"}
+        assert record["final_output_sanitized"]
+        assert record["redaction_policy"] == (
+            "Private computed body/sign/date/window details are replaced by "
+            "[redacted computed detail] or an equally specific bracketed redaction; "
+            "raw JSONL remains local and untracked."
+        )
+        assert len(record["raw_transcript_sha256"]) == 64
+        serialized = raw.decode().lower()
+        assert not any(marker in serialized for marker in (
+            "/users/", "artifact_token", "question_fingerprint", "anchor_token",
+            "jya_", "prq_", "mw_", '"latitude"', '"longitude"',
+        ))
+        loaded[record["id"]] = record
+
+    expected_times = {
+        "cs_jaimini_ru_quick": "2026-07-14T07:32:13+03:00",
+        "cs_jaimini_ru_inspection": "2026-07-14T07:36:14+03:00",
+        "cs_failed_prashna_pre_guard_inference": "2026-07-14T07:36:59+03:00",
+        "cs_muhurta_ru_quick": "2026-07-14T07:38:35+03:00",
+        "cs_muhurta_en_inspection": "2026-07-14T07:40:02+03:00",
+        "cs_prashna_ru_quick": "2026-07-14T07:40:57+03:00",
+        "cs_prashna_en_inspection": "2026-07-14T07:43:20+03:00",
+    }
+    assert {key: value["executed_at"] for key, value in loaded.items()} == expected_times
+
+    counted_index = {case["id"]: case for case in index["cases"]}
+    for record_id, case in counted_index.items():
+        record = loaded[record_id]
+        path = ROOT / case["execution_record"]
+        assert path.name == f"{record_id}.json"
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == case["execution_record_sha256"]
+        assert record["counted"] is True and record["passed"] is True
+        assert record["prompt"] == case["prompt"]
+        assert record["raw_transcript_sha256"] == case["raw_transcript_sha256"]
+        assert record["ordered_events"][1]["tool"] == case["tool_routing"][0]
+
+    excluded = index["excluded_failed_attempts"][0]
+    failed_record = loaded[excluded["id"]]
+    failed_path = ROOT / excluded["execution_record"]
+    assert hashlib.sha256(failed_path.read_bytes()).hexdigest() == excluded["execution_record_sha256"]
+    assert failed_record["counted"] is False and failed_record["passed"] is False
+    assert failed_record["failure_reason"] == "unsupported doctrine-like practical inference"
+    assert failed_record["corrected_by"] == "75e16b0"
 
 
 def test_consultant_skill_forbids_practical_inference_while_domain_source_gate_is_pending() -> None:
