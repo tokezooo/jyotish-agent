@@ -125,6 +125,8 @@ def test_requirement_audit_is_complete_and_honest() -> None:
         "jaimini.adjudicated_golden_fixtures",
         "muhurta.requested_planetary_change_boundaries",
         "muhurta.adjudicated_golden_searches",
+        "shared.e2e_modes",
+        "release.held_out_adversarial_evals",
         "release.doctrinal_quality_held_out_evals",
     } <= unavailable
     gaps = {item["id"] for item in requirements if item["status"] == "gap"}
@@ -194,7 +196,10 @@ def test_codex_smoke_artifact_schema_requires_real_routing_and_leak_checks() -> 
         "natural_answer", "source_gate_honest", "no_internal_ledger",
         "no_private_material", "expected_route",
     } == set(case["properties"]["checks"]["required"])
-    assert schema["properties"]["summary"]["properties"]["release_gate"]["enum"] == ["passed", "failed"]
+    assert schema["properties"]["summary"]["properties"]["evidence_gate"]["enum"] == [
+        "quick_inspection_passed", "failed",
+    ]
+    assert "release_gate" not in schema["properties"]["summary"]["properties"]
     excluded = schema["properties"]["excluded_failed_attempts"]["items"]
     assert excluded["additionalProperties"] is False
     assert {
@@ -206,10 +211,12 @@ def test_codex_smoke_artifact_schema_requires_real_routing_and_leak_checks() -> 
     assert excluded["properties"]["counted"]["const"] is False
 
 
-def test_real_codex_smokes_cover_quick_and_inspection_for_every_domain() -> None:
+def test_real_codex_smokes_are_partial_quick_and_inspection_evidence() -> None:
     artifact = json.loads((ROOT / "docs" / "release-codex-conversational-smokes-v1.json").read_text())
     assert artifact["runner"] == "real_codex_cli_against_current_worktree"
-    assert artifact["summary"] == {"passed": 6, "failed": 0, "release_gate": "passed"}
+    assert artifact["summary"] == {
+        "passed": 6, "failed": 0, "evidence_gate": "quick_inspection_passed",
+    }
     by_route: dict[str, set[str]] = {}
     for case in artifact["cases"]:
         assert case["passed"] is True and case["failure"] is None
@@ -223,6 +230,13 @@ def test_real_codex_smokes_cover_quick_and_inspection_for_every_domain() -> None
         "prashna": {"quick", "inspection"},
         "muhurta": {"quick", "inspection"},
     }
+    assert all(case["flow"] != "deep" for case in artifact["cases"])
+    audit = json.loads(
+        (ROOT / "docs" / "prashna-muhurta-jaimini-requirement-audit-v1.json").read_text()
+    )
+    statuses = {item["id"]: item["status"] for item in audit["requirements"]}
+    assert statuses["release.real_codex_quick_inspection_smokes"] == "met"
+    assert statuses["shared.e2e_modes"] == "intentionally_unavailable"
     assert artifact["excluded_failed_attempts"] == [{
         "id": "cs_failed_prashna_pre_guard_inference",
         "prompt_summary": "RU quick obstacle question produced unsupported practical inference",
@@ -331,6 +345,9 @@ def test_heldout_adversarial_runner_matches_independently_authored_fixture() -> 
     assert len(fixture["cases"]) == 15
     assert {case["domain"] for case in fixture["cases"]} == {"jaimini", "prashna", "muhurta"}
     assert len({case["id"] for case in fixture["cases"]}) == 15
+    kinds = {case["kind"] for case in fixture["cases"]}
+    assert "jaimini_geometry_expected_values" not in kinds
+    assert "school_labeling" not in kinds
     assert not any("heldout_domain_adversarial" in path.read_text(errors="ignore") for path in (ROOT / "src").rglob("*.py"))
     completed = subprocess.run(
         [sys.executable, "scripts/run_domain_adversarial_eval.py"],
@@ -343,3 +360,9 @@ def test_heldout_adversarial_runner_matches_independently_authored_fixture() -> 
     assert all(item["actual"] == item["expected"] and item["passed"] for item in result["results"])
     saved = json.loads((ROOT / "docs" / "release-domain-adversarial-eval-v1.json").read_text())
     assert saved == result
+    audit = json.loads(
+        (ROOT / "docs" / "prashna-muhurta-jaimini-requirement-audit-v1.json").read_text()
+    )
+    statuses = {item["id"]: item["status"] for item in audit["requirements"]}
+    assert statuses["release.held_out_calculation_trust_partial"] == "met"
+    assert statuses["release.held_out_adversarial_evals"] == "intentionally_unavailable"

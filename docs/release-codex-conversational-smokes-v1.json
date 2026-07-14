@@ -87,5 +87,5 @@
       "corrective_commit": "75e16b0"
     }
   ],
-  "summary": {"passed": 6, "failed": 0, "release_gate": "passed"}
+  "summary": {"passed": 6, "failed": 0, "evidence_gate": "quick_inspection_passed"}
 }

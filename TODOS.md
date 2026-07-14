@@ -13,6 +13,8 @@
 - Governed Jaimini doctrine, Prashna judgement, and Muhurta ranking/personalization.
 - 10–20 real/concierge sessions and reviewer material-error/value measurements.
 - Doctrinal-quality held-out evals after governed sources and qualified reviewers exist.
+- Real deep Codex conversational cases for all three domains; current evidence is quick plus inspection.
+- Complete held-out release evals with independent Jaimini geometry values and school-labeling cases.
 
 ## Additive domain release status (2026-07-14)
 
@@ -23,6 +25,8 @@
 - [ ] Admit governed sources/reviewers before enabling prose or ranking.
 - [x] Run real Codex conversational RU/EN quick and inspection smokes for all three domains.
 - [x] Run held-out calculation/trust adversarial domain evals (15 independently authored cases).
+- [ ] Run one real deep Codex case per domain; inspection does not satisfy the plan's deep-mode gate.
+- [ ] Add held-out independent Jaimini geometry expected values and school-labeling cases.
 - [ ] Run adjudicated real/concierge sessions and doctrinal-quality held-out evals.
 
 ## Next Implementation Tasks

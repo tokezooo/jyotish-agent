@@ -11,7 +11,8 @@
       "shared.inspect_opt_in", "shared.schema_drift_snapshot", "shared.fail_closed_source_governance",
       "shared.deterministic_truncation_ordering", "shared.normalized_time_timezone_provenance",
       "shared.no_hidden_place_timezone_fallback", "shared.pyjhora_prediction_prose_excluded",
-      "shared.local_only_distribution_posture", "shared.natal_byte_compatibility"
+      "shared.local_only_distribution_posture", "shared.natal_byte_compatibility",
+      "shared.e2e_modes"
     ],
     "jaimini_scope_and_phases_0_to_3": [
       "jaimini.exact_input", "jaimini.approximate_sweep", "jaimini.unknown_rejected",
@@ -43,9 +44,10 @@
     ],
     "test_strategy_release_and_value_gates": [
       "benchmark.all_modes_warm_p50_p95", "release.real_stdio_matrix",
-      "release.unsupported_claim_rejection", "release.held_out_adversarial_evals",
+      "release.unsupported_claim_rejection", "release.held_out_calculation_trust_partial",
+      "release.held_out_adversarial_evals",
       "release.doctrinal_quality_held_out_evals",
-      "release.wheel_package_data", "release.real_codex_conversational_smokes",
+      "release.wheel_package_data", "release.real_codex_quick_inspection_smokes",
       "value.real_concierge_sessions"
     ],
     "not_in_scope_and_optional_surfaces": [

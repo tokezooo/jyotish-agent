@@ -5,13 +5,16 @@
 Integrated natural RU/EN routing for the three additive MCP tools, published strict
 tool-schema drift snapshots and per-domain operational docs, added a pure privacy-safe
 operation-metric projection, and produced reproducible benchmark, mixed
-release-evidence matrix, and 90-requirement audit artifacts. Existing
+release-evidence matrix, and 92-requirement audit artifacts. Existing
 natal/API/Pi/ResearchRun surfaces were not expanded. All new tools remain stateless,
 read-only/idempotent, and fail closed.
 
 The release is intentionally calculation-only. Jaimini governed doctrine, Prashna
 doctrinal judgement, Muhurta doctrinal eligibility/ranking and natal personalization,
 qualified source/reviewer admission, and real concierge validation are not claimed.
+The complete conversational and held-out release gates are also not claimed: durable
+Codex evidence is quick plus inspection rather than quick plus deep, and the 15-case
+held-out fixture does not contain independent Jaimini geometry values or school labels.
 
 ## TDD evidence
 
@@ -109,10 +112,13 @@ process-level claim. Focused signing/checker tests assert artifact substitution 
 unsupported prose fail closed. Data-root snapshots/counts prove no ResearchRun or
 domain persistence where that assertion is attached.
 
-The final requirement audit has 90 stable IDs: 62 `met`, 19
+The final requirement audit has 92 stable IDs: 62 `met`, 21
 `intentionally_unavailable`, 9 `not_in_scope`, and zero `gap` rows. A separately named
-doctrinal-quality held-out evaluation remains intentionally unavailable until governed
-sources and qualified review exist. External source admission, qualified human
+complete held-out adversarial gate remains intentionally unavailable: the current
+15-case calculation/trust fixture contains no independent Jaimini geometry expected
+values or school-labeling cases. The plan's real quick-plus-deep Codex gate is also
+intentionally unavailable because the six durable executions are quick plus inspection,
+not deep. External source admission, qualified human
 review, adjudicated real sessions, governed interpretation/ranking, and Muhurta natal
 personalization are explicitly unavailable rather than silently marked complete.
 
@@ -142,6 +148,8 @@ and Muhurta. `git diff --check` is clean.
 3. Run 10–20 real/concierge sessions and record usefulness, follow-up/return behavior,
    reviewer material-error rate, latency versus manual work, and preference.
 4. Run doctrinal-quality held-out evaluation only after sources/reviewers are admitted.
+5. Run one real deep Codex case per domain; the existing inspection cases do not satisfy it.
+6. Add held-out independent Jaimini geometry values and school-labeling cases.
 
 ## Independent review-fix addendum
 
@@ -150,7 +158,7 @@ The first Task 7 review requested changes. The following fixes landed test-first
 1. The transport artifact no longer calls facade/core evidence stdio. Every one of its
    17 cases now declares `process_stdio`, `facade`, or `pure_core` and maps each claimed
    assertion to exact evidence. There are no blanket common assertions.
-2. The audit expanded from 61 to 90 plan requirements and is checked for exact equality
+2. The audit expanded from 61 to 92 plan requirements and is checked for exact equality
    against `tests/fixtures/task7_requirement_manifest_v1.json`, grouped by authoritative
    plan sections. It explicitly includes held-out adversarial evals, independent versus
    adjudicated goldens, applying/separating geometry, soft ranking, requested planetary
@@ -158,7 +166,7 @@ The first Task 7 review requested changes. The following fixes landed test-first
 3. Operation metrics now accept only codes present in `ERROR_REGISTRY`, require a strict
    boolean truncation flag and strict numeric/count/mode/status types, and reject private
    uppercase strings and arbitrary objects.
-4. Six real Codex CLI smokes passed: RU quick plus RU inspection Jaimini, RU quick plus
+4. Six real Codex CLI partial smokes passed: RU quick plus RU inspection Jaimini, RU quick plus
    EN inspection Muhurta, and RU quick plus EN inspection Prashna. All used the correct
    dedicated MCP tool, produced natural answers, kept source gates honest, and exposed no
    private material or internal ledgers. A pre-fix normal Prashna answer inferred a
@@ -173,11 +181,13 @@ The first Task 7 review requested changes. The following fixes landed test-first
    it stores only prompt/output summaries plus raw transcript hash, failure reason,
    uncounted status, and corrective commit. The index binds every record by a second
    SHA-256; tests recompute both layers and prevent the summary record from being counted.
-5. A genuinely held-out static calculation/trust fixture now drives 15 adversarial cases:
+5. A static partial calculation/trust fixture drives 15 adversarial cases:
    Jaimini tie/approximate/source-prose/substitution, Prashna anchor/retry/privacy/safety/
    source state, and Muhurta skipped-date/stale-window/cancel/deadline/payload/source state.
    Expected outcomes are independently authored package-external fixture data; production
    never reads them. The reproducible runner passed 15/15 and emitted a checksum-bound artifact.
+   This is not the complete held-out plan gate: it lacks independent Jaimini geometry
+   expected values and school-labeling cases.
 
 Review-fix RED evidence:
 
@@ -206,3 +216,18 @@ git diff --check: clean
 Wheel: built successfully; all nine domain governance assets present
 Bun: typecheck plus 52 tests passed
 ```
+
+## Release-evidence overclaim correction
+
+A later audit found two status overclaims. Test-first checks now require the exact
+distinction between partial evidence and the authoritative plan gates:
+
+- `release.real_codex_quick_inspection_smokes=met`, while
+  `shared.e2e_modes=intentionally_unavailable` until one real deep case per domain exists;
+- `release.held_out_calculation_trust_partial=met`, while
+  `release.held_out_adversarial_evals=intentionally_unavailable` until independent
+  Jaimini geometry expected values and school-labeling cases exist.
+
+Focused RED: three tests failed because these split audit IDs/statuses were absent.
+Focused GREEN: the four audit/smoke/held-out evidence tests passed. No MCP, signing,
+or Muhurta calculation algorithm changed.

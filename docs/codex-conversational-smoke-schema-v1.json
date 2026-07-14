@@ -68,11 +68,11 @@
     },
     "summary": {
       "type": "object", "additionalProperties": false,
-      "required": ["passed", "failed", "release_gate"],
+      "required": ["passed", "failed", "evidence_gate"],
       "properties": {
         "passed": {"type": "integer", "minimum": 0},
         "failed": {"type": "integer", "minimum": 0},
-        "release_gate": {"enum": ["passed", "failed"]}
+        "evidence_gate": {"enum": ["quick_inspection_passed", "failed"]}
       }
     }
   }
