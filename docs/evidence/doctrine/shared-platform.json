@@ -1,0 +1,91 @@
+{
+  "schema_version": "1.0",
+  "profile_id": "shared_doctrine_platform_v1",
+  "compiled_profile_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source_manifest_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "evidence_store_sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "gates": [
+    {
+      "gate_id": "rule_fixtures",
+      "status": "passed",
+      "evidence": "LEA-519 focused suite: 6 passed"
+    },
+    {
+      "gate_id": "hand_worked_cases",
+      "status": "missing",
+      "evidence": null
+    },
+    {
+      "gate_id": "school_conflict_cases",
+      "status": "passed",
+      "evidence": "LEA-520 explicit conflict fixture"
+    },
+    {
+      "gate_id": "metamorphic_tests",
+      "status": "passed",
+      "evidence": "ordering, substitution, and concurrency suites"
+    },
+    {
+      "gate_id": "held_out_cases",
+      "status": "missing",
+      "evidence": null
+    },
+    {
+      "gate_id": "conversational_e2e_ru",
+      "status": "missing",
+      "evidence": null
+    },
+    {
+      "gate_id": "conversational_e2e_en",
+      "status": "missing",
+      "evidence": null
+    },
+    {
+      "gate_id": "privacy_adversarial",
+      "status": "passed",
+      "evidence": "LEA-516/518/521 privacy and injection suites"
+    },
+    {
+      "gate_id": "payload_performance",
+      "status": "passed",
+      "evidence": "graph bounds and package scans"
+    },
+    {
+      "gate_id": "deep_conversational_e2e",
+      "status": "missing",
+      "evidence": null
+    }
+  ],
+  "gate_summary": {
+    "passed": 5,
+    "failed": 0,
+    "missing": 5
+  },
+  "metrics": {
+    "topic_coverage": 0.0,
+    "source_coverage": 0.0,
+    "conflict_count": 1,
+    "heldout_pass_rate": 0.0,
+    "material_error_count": 0,
+    "confidence_distribution": {
+      "low": 0,
+      "medium": 1,
+      "high": 0
+    },
+    "user_value_score": null,
+    "no_answer_rate": 1.0
+  },
+  "reviewer_decisions": [],
+  "admission_state": "automated_verified",
+  "eligible_for_experimental_full": false,
+  "external_review_missing": true,
+  "promotion_blockers": [
+    "hand_worked_cases:missing",
+    "held_out_cases:missing",
+    "conversational_e2e_ru:missing",
+    "conversational_e2e_en:missing",
+    "deep_conversational_e2e:missing"
+  ],
+  "rejected_rule_ids": [],
+  "report_sha256": "ada01a600060871fdf74e0414482764147adbfa3dabeb1b8ed65b7ae1992a78e"
+}
