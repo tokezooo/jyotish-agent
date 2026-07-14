@@ -12,6 +12,7 @@ from mcp.client.stdio import stdio_client
 
 from jyotish_agent.mcp_facade import JyotishMcpFacade, McpFacadeError
 from jyotish_agent import mcp_models
+from jyotish_agent.mcp_server import build_server
 
 
 def _profile(tmp_path: Path) -> Path:
@@ -87,6 +88,54 @@ def test_mcp_facade_rejects_fixed_timezone_without_leaking_profile(tmp_path: Pat
 
 def test_realistic_ru_en_stdio_exact_and_ten_minute_range(tmp_path: Path):
     asyncio.run(_stdio_scenarios(tmp_path))
+
+
+def test_jaimini_discovery_stays_strict_while_malformed_stdio_is_privacy_safe(
+    tmp_path: Path,
+):
+    profile_path = _profile(tmp_path)
+    tools = asyncio.run(build_server(JyotishMcpFacade(tmp_path / "data", profile_path)).list_tools())
+    schema = next(tool.inputSchema for tool in tools if tool.name == "jaimini")
+    assert schema["required"] == ["request"]
+    assert schema["additionalProperties"] is False
+    request_ref = schema["properties"]["request"]["$ref"].split("/")[-1]
+    assert schema["$defs"][request_ref]["additionalProperties"] is False
+    asyncio.run(_malformed_stdio_is_private(tmp_path, profile_path))
+
+
+async def _malformed_stdio_is_private(tmp_path: Path, profile_path: Path):
+    secret = "SECRET QUESTION ORION-7419"
+    env = {
+        **os.environ,
+        "JYOTISH_AGENT_DATA_ROOT": str(tmp_path / "invalid-data"),
+        "JYOTISH_DEFAULT_PROFILE_PATH": str(profile_path),
+    }
+    parameters = StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "jyotish_agent.mcp_server"],
+        env=env,
+    )
+    async with stdio_client(parameters) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            result = await session.call_tool(
+                "jaimini",
+                {
+                    "request": {
+                        "question": secret,
+                        "birth": {"confidence": "exact"},
+                        "gender": "male",
+                        "SECRET_EXTRA": secret,
+                    }
+                },
+            )
+    serialized = result.model_dump_json()
+    assert result.isError is False
+    assert result.structuredContent["status"] == "needs_input"
+    assert result.structuredContent["error_code"] == "INPUT_INVALID"
+    assert result.structuredContent["next_action"] == "correct_request"
+    assert secret not in serialized
+    assert "SECRET_EXTRA" not in serialized
 
 
 async def _stdio_scenarios(tmp_path: Path):

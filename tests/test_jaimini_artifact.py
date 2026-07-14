@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import copy
+import threading
+from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from types import SimpleNamespace
 
 import pytest
@@ -52,6 +55,62 @@ def test_domain_artifact_is_deterministic_and_cache_is_defensive():
     assert first == second
     first["facts"][0]["value"] = "tampered outside cache"
     assert signing.get_cached_domain_artifact(second["artifact_token"])["facts"][0]["value"] == "Saturn"
+
+
+def test_domain_artifact_cache_mutations_and_recency_reads_hold_one_lock(monkeypatch):
+    lock = threading.RLock()
+
+    class GuardedCache(OrderedDict):
+        def _guard(self):
+            assert lock._is_owned(), "domain artifact cache accessed without its lock"
+
+        def __setitem__(self, key, value):
+            self._guard()
+            return super().__setitem__(key, value)
+
+        def get(self, key, default=None):
+            self._guard()
+            return super().get(key, default)
+
+        def move_to_end(self, key, last=True):
+            self._guard()
+            return super().move_to_end(key, last)
+
+        def __len__(self):
+            self._guard()
+            return super().__len__()
+
+        def popitem(self, last=True):
+            self._guard()
+            return super().popitem(last)
+
+    monkeypatch.setattr(signing, "_DOMAIN_ARTIFACT_CACHE_LOCK", lock, raising=False)
+    monkeypatch.setattr(signing, "_DOMAIN_ARTIFACT_CACHE", GuardedCache())
+    artifact = signing.cache_domain_artifact(_artifact_payload())
+    assert signing.get_cached_domain_artifact(artifact["artifact_token"]) == artifact
+
+
+def test_domain_artifact_cache_concurrent_get_put_evict_is_bounded_and_valid(monkeypatch):
+    monkeypatch.setattr(signing, "_DOMAIN_ARTIFACT_CACHE", OrderedDict())
+    monkeypatch.setattr(signing, "_DOMAIN_ARTIFACT_CACHE_MAX", 16)
+    barrier = threading.Barrier(12)
+
+    def churn(worker: int):
+        barrier.wait()
+        artifacts = []
+        for index in range(40):
+            payload = _artifact_payload()
+            payload["normalized_anchor_sha256"] = f"{worker * 40 + index:064x}"
+            artifact = signing.cache_domain_artifact(payload)
+            artifacts.append(artifact)
+            cached = signing.get_cached_domain_artifact(artifact["artifact_token"])
+            assert cached is None or signing.verify_domain_artifact(cached)
+        return artifacts[-1]
+
+    with ThreadPoolExecutor(max_workers=12) as pool:
+        newest = list(pool.map(churn, range(12)))
+    assert len(signing._DOMAIN_ARTIFACT_CACHE) <= 16
+    assert all(signing.verify_domain_artifact(artifact) for artifact in newest)
 
 
 def test_jaimini_atomizer_and_checker_use_only_signed_citable_facts():

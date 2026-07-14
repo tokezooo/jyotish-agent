@@ -177,10 +177,13 @@ class JaiminiProvenance(_FrozenStrictModel):
     tzdb_fingerprint: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
 
 
-class _JaiminiResultBase(_StrictModel):
+class _JaiminiIdentityBase(_StrictModel):
     request_id: str = Field(min_length=1, max_length=100)
     mode: Literal["jaimini"] = "jaimini"
     rule_profile: JaiminiRuleProfileId = "jaimini_core_v1"
+
+
+class _JaiminiResultBase(_JaiminiIdentityBase):
     warnings: tuple[str, ...] = ()
     limitations: tuple[JaiminiLimitation, ...]
     interpretation_status: InterpretationStatus
@@ -218,9 +221,19 @@ class JaiminiCompletedResult(_JaiminiResultBase):
         return self
 
 
-class JaiminiNeedsInputResult(_JaiminiResultBase):
+class JaiminiNeedsInputResult(_JaiminiIdentityBase):
     status: Literal["needs_input"]
-    next_action: Literal["provide_birth_range", "confirm_birth_time"]
+    next_action: Literal["provide_birth_range", "confirm_birth_time", "correct_request"]
+    error_code: Literal["INPUT_INVALID", "BIRTH_TIME_RANGE_REQUIRED"] | None = None
+    stage: str | None = Field(default=None, min_length=1, max_length=80)
+    retryable: bool | None = None
+    problem: str | None = Field(default=None, min_length=1, max_length=500)
+    cause: str | None = Field(default=None, min_length=1, max_length=500)
+    fix: str | None = Field(default=None, min_length=1, max_length=500)
+    warnings: tuple[str, ...] = ()
+    limitations: tuple[JaiminiLimitation, ...] = ()
+    interpretation_status: Literal["unavailable"] = "unavailable"
+    provenance: JaiminiProvenance | None = None
 
 
 class JaiminiUnavailableResult(_JaiminiResultBase):

@@ -52,6 +52,26 @@ class _PrashnaWireArguments(ArgModelBase):
         }
 
 
+class _JaiminiPublishedArguments(BaseModel):
+    """Strict Jaimini discovery schema, separate from total wire parsing."""
+
+    model_config = ConfigDict(extra="forbid")
+    request: JaiminiMcpInput
+
+
+class _JaiminiWireArguments(ArgModelBase):
+    """Route every malformed Jaimini shape to the privacy-safe domain result."""
+
+    request: Any = None
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+
+    def model_dump_one_level(self) -> dict[str, Any]:
+        return {
+            "request": self.request,
+            "outer_arguments": dict(self.model_extra or {}),
+        }
+
+
 class _MuhurtaPublishedArguments(BaseModel):
     model_config = ConfigDict(extra="forbid")
     request: MuhurtaMcpInput
@@ -140,8 +160,18 @@ def build_server(facade: JyotishMcpFacade | None = None) -> FastMCP:
         annotations=READ_ONLY,
         structured_output=True,
     )
-    def jaimini(request: JaiminiMcpInput) -> JaiminiResultModel:
-        return JaiminiResultModel(root=runtime.jaimini(request))
+    def jaimini(
+        request: Any = None,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> JaiminiResultModel:
+        return JaiminiResultModel(
+            root=runtime.jaimini_payload(request, outer_arguments=outer_arguments)
+        )
+
+    jaimini_tool = server._tool_manager.get_tool("jaimini")
+    assert jaimini_tool is not None
+    jaimini_tool.parameters = _JaiminiPublishedArguments.model_json_schema()
+    jaimini_tool.fn_metadata.arg_model = _JaiminiWireArguments
 
     @server.tool(
         name="prashna",

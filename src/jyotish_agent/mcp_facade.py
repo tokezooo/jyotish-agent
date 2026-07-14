@@ -16,6 +16,7 @@ from .jaimini_models import (
     ApproximateJaiminiBirthInput,
     ExactJaiminiBirthInput,
     JaiminiInput,
+    JaiminiNeedsInputResult,
     JaiminiPlace,
     JaiminiResult,
 )
@@ -294,6 +295,57 @@ class JyotishMcpFacade:
             include_trace=value.include_trace,
         )
         return JaiminiFacade().calculate(request)
+
+    def jaimini_payload(
+        self,
+        value: object,
+        *,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> JaiminiResult:
+        """Make malformed Jaimini MCP execution total without reflecting inputs."""
+        parsed: JaiminiMcpInput | None = None
+        if not outer_arguments and isinstance(value, dict):
+            try:
+                parsed = JaiminiMcpInput.model_validate(value)
+            except ValidationError:
+                pass
+        if parsed is not None:
+            return self.jaimini(parsed)
+
+        import hashlib
+
+        from .error_registry import error_record
+
+        request_id = "req_" + hashlib.sha256(
+            json.dumps(
+                {"request": value, "outer": outer_arguments},
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            ).encode()
+        ).hexdigest()[:24]
+        record = error_record(
+            "INPUT_INVALID",
+            run_id=None,
+            request_id=request_id,
+            mode="jaimini",
+            stage="input_validation",
+        )
+        fields = {
+            key: record[key]
+            for key in (
+                "error_code",
+                "request_id",
+                "mode",
+                "stage",
+                "retryable",
+                "problem",
+                "cause",
+                "fix",
+                "next_action",
+            )
+        }
+        return JaiminiNeedsInputResult(status="needs_input", **fields)
 
     def prashna(self, value: PrashnaMcpInput) -> PrashnaResult:
         """Compute one stateless, sealed question-time Praśna result."""

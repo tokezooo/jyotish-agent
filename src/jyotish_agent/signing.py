@@ -22,6 +22,7 @@ import os
 import secrets
 from copy import deepcopy
 from collections import OrderedDict
+from threading import RLock
 
 _env_key = os.environ.get("JYOTISH_SIGNING_KEY", "")
 _SIGNING_KEY: bytes = _env_key.encode("utf-8") if _env_key else secrets.token_bytes(32)
@@ -79,6 +80,7 @@ def get_cached_facts(token: str) -> dict | None:
 # cache so the existing ``facts_token`` behavior and eviction budget do not change.
 _DOMAIN_ARTIFACT_CACHE: "OrderedDict[str, dict]" = OrderedDict()
 _DOMAIN_ARTIFACT_CACHE_MAX = 256
+_DOMAIN_ARTIFACT_CACHE_LOCK = RLock()
 
 
 def _domain_unsigned(payload: dict) -> dict:
@@ -100,10 +102,11 @@ def cache_domain_artifact(payload: dict) -> dict:
         "artifact_sha256": digest,
         "artifact_token": token,
     }
-    _DOMAIN_ARTIFACT_CACHE[token] = deepcopy(artifact)
-    _DOMAIN_ARTIFACT_CACHE.move_to_end(token)
-    while len(_DOMAIN_ARTIFACT_CACHE) > _DOMAIN_ARTIFACT_CACHE_MAX:
-        _DOMAIN_ARTIFACT_CACHE.popitem(last=False)
+    with _DOMAIN_ARTIFACT_CACHE_LOCK:
+        _DOMAIN_ARTIFACT_CACHE[token] = deepcopy(artifact)
+        _DOMAIN_ARTIFACT_CACHE.move_to_end(token)
+        while len(_DOMAIN_ARTIFACT_CACHE) > _DOMAIN_ARTIFACT_CACHE_MAX:
+            _DOMAIN_ARTIFACT_CACHE.popitem(last=False)
     return deepcopy(artifact)
 
 
@@ -125,8 +128,9 @@ def verify_domain_artifact(artifact: dict) -> bool:
 
 def get_cached_domain_artifact(token: str) -> dict | None:
     """Return a defensive copy of a server-held signed domain artifact."""
-    artifact = _DOMAIN_ARTIFACT_CACHE.get(token)
-    if artifact is None:
-        return None
-    _DOMAIN_ARTIFACT_CACHE.move_to_end(token)
-    return deepcopy(artifact)
+    with _DOMAIN_ARTIFACT_CACHE_LOCK:
+        artifact = _DOMAIN_ARTIFACT_CACHE.get(token)
+        if artifact is None:
+            return None
+        _DOMAIN_ARTIFACT_CACHE.move_to_end(token)
+        return deepcopy(artifact)
