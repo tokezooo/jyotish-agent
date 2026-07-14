@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "authoritative_plan": "docs/superpowers/plans/2026-07-13-prashna-muhurta-jaimini.md",
+  "plan_sections": {
+    "confirmed_premises_and_shared_architecture": [
+      "shared.deterministic_facts_first", "shared.distinct_anchors", "shared.versioned_rule_profiles",
+      "shared.locked_engine_session", "shared.strict_additive_models", "shared.signed_domain_artifacts",
+      "shared.domain_atomizers_checkers", "shared.payload_ceiling", "shared.privacy_errors",
+      "shared.operation_metrics_projection", "shared.mcp_readonly_idempotent",
+      "shared.natal_api_pi_research_compatibility", "shared.ru_en_routing_docs",
+      "shared.inspect_opt_in", "shared.schema_drift_snapshot", "shared.fail_closed_source_governance",
+      "shared.deterministic_truncation_ordering", "shared.normalized_time_timezone_provenance",
+      "shared.no_hidden_place_timezone_fallback", "shared.pyjhora_prediction_prose_excluded",
+      "shared.local_only_distribution_posture", "shared.natal_byte_compatibility"
+    ],
+    "jaimini_scope_and_phases_0_to_3": [
+      "jaimini.exact_input", "jaimini.approximate_sweep", "jaimini.unknown_rejected",
+      "jaimini.karaka_7_8_ties", "jaimini.rasi_drishti", "jaimini.arudhas_al_ul",
+      "jaimini.argala", "jaimini.svamsa_karakamsa", "jaimini.special_lagnas",
+      "jaimini.chara_dasha", "jaimini.relationship_graph", "jaimini.independent_hand_checked_fixture",
+      "jaimini.pyjhora_diagnostic_only", "jaimini.unstable_major_synthesis_prohibited",
+      "jaimini.analysis_graph_topics", "jaimini.adjudicated_golden_fixtures", "jaimini.governed_interpretation",
+      "governance.jaimini_sources", "governance.jaimini_human_review"
+    ],
+    "prashna_scope_and_phase_4": [
+      "prashna.strict_event_anchor", "prashna.capture_once_idempotent", "prashna.anchor_reuse_mismatch",
+      "prashna.work_topic_router", "prashna.time_chart_facts", "prashna.readability_traces",
+      "prashna.applying_separating_geometry", "prashna.numbered_kp_nadi_methods",
+      "prashna.radicality_status_contract", "prashna.adjudicated_golden_cases",
+      "prashna.high_stakes_rescue", "prashna.doctrinal_judgement",
+      "governance.prashna_sources", "governance.prashna_human_review"
+    ],
+    "muhurta_scope_and_phases_5_to_6": [
+      "muhurta.half_open_intervals", "muhurta.boundary_collection", "muhurta.named_boundary_families",
+      "muhurta.explicit_hard_constraints", "muhurta.general_without_natal",
+      "muhurta.hard_exclusion_monotonicity", "muhurta.deterministic_tie_breaking",
+      "muhurta.calendar_ready_windows",
+      "muhurta.near_misses_empty_result", "muhurta.range_candidate_result_bounds",
+      "muhurta.cancellation_deadline", "muhurta.dst_civil_days", "muhurta.soft_rule_stage",
+      "muhurta.requested_planetary_change_boundaries", "muhurta.adjudicated_golden_searches",
+      "muhurta.doctrinal_ranking", "muhurta.natal_personalization",
+      "governance.muhurta_sources", "governance.muhurta_human_review"
+    ],
+    "test_strategy_release_and_value_gates": [
+      "benchmark.all_modes_warm_p50_p95", "release.real_stdio_matrix",
+      "release.unsupported_claim_rejection", "release.held_out_adversarial_evals",
+      "release.wheel_package_data", "release.real_codex_conversational_smokes",
+      "value.real_concierge_sessions"
+    ],
+    "not_in_scope_and_optional_surfaces": [
+      "surface.rest_expansion", "surface.pi_expansion", "surface.researchrun_expansion",
+      "surface.public_saas", "surface.booking_side_effects", "surface.gui_calendar_rendering",
+      "surface.high_stakes_elections", "surface.every_regional_lineage"
+    ]
+  }
+}

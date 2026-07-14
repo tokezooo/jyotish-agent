@@ -73,7 +73,9 @@ Routing:
 - jaimini is stateless and returns signed computed facts; do not invent interpretation
   when interpretation_status is unavailable, and never infer an approximate range.
 - prashna seals one explicit/captured question moment and supports only bounded work/project
-  facts; reuse its opaque anchor token for clarification and never invent doctrine.
+  facts; reuse its opaque anchor token for clarification and never invent doctrine. While
+  source review is pending, report literal computed facts/statuses only: do not infer a
+  practical obstacle, theme, advice, or area to watch from planets, houses, signs, or lords.
 - muhurta searches calculated event boundaries for general/private focused-work sessions;
   ranking and interpretation remain unavailable until their governed source pack is admitted.
 - research creates exactly one authoritative run and returns evidence for synthesis.

@@ -10,5 +10,7 @@
 All three are stateless MCP calculation tools and do not create ResearchRuns. Their
 source/reviewer gates are pending: Jaimini doctrine, Prashna judgement, and Muhurta
 eligibility/ranking remain unavailable. Present computed candidates and limitations
-naturally. Show fact paths, rule traces, scores, hashes, evidence IDs, and tokens only
+naturally, but do not infer practical advice, meaning, significance, or an area to
+watch from a planet, house, pada, boundary, or other computed factor. Show fact paths,
+rule traces, scores, hashes, evidence IDs, and tokens only
 when the user explicitly requests technical inspection.

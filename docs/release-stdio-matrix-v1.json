@@ -1,29 +1,29 @@
 {
-  "schema_version": 1,
-  "transport": "local_python_mcp_stdio",
-  "persistence": "none_for_additive_domains",
+  "schema_version": 2,
+  "transport": "mixed_release_evidence",
   "privacy_summary": "No private request material, event detail, identity material, or rule trace is retained here.",
-  "common_assertions": [
-    "strict_schema", "signed_artifact", "checker_fail_closed", "deterministic_replay_where_applicable",
-    "payload_under_512_kib", "no_research_run", "no_private_error_echo"
+  "assertion_catalog": [
+    "strict_schema", "signed_artifact", "checker_fail_closed", "deterministic_replay",
+    "payload_under_512_kib", "no_research_run", "no_private_error_echo",
+    "source_gate_pending", "typed_rescue", "bounded_trace", "half_open_boundary"
   ],
   "cases": [
-    {"id":"j_ru_exact","mode":"jaimini","outcome":"completed_facts_source_pending","evidence":"tests/test_jaimini_mcp.py::test_realistic_ru_en_stdio_exact_and_ten_minute_range"},
-    {"id":"j_en_approximate","mode":"jaimini","outcome":"completed_three_samples_source_pending","evidence":"tests/test_jaimini_mcp.py::test_realistic_ru_en_stdio_exact_and_ten_minute_range"},
-    {"id":"j_tie","mode":"jaimini","outcome":"typed_adjudication","evidence":"tests/test_jaimini_facade.py"},
-    {"id":"j_boundary","mode":"jaimini","outcome":"half_open_period_verified","evidence":"tests/test_jaimini_core.py"},
-    {"id":"j_inspection","mode":"jaimini","outcome":"bounded_trace_signed","evidence":"tests/test_jaimini_facade.py"},
-    {"id":"j_checker","mode":"jaimini","outcome":"unsupported_prose_rejected","evidence":"tests/test_jaimini_artifact.py"},
-    {"id":"p_ru_explicit","mode":"prashna","outcome":"completed_source_pending","evidence":"tests/test_prashna_mcp.py::test_realistic_ru_en_stdio_anchor_reuse_and_mismatch"},
-    {"id":"p_en_capture_retry_clarify","mode":"prashna","outcome":"completed_reused_anchor","evidence":"tests/test_prashna_mcp.py::test_realistic_ru_en_stdio_anchor_reuse_and_mismatch"},
-    {"id":"p_material_mismatch","mode":"prashna","outcome":"anchor_mismatch","evidence":"tests/test_prashna_mcp.py::test_realistic_ru_en_stdio_anchor_reuse_and_mismatch"},
-    {"id":"p_unsupported_high_stakes","mode":"prashna","outcome":"typed_safe_rescue","evidence":"tests/test_prashna_core.py"},
-    {"id":"p_secret_invalid","mode":"prashna","outcome":"input_invalid_no_echo","evidence":"tests/test_prashna_mcp.py::test_realistic_ru_en_stdio_anchor_reuse_and_mismatch"},
-    {"id":"m_ru_one_day","mode":"muhurta","outcome":"completed_boundaries_source_pending","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety"},
-    {"id":"m_en_multi_day","mode":"muhurta","outcome":"completed_boundaries_source_pending","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety"},
-    {"id":"m_no_window","mode":"muhurta","outcome":"successful_empty","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety"},
-    {"id":"m_oversized","mode":"muhurta","outcome":"range_rescue","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety"},
-    {"id":"m_cancel_deadline","mode":"muhurta","outcome":"typed_incomplete","evidence":"tests/test_muhurta_core.py"},
-    {"id":"m_high_stakes","mode":"muhurta","outcome":"typed_safe_rescue","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety"}
+    {"id":"j_ru_exact","mode":"jaimini","evidence_layer":"process_stdio","outcome":"completed_facts_source_pending","evidence":"tests/test_jaimini_mcp.py::test_realistic_ru_en_stdio_exact_and_ten_minute_range","assertions":{"strict_schema":"tests/test_mcp_server.py","signed_artifact":"required by completed output model","payload_under_512_kib":"tests/test_jaimini_mcp.py","no_private_error_echo":"tests/test_jaimini_mcp.py","source_gate_pending":"interpretation_status assertion","no_research_run":"tests/test_jaimini_mcp.py::test_mcp_facade_exact_and_approximate_are_stateless_and_fail_closed"}},
+    {"id":"j_en_approximate","mode":"jaimini","evidence_layer":"process_stdio","outcome":"completed_three_samples_source_pending","evidence":"tests/test_jaimini_mcp.py::test_realistic_ru_en_stdio_exact_and_ten_minute_range","assertions":{"strict_schema":"tests/test_mcp_server.py","signed_artifact":"required by completed output model","payload_under_512_kib":"tests/test_jaimini_mcp.py","no_private_error_echo":"tests/test_jaimini_mcp.py","source_gate_pending":"interpretation_status assertion","no_research_run":"tests/test_jaimini_mcp.py::test_mcp_facade_exact_and_approximate_are_stateless_and_fail_closed"}},
+    {"id":"j_tie","mode":"jaimini","evidence_layer":"facade","outcome":"typed_adjudication","evidence":"tests/test_jaimini_facade.py","assertions":{"typed_rescue":"exact tie returns adjudicate_karaka_tie","source_gate_pending":"no interpretation path"}},
+    {"id":"j_boundary","mode":"jaimini","evidence_layer":"pure_core","outcome":"half_open_period_verified","evidence":"tests/test_jaimini_core.py","assertions":{"half_open_boundary":"exact start/end membership tests","deterministic_replay":"pure timeline equality"}},
+    {"id":"j_inspection","mode":"jaimini","evidence_layer":"facade","outcome":"bounded_trace_signed","evidence":"tests/test_jaimini_facade.py","assertions":{"bounded_trace":"include_trace bounded contract","signed_artifact":"trace included in signed facts"}},
+    {"id":"j_checker","mode":"jaimini","evidence_layer":"pure_core","outcome":"unsupported_prose_rejected","evidence":"tests/test_jaimini_artifact.py","assertions":{"checker_fail_closed":"source-unavailable and substitution tests","signed_artifact":"artifact HMAC tests"}},
+    {"id":"p_ru_explicit","mode":"prashna","evidence_layer":"process_stdio","outcome":"completed_source_pending","evidence":"tests/test_prashna_mcp.py::test_realistic_ru_en_stdio_anchor_reuse_and_mismatch","assertions":{"strict_schema":"tests/test_mcp_server.py","signed_artifact":"required by completed output model","payload_under_512_kib":"tests/test_prashna_mcp.py","no_private_error_echo":"tests/test_prashna_mcp.py","no_research_run":"data-root before/after assertion","source_gate_pending":"completed interpretation unavailable"}},
+    {"id":"p_en_capture_retry_clarify","mode":"prashna","evidence_layer":"process_stdio","outcome":"completed_reused_anchor","evidence":"tests/test_prashna_mcp.py::test_realistic_ru_en_stdio_anchor_reuse_and_mismatch","assertions":{"signed_artifact":"required by completed output model","deterministic_replay":"tests/test_prashna_third_review_fixes.py","no_research_run":"data-root before/after assertion","source_gate_pending":"completed interpretation unavailable"}},
+    {"id":"p_material_mismatch","mode":"prashna","evidence_layer":"process_stdio","outcome":"anchor_mismatch","evidence":"tests/test_prashna_mcp.py::test_realistic_ru_en_stdio_anchor_reuse_and_mismatch","assertions":{"typed_rescue":"ANCHOR_MISMATCH/create_new_anchor assertion","no_private_error_echo":"response serialization assertion"}},
+    {"id":"p_unsupported_high_stakes","mode":"prashna","evidence_layer":"facade","outcome":"typed_safe_rescue","evidence":"tests/test_prashna_core.py","assertions":{"typed_rescue":"unsupported and high-stakes table tests","no_private_error_echo":"controlled registry envelope"}},
+    {"id":"p_secret_invalid","mode":"prashna","evidence_layer":"process_stdio","outcome":"input_invalid_no_echo","evidence":"tests/test_prashna_mcp.py::test_realistic_ru_en_stdio_anchor_reuse_and_mismatch","assertions":{"strict_schema":"published strict schema plus total adapter","typed_rescue":"INPUT_INVALID assertion","no_private_error_echo":"secret/place/coordinate absence assertions"}},
+    {"id":"m_ru_one_day","mode":"muhurta","evidence_layer":"process_stdio","outcome":"completed_boundaries_source_pending","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety","assertions":{"strict_schema":"tests/test_mcp_server.py","signed_artifact":"required by completed output model","payload_under_512_kib":"tests/test_muhurta_mcp.py","no_private_error_echo":"tests/test_muhurta_mcp.py","source_gate_pending":"ranking unavailable contract","no_research_run":"tests/test_muhurta_mcp.py::test_mcp_ru_en_no_window_limit_and_no_persistence"}},
+    {"id":"m_en_multi_day","mode":"muhurta","evidence_layer":"process_stdio","outcome":"completed_boundaries_source_pending","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety","assertions":{"strict_schema":"tests/test_mcp_server.py","signed_artifact":"required by completed output model","payload_under_512_kib":"tests/test_muhurta_mcp.py","no_private_error_echo":"tests/test_muhurta_mcp.py","source_gate_pending":"ranking unavailable contract"}},
+    {"id":"m_no_window","mode":"muhurta","evidence_layer":"process_stdio","outcome":"successful_empty","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety","assertions":{"signed_artifact":"completed empty output contract","deterministic_replay":"stable empty result tests","source_gate_pending":"ranking unavailable contract"}},
+    {"id":"m_oversized","mode":"muhurta","evidence_layer":"process_stdio","outcome":"range_rescue","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety","assertions":{"typed_rescue":"SEARCH_RANGE_TOO_LARGE/narrow_search_range assertions","no_private_error_echo":"controlled registry envelope"}},
+    {"id":"m_cancel_deadline","mode":"muhurta","evidence_layer":"facade","outcome":"typed_incomplete","evidence":"tests/test_muhurta_core.py","assertions":{"typed_rescue":"cancellation and deadline table tests","no_private_error_echo":"controlled registry envelope"}},
+    {"id":"m_high_stakes","mode":"muhurta","evidence_layer":"process_stdio","outcome":"typed_safe_rescue","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety","assertions":{"typed_rescue":"HIGH_STAKES_ACTIVITY assertion","no_private_error_echo":"controlled registry envelope"}}
   ]
 }

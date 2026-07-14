@@ -8,8 +8,9 @@ persists it and never accepts request/result payloads.
 from __future__ import annotations
 
 import math
-import re
 from typing import Literal, TypedDict
+
+from .error_registry import ERROR_REGISTRY
 
 
 Mode = Literal["jaimini", "prashna", "muhurta"]
@@ -29,6 +30,8 @@ class OperationMetric(TypedDict):
 
 
 def _duration_bucket(duration_ms: float) -> str:
+    if isinstance(duration_ms, bool) or not isinstance(duration_ms, (int, float)):
+        raise TypeError("duration_ms must be a real number")
     if not math.isfinite(duration_ms) or duration_ms < 0:
         raise ValueError("duration_ms must be finite and non-negative")
     if duration_ms < 100:
@@ -58,15 +61,19 @@ def project_operation_metric(
     error_code: str | None = None,
 ) -> OperationMetric:
     """Return only cardinalities and stable labels; no private payload is accepted."""
-    if mode not in {"jaimini", "prashna", "muhurta"}:
+    if not isinstance(mode, str) or mode not in {"jaimini", "prashna", "muhurta"}:
         raise ValueError("unsupported operation mode")
-    if status not in {"completed", "needs_input", "unavailable", "incomplete"}:
+    if not isinstance(status, str) or status not in {"completed", "needs_input", "unavailable", "incomplete"}:
         raise ValueError("unsupported operation status")
     counts = (candidate_count, sample_count, result_count)
     if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in counts):
         raise ValueError("operation counts must be non-negative integers")
-    if error_code is not None and re.fullmatch(r"[A-Z][A-Z0-9_]{1,79}", error_code) is None:
-        raise ValueError("error_code must be a stable uppercase code")
+    if type(truncated) is not bool:
+        raise TypeError("truncated must be a strict bool")
+    if error_code is not None and (
+        not isinstance(error_code, str) or error_code not in ERROR_REGISTRY
+    ):
+        raise ValueError("error_code must be a registered stable code")
     return {
         "schema_version": 1,
         "mode": mode,

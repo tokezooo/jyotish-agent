@@ -63,6 +63,11 @@ means deep mode when the supported career scope applies.
 - For Jaimini, Prashna, and Muhurta, do not turn source-unavailable facts into remembered
   doctrine. Technical traces require explicit inspection opt-in; never expose tokens or
   private anchors in ordinary prose.
+- While a domain source gate is pending, do not infer practical meaning, advice,
+  significance, or an area to watch from Mercury, a house lord, a pada, a boundary,
+  or another computed factor. State only the computed fact, its stability, and the
+  unavailable interpretation limitation. A practical inference is doctrine even when
+  phrased cautiously.
 
 ## Load References Only When Needed
 

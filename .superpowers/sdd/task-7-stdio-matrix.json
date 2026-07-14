@@ -1,1 +1,1 @@
-{"artifact":"docs/release-stdio-matrix-v1.json","sha256":"cb6dde94150330ab9725c8e920799fb5a417ec0b3cce5f7314f2e65fbd46b910","cases":17,"transport":"local_python_mcp_stdio"}
+{"artifact":"docs/release-stdio-matrix-v1.json","sha256":"7ca4806b7f5d24428d3d2db7c29065c2d04f1529097bfd681eedd1ccb79154ae","cases":17,"transport":"mixed_release_evidence"}
