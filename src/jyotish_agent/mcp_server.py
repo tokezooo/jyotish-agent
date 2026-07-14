@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
@@ -15,7 +17,6 @@ from .mcp_models import (
     FinalizeResearchInput,
     InspectResearchInput,
     JaiminiMcpInput,
-    PrashnaMcpInput,
     ProfileInput,
     ProfileResult,
     ResearchBundle,
@@ -105,13 +106,14 @@ def build_server(facade: JyotishMcpFacade | None = None) -> FastMCP:
         description=(
             "Compute signed time-chart facts for one low-risk work/project status question. "
             "Use an explicit event anchor or capture_now with place; reuse the opaque anchor "
-            "token only for clarification. Governed interpretation is unavailable."
+            "token only for clarification. capture_now requires an idempotency_key and retries "
+            "are process-local for the 256 most recent identities. Governed interpretation is unavailable."
         ),
         annotations=READ_ONLY,
         structured_output=True,
     )
-    def prashna(request: PrashnaMcpInput) -> PrashnaResultModel:
-        return PrashnaResultModel(root=runtime.prashna(request))
+    def prashna(request: dict[str, Any]) -> PrashnaResultModel:
+        return PrashnaResultModel(root=runtime.prashna_payload(request))
 
     @server.tool(
         name="search_sources",

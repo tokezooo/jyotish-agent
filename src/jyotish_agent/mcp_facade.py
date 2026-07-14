@@ -6,7 +6,9 @@ import datetime as dt
 import json
 import os
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
+
+from pydantic import ValidationError
 
 from .hardening import reject_symlink_ancestors
 from .jaimini import JaiminiFacade
@@ -293,6 +295,33 @@ class JyotishMcpFacade:
     def prashna(self, value: PrashnaMcpInput) -> PrashnaResult:
         """Compute one stateless, sealed question-time Praśna result."""
         return PrashnaFacade(clock=self.clock).calculate(value)
+
+    def prashna_payload(self, value: dict[str, Any]) -> PrashnaResult:
+        """Sanitize adapter validation failures into the stable domain envelope."""
+        try:
+            parsed = PrashnaMcpInput.model_validate(value)
+        except ValidationError:
+            import hashlib
+
+            request_id = "prq_" + hashlib.sha256(
+                json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()
+            ).hexdigest()[:24]
+            from .error_registry import error_record
+            from .prashna_models import PrashnaNeedsInputResult
+
+            record = error_record(
+                "INPUT_INVALID", run_id=None, request_id=request_id,
+                mode="prashna", stage="input_validation",
+            )
+            fields = {
+                key: record[key]
+                for key in (
+                    "error_code", "request_id", "mode", "stage", "retryable",
+                    "problem", "cause", "fix", "next_action",
+                )
+            }
+            return PrashnaNeedsInputResult(status="needs_input", **fields)
+        return self.prashna(parsed)
 
     def search_sources(self, value: SourceSearchInput) -> SourceSearchResult:
         results = []

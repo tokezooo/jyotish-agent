@@ -30,7 +30,10 @@ def test_mcp_facade_prashna_is_stateless_and_clock_is_injected(tmp_path: Path):
     )
     before = facade.store.count_runs()
     result = facade.prashna(
-        PrashnaMcpInput(question="Что мешает моему проекту?", capture_now=True, place=PLACE)
+        PrashnaMcpInput(
+            question="Что мешает моему проекту?", capture_now=True, place=PLACE,
+            idempotency_key="mcp-facade-capture-0001",
+        )
     )
     assert result.status == "completed"
     assert facade.store.count_runs() == before
@@ -55,15 +58,23 @@ async def _stdio(tmp_path: Path):
                 "question": "What is blocking my work project right now?",
                 "capture_now": True,
                 "place": PLACE,
+                "idempotency_key": "stdio-capture-project-0001",
             }})
             token = captured.structuredContent["anchor_token"]
             en = await session.call_tool("prashna", {"request": {
-                "question": "Which obstacle in this work project is most visible?",
+                "question": "What is blocking my work project right now? Which obstacle is most visible?",
                 "anchor_token": token,
+                "clarification_of_fingerprint": captured.structuredContent["question_fingerprint"],
             }})
             mismatch = await session.call_tool("prashna", {"request": {
                 "question": "Will my relationship last?",
                 "anchor_token": token,
+            }})
+            invalid = await session.call_tool("prashna", {"request": {
+                "question": "SECRET PROJECT ORION",
+                "capture_now": True,
+                "idempotency_key": "stdio-secret-invalid-0001",
+                "place": {**PLACE, "name": "SECRET PLACE", "zone_id": "Etc/GMT-3"},
             }})
             after = list((tmp_path / "data").glob("**/*"))
     assert ru.isError is captured.isError is en.isError is mismatch.isError is False
@@ -71,6 +82,15 @@ async def _stdio(tmp_path: Path):
     assert captured.structuredContent["anchor_summary"].startswith("sealed question moment:")
     assert mismatch.structuredContent["error_code"] == "ANCHOR_MISMATCH"
     assert mismatch.structuredContent["next_action"] == "create_new_anchor"
+    assert invalid.isError is False
+    assert invalid.structuredContent["status"] == "needs_input"
+    assert invalid.structuredContent["error_code"] == "INPUT_INVALID"
+    for key in ("stage", "retryable", "problem", "cause", "fix", "next_action"):
+        assert key in invalid.structuredContent
+    invalid_text = json.dumps(invalid.structuredContent, ensure_ascii=False)
+    assert "SECRET PROJECT ORION" not in invalid_text
+    assert "SECRET PLACE" not in invalid_text
+    assert "55.7558" not in invalid_text
     assert before == after
     payload = json.dumps(ru.structuredContent, ensure_ascii=False)
     assert "Что сейчас" not in payload

@@ -13,11 +13,11 @@ RuleStatus = Literal["pass", "warn", "fail", "not_applicable"]
 
 
 class _Strict(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
 
 
 class _Frozen(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True)
+    model_config = ConfigDict(extra="forbid", frozen=True, hide_input_in_errors=True)
 
 
 class PrashnaRequest(_Strict):
@@ -26,23 +26,31 @@ class PrashnaRequest(_Strict):
     capture_now: bool = False
     place: EventPlace | None = None
     anchor_token: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    clarification_of_fingerprint: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    idempotency_key: str | None = Field(
+        default=None, pattern=r"^[A-Za-z0-9._:-]{16,128}$"
+    )
     rule_profile: PrashnaRuleProfileId = "prashna_work_v1"
     include_trace: bool = False
 
     @model_validator(mode="after")
     def anchor_lifecycle(self) -> "PrashnaRequest":
         if self.anchor_token is not None:
-            if self.anchor is not None or self.capture_now or self.place is not None:
+            if self.anchor is not None or self.capture_now or self.place is not None or self.idempotency_key is not None:
                 raise ValueError("follow-up supplies a token or new anchor, never both")
             return self
+        if self.clarification_of_fingerprint is not None:
+            raise ValueError("clarification_of_fingerprint requires an anchor token")
         if self.anchor is not None:
-            if self.capture_now or self.place is not None:
+            if self.capture_now or self.place is not None or self.idempotency_key is not None:
                 raise ValueError("explicit anchor and capture_now are mutually exclusive")
             return self
         if not self.capture_now:
             raise ValueError("a new request requires an anchor or capture_now")
         if self.place is None:
             raise ValueError("capture_now requires an event place")
+        if self.idempotency_key is None:
+            raise ValueError("capture_now requires an explicit idempotency_key")
         return self
 
 
@@ -96,11 +104,21 @@ class _BaseResult(_Strict):
     rule_profile: PrashnaRuleProfileId = "prashna_work_v1"
 
 
+class _ErrorResultBase(_BaseResult):
+    stage: str = Field(min_length=1, max_length=80)
+    retryable: bool
+    problem: str = Field(min_length=1, max_length=500)
+    cause: str = Field(min_length=1, max_length=500)
+    fix: str = Field(min_length=1, max_length=500)
+
+
 class PrashnaCompletedResult(_BaseResult):
     status: Literal["completed"]
     anchor_token: str = Field(pattern=r"^[0-9a-f]{64}$")
     anchor_summary: str = Field(max_length=200)
     question_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
+    current_question_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
+    question_relation: Literal["new_anchor", "exact_duplicate", "bounded_clarification"]
     facts: tuple[PrashnaFact, ...]
     rules: tuple[PrashnaRuleResult, ...] = Field(max_length=100)
     truncation: PrashnaTruncation
@@ -114,21 +132,21 @@ class PrashnaCompletedResult(_BaseResult):
     trace: tuple[PrashnaFact, ...] | None = Field(default=None, max_length=100)
 
 
-class PrashnaNeedsInputResult(_BaseResult):
+class PrashnaNeedsInputResult(_ErrorResultBase):
     status: Literal["needs_input"]
-    error_code: Literal["ANCHOR_MISMATCH", "TOPIC_UNSUPPORTED", "TOPIC_COMPOSITE"]
-    next_action: Literal["create_new_anchor", "provide_primary_question"]
+    error_code: Literal["ANCHOR_MISMATCH", "TOPIC_UNSUPPORTED", "TOPIC_COMPOSITE", "IDEMPOTENCY_CONFLICT", "INPUT_INVALID"]
+    next_action: Literal["create_new_anchor", "provide_primary_question", "use_new_idempotency_key", "correct_request"]
     supported_values: tuple[str, ...] = ("work_project_status_and_obstacles",)
 
 
-class PrashnaUnavailableResult(_BaseResult):
+class PrashnaUnavailableResult(_ErrorResultBase):
     status: Literal["unavailable"]
-    error_code: Literal["HIGH_STAKES_TOPIC", "INTERPRETATION_SOURCE_UNAVAILABLE"]
+    error_code: Literal["HIGH_STAKES_TOPIC", "INTERPRETATION_SOURCE_UNAVAILABLE", "GOVERNANCE_INTEGRITY_ERROR"]
     next_action: Literal["consult_qualified_professional", "inspect_source_status"]
     interpretation_status: Literal["unavailable"] = "unavailable"
 
 
-class PrashnaIncompleteResult(_BaseResult):
+class PrashnaIncompleteResult(_ErrorResultBase):
     status: Literal["incomplete"]
     error_code: Literal["ENGINE_CROSSCHECK_FAILED"]
     next_action: Literal["retry_calculation"] = "retry_calculation"

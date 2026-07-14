@@ -53,12 +53,18 @@ def test_explicit_anchor_calculates_bounded_signed_facts_and_fails_source_closed
     artifact = signing.get_cached_domain_artifact(result.artifact_token)
     assert artifact is not None and signing.verify_domain_artifact(artifact)
     assert artifact["mode"] == "prashna"
-    for field in ("normalized_anchor_sha256", "question_fingerprint", "rule_profile_sha256", "source_map_sha256", "facts", "rule_traces", "provenance"):
+    for field in ("normalized_anchor_sha256", "question_fingerprint", "current_question_fingerprint", "question_relation", "rule_profile_sha256", "source_map_sha256", "facts", "rule_traces", "provenance"):
         changed = copy.deepcopy(artifact)
         changed[field] = "0" * 64 if "sha256" in field or field == "question_fingerprint" else []
         assert signing.verify_domain_artifact(changed) is False
     assert interpretations.validate_prashna_answer(
-        [{"path": "prashna.topic.primary_house", "value": "10"}], result.artifact_token
+        [{
+            "claim_type": "computed_fact",
+            "path": "prashna.topic.primary_house",
+            "value": "10",
+            "text": "prashna.topic.primary_house = 10",
+        }],
+        result.artifact_token,
     ) == []
     assert interpretations.validate_prashna_answer([], result.artifact_token, interpretation_requested=True) == [
         "INTERPRETATION_SOURCE_UNAVAILABLE"
@@ -78,16 +84,19 @@ def test_exactly_once_now_capture_and_anchor_reuse_mismatch_and_tamper():
     initial = facade.calculate(
         PrashnaRequest(
             question="What is blocking my work project?",
-            capture_now=True,
-            place=place,
+                capture_now=True,
+                place=place,
+                idempotency_key="core-now-capture-0001",
         )
     )
     duplicate = facade.calculate(
         PrashnaRequest(question="What is blocking my work project?", anchor_token=initial.anchor_token)
     )
-    clarification = facade.calculate(
-        PrashnaRequest(question="Which obstacle in this project is most visible?", anchor_token=initial.anchor_token)
-    )
+    clarification = facade.calculate(PrashnaRequest(
+        question="What is blocking my work project? Which obstacle is most visible?",
+        anchor_token=initial.anchor_token,
+        clarification_of_fingerprint=initial.question_fingerprint,
+    ))
     mismatch = facade.calculate(
         PrashnaRequest(question="Will my relationship last?", anchor_token=initial.anchor_token)
     )

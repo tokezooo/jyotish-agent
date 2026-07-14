@@ -25,16 +25,16 @@ def test_profile_source_and_five_cases_are_checksum_bound_and_honestly_pending()
     profile = load_prashna_rule_profile()
     sources = load_prashna_source_map()
     fixtures = load_prashna_adjudication_fixtures()
-    assert profile["profile_id"] == sources["profile_id"] == "prashna_work_v1"
-    assert sources["rule_profile_sha256"] == prashna_rule_profile_sha256()
-    assert sources["review"] == {
+    assert profile.profile_id == sources.profile_id == "prashna_work_v1"
+    assert sources.rule_profile_sha256 == prashna_rule_profile_sha256()
+    assert sources.review.model_dump(mode="json") == {
         "status": "pending", "reviewer": None, "reviewer_role": None,
         "reason": "No licensed or public-domain Praśna interpretation corpus and no qualified human adjudication are admitted.",
     }
-    assert fixtures["gate_status"] == "pending"
-    assert fixtures["reviewer"] is fixtures["reviewer_role"] is None
-    assert len(fixtures["cases"]) == 5
-    assert all(case["review_status"] == "pending" for case in fixtures["cases"])
+    assert fixtures.gate_status == "pending"
+    assert fixtures.reviewer is fixtures.reviewer_role is None
+    assert len(fixtures.cases) == 5
+    assert all(case.review_status == "pending" for case in fixtures.cases)
 
 
 def test_concurrent_places_are_isolated_and_each_result_is_deterministic():

@@ -256,12 +256,14 @@ def iter_prashna_fact_atoms(facts: list[dict]) -> dict[str, str]:
 
 
 def validate_prashna_answer(
-    facts_used: list[dict],
+    claims: list[dict],
     artifact_token: str,
     *,
     interpretation_requested: bool = False,
     normalized_anchor_sha256: str | None = None,
     question_fingerprint: str | None = None,
+    current_question_fingerprint: str | None = None,
+    question_relation: str | None = None,
 ) -> list[str]:
     """Validate citations and keep Praśna doctrine fail-closed."""
     from .prashna_profiles import prashna_source_admission_evidence
@@ -275,6 +277,10 @@ def validate_prashna_answer(
         return ["ANCHOR_MISMATCH"]
     if question_fingerprint is not None and artifact.get("question_fingerprint") != question_fingerprint:
         return ["QUESTION_FINGERPRINT_MISMATCH"]
+    if current_question_fingerprint is not None and artifact.get("current_question_fingerprint") != current_question_fingerprint:
+        return ["CURRENT_QUESTION_FINGERPRINT_MISMATCH"]
+    if question_relation is not None and artifact.get("question_relation") != question_relation:
+        return ["QUESTION_RELATION_MISMATCH"]
     if interpretation_requested:
         admission = prashna_source_admission_evidence()
         if not admission["verified"]:
@@ -284,8 +290,17 @@ def validate_prashna_answer(
         return ["INTERPRETATION_RENDERER_UNAVAILABLE"]
     atoms = iter_prashna_fact_atoms(artifact.get("facts", []))
     violations: list[str] = []
-    for ref in facts_used:
-        path, value = str(ref.get("path", "")).strip(), str(ref.get("value", "")).strip()
+    for claim in claims:
+        if not isinstance(claim, dict) or set(claim) != {"claim_type", "path", "value", "text"}:
+            violations.append("INVALID_CLAIM_STRUCTURE")
+            continue
+        if claim.get("claim_type") != "computed_fact":
+            violations.append("UNSUPPORTED_CLAIM_TYPE")
+            continue
+        path, value = str(claim["path"]).strip(), str(claim["value"]).strip()
+        if claim.get("text") != f"{path} = {value}":
+            violations.append(f"UNSUPPORTED_CLAIM_TEXT:{path}")
+            continue
         if path not in atoms:
             violations.append(f"FACT_NOT_IN_ARTIFACT:{path}")
         elif not _values_match(value, atoms[path]):

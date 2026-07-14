@@ -6,13 +6,16 @@ import datetime as dt
 import hashlib
 import json
 import re
+import threading
 import unicodedata
+from collections import OrderedDict
 from dataclasses import dataclass
 from typing import Callable, Literal
 from zoneinfo import ZoneInfo
 
 from . import ENGINE_VERSION, names
-from .config import CalculationConfig
+from .config import CalculationConfig, ConfigError
+from .error_registry import error_record
 from .event_models import EventAnchor, EventPlace
 from .prashna_models import (
     PrashnaCompletedResult,
@@ -27,14 +30,16 @@ from .prashna_models import (
     PrashnaUnavailableResult,
 )
 from .prashna_profiles import (
+    PrashnaGovernanceError,
+    PrashnaRuleProfile,
     load_prashna_rule_profile,
     load_prashna_source_map,
     prashna_rule_profile_sha256,
     prashna_source_admission_evidence,
     prashna_source_map_sha256,
 )
-from .pyjhora_facade import BirthProfile, _run_engine_session
-from .signing import cache_domain_artifact, get_cached_domain_artifact, verify_domain_artifact
+from .pyjhora_facade import BirthProfile, EngineOutputError, _run_engine_session
+from .signing import cache_domain_artifact, get_cached_domain_artifact, sign_facts, verify_domain_artifact
 
 _WORD = re.compile(r"[^\w]+", re.UNICODE)
 _WORK = ("work", "project", "job", "career", "business", "founder", "startup", "работ", "проект", "карьер", "бизнес", "стартап", "делов")
@@ -75,7 +80,8 @@ def _contains_any(text: str, fragments: tuple[str, ...]) -> bool:
     return any(fragment in text for fragment in fragments)
 
 
-def route_prashna_topic(question: str) -> TopicRoute:
+def route_prashna_topic(question: str, profile: PrashnaRuleProfile | None = None) -> TopicRoute:
+    profile = profile or load_prashna_rule_profile()
     normalized = _normalized_question(question)
     if _contains_any(normalized, _HIGH_STAKES):
         return TopicRoute("high_stakes")
@@ -84,7 +90,12 @@ def route_prashna_topic(question: str) -> TopicRoute:
     if work and relationship:
         return TopicRoute("composite")
     if work:
-        return TopicRoute("supported", "work_project_status_and_obstacles", 10, (6, 11))
+        return TopicRoute(
+            "supported",
+            profile.question_family,
+            profile.primary_house,
+            profile.secondary_houses,
+        )
     return TopicRoute("unsupported")
 
 
@@ -128,6 +139,57 @@ def _request_id(fingerprint: str, anchor_hash: str) -> str:
     return "prq_" + hashlib.sha256(f"{fingerprint}:{anchor_hash}".encode()).hexdigest()[:24]
 
 
+@dataclass(frozen=True)
+class _CaptureRecord:
+    material_sha256: str
+    anchor_data: dict
+    anchor_token: str
+
+
+_CAPTURE_CACHE: "OrderedDict[str, _CaptureRecord]" = OrderedDict()
+_CAPTURE_CACHE_MAX = 256
+_CAPTURE_LOCK = threading.Lock()
+
+
+class _IdempotencyConflict(ValueError):
+    pass
+
+
+class _PrashnaEngineFailure(RuntimeError):
+    pass
+
+
+def _error_fields(code: str, *, request_id: str, stage: str) -> dict:
+    record = error_record(
+        code,
+        run_id=None,
+        request_id=request_id,
+        mode="prashna",
+        stage=stage,
+    )
+    return {
+        key: record[key]
+        for key in (
+            "error_code", "request_id", "mode", "stage", "retryable",
+            "problem", "cause", "fix", "next_action",
+        )
+    }
+
+
+def _provable_clarification(original: str, current: str) -> bool:
+    """Allow only the exact original normalized question plus a short suffix."""
+    if not current.startswith(original + " "):
+        return False
+    suffix = current[len(original):].strip().split()
+    allowed = {
+        "which", "obstacle", "is", "most", "visible", "strongest", "primary",
+        "now", "please", "clarify", "detail", "what", "does", "this", "mean",
+        "какое", "препятствие", "сейчас", "самое", "заметное", "главное",
+        "уточни", "поясни", "пожалуйста", "что", "это", "значит",
+    }
+    return 2 <= len(suffix) <= 20 and set(suffix) <= allowed
+
+
 class PrashnaFacade:
     def __init__(self, *, clock: Callable[[], dt.datetime] | None = None):
         self._clock = clock or (lambda: dt.datetime.now(dt.UTC))
@@ -141,9 +203,85 @@ class PrashnaFacade:
         if place.fold is None and local.fold:
             effective_place = place.model_copy(update={"fold": local.fold})
         return EventAnchor(
-            asked_at=local,
+            asked_at=local.isoformat(timespec="microseconds"),
             place=effective_place,
             time_confidence="captured_now",
+        )
+
+    def _capture_idempotently(
+        self,
+        request: PrashnaRequest,
+        *,
+        fingerprint: str,
+        route: TopicRoute,
+    ) -> tuple[EventAnchor, str]:
+        assert request.place is not None and request.idempotency_key is not None
+        identity = sign_facts({
+            "mode": "prashna_capture_identity",
+            "idempotency_key": request.idempotency_key,
+        })
+        material_sha256 = _sha({
+            "question_fingerprint": fingerprint,
+            "place": request.place.model_dump(mode="json"),
+            "rule_profile": request.rule_profile,
+        })
+        with _CAPTURE_LOCK:
+            cached = _CAPTURE_CACHE.get(identity)
+            if cached is not None:
+                if cached.material_sha256 != material_sha256:
+                    raise _IdempotencyConflict
+                _CAPTURE_CACHE.move_to_end(identity)
+                resealed = self._seal_anchor(
+                    cached.anchor_data,
+                    fingerprint=fingerprint,
+                    normalized_question=_normalized_question(request.question),
+                    route=route,
+                    rule_profile=request.rule_profile,
+                )
+                return (
+                    EventAnchor(
+                        asked_at=cached.anchor_data["asked_at"],
+                        place=cached.anchor_data["place"],
+                        time_confidence=cached.anchor_data["time_confidence"],
+                    ),
+                    resealed["artifact_token"],
+                )
+            anchor = self._capture(request.place)
+            anchor_data = _anchor_payload(anchor)
+            sealed = self._seal_anchor(
+                anchor_data,
+                fingerprint=fingerprint,
+                normalized_question=_normalized_question(request.question),
+                route=route,
+                rule_profile=request.rule_profile,
+            )
+            record = _CaptureRecord(material_sha256, anchor_data, sealed["artifact_token"])
+            _CAPTURE_CACHE[identity] = record
+            _CAPTURE_CACHE.move_to_end(identity)
+            while len(_CAPTURE_CACHE) > _CAPTURE_CACHE_MAX:
+                _CAPTURE_CACHE.popitem(last=False)
+            return anchor, record.anchor_token
+
+    @staticmethod
+    def _seal_anchor(
+        anchor_data: dict,
+        *,
+        fingerprint: str,
+        normalized_question: str,
+        route: TopicRoute,
+        rule_profile: str,
+    ) -> dict:
+        return cache_domain_artifact(
+            {
+                "mode": "prashna_anchor",
+                "normalized_anchor": anchor_data,
+                "normalized_anchor_sha256": _sha(anchor_data),
+                "question_fingerprint": fingerprint,
+                "normalized_question": normalized_question,
+                "topic_family": route.family,
+                "rule_profile": rule_profile,
+                "rule_profile_sha256": prashna_rule_profile_sha256(),
+            }
         )
 
     @staticmethod
@@ -151,32 +289,55 @@ class PrashnaFacade:
         if route.status == "high_stakes":
             return PrashnaUnavailableResult(
                 status="unavailable",
-                request_id=request_id,
-                error_code="HIGH_STAKES_TOPIC",
-                next_action="consult_qualified_professional",
+                **_error_fields("HIGH_STAKES_TOPIC", request_id=request_id, stage="topic_routing"),
             )
+        code = "TOPIC_COMPOSITE" if route.status == "composite" else "TOPIC_UNSUPPORTED"
         return PrashnaNeedsInputResult(
             status="needs_input",
-            request_id=request_id,
-            error_code="TOPIC_COMPOSITE" if route.status == "composite" else "TOPIC_UNSUPPORTED",
-            next_action="provide_primary_question",
+            **_error_fields(code, request_id=request_id, stage="topic_routing"),
         )
 
     @staticmethod
     def _mismatch(fingerprint: str) -> PrashnaNeedsInputResult:
         return PrashnaNeedsInputResult(
             status="needs_input",
-            request_id="prq_" + fingerprint[:24],
-            error_code="ANCHOR_MISMATCH",
-            next_action="create_new_anchor",
+            **_error_fields(
+                "ANCHOR_MISMATCH",
+                request_id="prq_" + fingerprint[:24],
+                stage="anchor_reuse",
+            ),
         )
 
     def calculate(self, request: PrashnaRequest) -> PrashnaResult:
         current_fingerprint = question_fingerprint(request.question)
-        route = route_prashna_topic(request.question)
+        try:
+            profile = load_prashna_rule_profile()
+            route = route_prashna_topic(request.question, profile)
+        except PrashnaGovernanceError:
+            return PrashnaUnavailableResult(
+                status="unavailable",
+                **_error_fields(
+                    "GOVERNANCE_INTEGRITY_ERROR",
+                    request_id="prq_" + current_fingerprint[:24],
+                    stage="governance",
+                ),
+            )
+
+        if request.anchor_token is None and route.status != "supported":
+            return self._rescue(route, "prq_" + current_fingerprint[:24])
 
         if request.anchor_token is not None:
             sealed = get_cached_domain_artifact(request.anchor_token)
+            original_fingerprint = None if sealed is None else str(sealed.get("question_fingerprint", ""))
+            exact = current_fingerprint == original_fingerprint
+            clarified = bool(
+                sealed is not None
+                and request.clarification_of_fingerprint == original_fingerprint
+                and _provable_clarification(
+                    str(sealed.get("normalized_question", "")),
+                    _normalized_question(request.question),
+                )
+            )
             if (
                 sealed is None
                 or not verify_domain_artifact(sealed)
@@ -184,6 +345,7 @@ class PrashnaFacade:
                 or sealed.get("rule_profile") != request.rule_profile
                 or route.status != "supported"
                 or route.family != sealed.get("topic_family")
+                or not (exact or clarified)
             ):
                 return self._mismatch(current_fingerprint)
             anchor_data = sealed["normalized_anchor"]
@@ -194,26 +356,36 @@ class PrashnaFacade:
             )
             anchor_token = request.anchor_token
             fingerprint = str(sealed["question_fingerprint"])
+            relation = "exact_duplicate" if exact else "bounded_clarification"
         else:
-            anchor = request.anchor if request.anchor is not None else self._capture(request.place)  # type: ignore[arg-type]
+            try:
+                if request.anchor is not None:
+                    anchor = request.anchor
+                    anchor_data = _anchor_payload(anchor)
+                    sealed = self._seal_anchor(
+                        anchor_data,
+                        fingerprint=current_fingerprint,
+                        normalized_question=_normalized_question(request.question),
+                        route=route,
+                        rule_profile=request.rule_profile,
+                    )
+                    anchor_token = sealed["artifact_token"]
+                else:
+                    anchor, anchor_token = self._capture_idempotently(
+                        request, fingerprint=current_fingerprint, route=route
+                    )
+            except _IdempotencyConflict:
+                return PrashnaNeedsInputResult(
+                    status="needs_input",
+                    **_error_fields(
+                        "IDEMPOTENCY_CONFLICT",
+                        request_id="prq_" + current_fingerprint[:24],
+                        stage="anchor_capture",
+                    ),
+                )
             anchor_data = _anchor_payload(anchor)
-            anchor_hash = _sha(anchor_data)
-            preliminary_id = _request_id(current_fingerprint, anchor_hash)
-            if route.status != "supported":
-                return self._rescue(route, preliminary_id)
-            sealed = cache_domain_artifact(
-                {
-                    "mode": "prashna_anchor",
-                    "normalized_anchor": anchor_data,
-                    "normalized_anchor_sha256": anchor_hash,
-                    "question_fingerprint": current_fingerprint,
-                    "topic_family": route.family,
-                    "rule_profile": request.rule_profile,
-                    "rule_profile_sha256": prashna_rule_profile_sha256(),
-                }
-            )
-            anchor_token = sealed["artifact_token"]
             fingerprint = current_fingerprint
+            relation = "new_anchor"
 
         anchor_data = _anchor_payload(anchor)
         anchor_hash = _sha(anchor_data)
@@ -230,12 +402,27 @@ class PrashnaFacade:
                 fingerprint=fingerprint,
                 request_id=request_id,
                 route=route,
+                rule_profile=profile,
+                current_fingerprint=current_fingerprint,
+                question_relation=relation,
             )
-        except Exception:
+        except _PrashnaEngineFailure:
             return PrashnaIncompleteResult(
                 status="incomplete",
-                request_id=request_id,
-                error_code="ENGINE_CROSSCHECK_FAILED",
+                **_error_fields(
+                    "ENGINE_CROSSCHECK_FAILED",
+                    request_id=request_id,
+                    stage="calculation",
+                ),
+            )
+        except PrashnaGovernanceError:
+            return PrashnaUnavailableResult(
+                status="unavailable",
+                **_error_fields(
+                    "GOVERNANCE_INTEGRITY_ERROR",
+                    request_id=request_id,
+                    stage="governance",
+                ),
             )
 
     def _calculate_supported(
@@ -249,10 +436,13 @@ class PrashnaFacade:
         fingerprint: str,
         request_id: str,
         route: TopicRoute,
+        rule_profile: PrashnaRuleProfile,
+        current_fingerprint: str,
+        question_relation: str,
     ) -> PrashnaCompletedResult:
         resolved = anchor.resolved()
         local = resolved.utc_instant.astimezone(ZoneInfo(anchor.place.zone_id))
-        profile = BirthProfile(
+        engine_profile = BirthProfile(
             name="event-anchor",
             date=(local.year, local.month, local.day),
             time=(local.hour, local.minute, local.second),
@@ -260,12 +450,15 @@ class PrashnaFacade:
             longitude=anchor.place.longitude,
             timezone=resolved.offset_minutes / 60,
         )
-        session = _run_engine_session(
-            profile,
-            (local.year, local.month, local.day),
-            CalculationConfig(charts=("D1",)),
-            domain_callback=lambda snapshot: snapshot,
-        )
+        try:
+            session = _run_engine_session(
+                engine_profile,
+                (local.year, local.month, local.day),
+                CalculationConfig(charts=("D1",)),
+                domain_callback=lambda snapshot: snapshot,
+            )
+        except (ConfigError, EngineOutputError, ArithmeticError) as exc:
+            raise _PrashnaEngineFailure from exc
         chart = session.natal["facts"]
         ascendant = chart["ascendant"]
         placements = chart["d1"]
@@ -345,29 +538,46 @@ class PrashnaFacade:
             )
         facts.sort(key=lambda item: item.fact_id)
 
-        rules = tuple(sorted((
-            PrashnaRuleResult(
-                rule_id="prashna.readability.anchor_complete", version="1.0.0",
-                status="pass", severity="info", inputs=("normalized_utc", "zone_id", "place"),
-                outputs=("sealed",), source_status="not_required",
+        definitions = {rule.rule_id: rule for rule in rule_profile.rules}
+
+        def evaluated_rule(
+            rule_id: str,
+            *,
+            status: str,
+            severity: str,
+            inputs: tuple[str, ...],
+            outputs: tuple[str, ...],
+        ) -> PrashnaRuleResult:
+            definition = definitions[rule_id]
+            return PrashnaRuleResult(
+                rule_id=definition.rule_id,
+                version=definition.version,
+                status=status,
+                severity=severity,
+                inputs=inputs,
+                outputs=outputs,
+                source_status=definition.source_status,
+            )
+
+        all_rules = tuple(sorted((
+            evaluated_rule(
+                "prashna.readability.anchor_complete", status="pass", severity="info",
+                inputs=("normalized_utc", "zone_id", "place"), outputs=("sealed",),
             ),
-            PrashnaRuleResult(
-                rule_id="prashna.readability.single_topic", version="1.0.0",
-                status="pass", severity="info", inputs=(route.family or "",),
-                outputs=("house_10",), source_status="not_required",
+            evaluated_rule(
+                "prashna.readability.single_topic", status="pass", severity="info",
+                inputs=(route.family or "",), outputs=(f"house_{rule_profile.primary_house}",),
             ),
-            PrashnaRuleResult(
-                rule_id="prashna.geometry.applying_separating", version="1.0.0",
-                status="not_applicable", severity="warning", inputs=(),
-                outputs=("unsupported_by_verified_primitive",), source_status="pending",
+            evaluated_rule(
+                "prashna.geometry.applying_separating", status="not_applicable", severity="warning",
+                inputs=(), outputs=("unsupported_by_verified_primitive",),
             ),
-            PrashnaRuleResult(
-                rule_id="prashna.radicality.source_gate", version="1.0.0",
-                status="not_applicable", severity="warning", inputs=(),
-                outputs=("no_admitted_doctrinal_rule",), source_status="pending",
+            evaluated_rule(
+                "prashna.radicality.source_gate", status="not_applicable", severity="warning",
+                inputs=(), outputs=("no_admitted_doctrinal_rule",),
             ),
         ), key=lambda item: item.rule_id))
-        profile = load_prashna_rule_profile()
+        rules = all_rules[:rule_profile.rule_result_limit]
         source_map = load_prashna_source_map()
         provenance = PrashnaProvenance(
             normalized_utc=anchor_data["normalized_utc"],
@@ -379,7 +589,7 @@ class PrashnaFacade:
             ephemeris_mode=session.snapshot.ephemeris_mode,
             rule_profile_sha256=prashna_rule_profile_sha256(),
             source_map_sha256=prashna_source_map_sha256(),
-            source_review_status=source_map["review"]["status"],
+            source_review_status=source_map.review.status,
         )
         source_evidence = prashna_source_admission_evidence()
         fact_payload = [item.model_dump(mode="json") for item in facts]
@@ -389,6 +599,8 @@ class PrashnaFacade:
                 "mode": "prashna",
                 "normalized_anchor_sha256": anchor_hash,
                 "question_fingerprint": fingerprint,
+                "current_question_fingerprint": current_fingerprint,
+                "question_relation": question_relation,
                 "rule_profile": request.rule_profile,
                 "rule_profile_sha256": prashna_rule_profile_sha256(),
                 "source_map_sha256": prashna_source_map_sha256(),
@@ -409,13 +621,20 @@ class PrashnaFacade:
             anchor_token=anchor_token,
             anchor_summary=f"sealed question moment: {anchor_data['normalized_utc']}; {anchor_data['zone_id']}",
             question_fingerprint=fingerprint,
+            current_question_fingerprint=current_fingerprint,
+            question_relation=question_relation,
             facts=tuple(facts),
             rules=rules,
-            truncation=PrashnaTruncation(truncated=False, total_count=len(rules), returned_count=len(rules)),
+            truncation=PrashnaTruncation(
+                truncated=len(rules) < len(all_rules),
+                total_count=len(all_rules),
+                returned_count=len(rules),
+            ),
             limitations=(
                 "Computed chart and geometry facts only; governed Praśna interpretation is unavailable.",
                 "Applying/separating geometry is unavailable because no independently verified primitive is admitted.",
-                "KP-249, KP-108 and Nāḍi lagna methods are unsupported.",
+                "Unsupported lagna methods: " + ", ".join(rule_profile.unsupported_lagna_methods) + ".",
+                "Captured-now retry idempotency is process-local and bounded to the 256 most recent identities.",
             ),
             provenance=provenance,
             artifact_id=artifact["artifact_id"],

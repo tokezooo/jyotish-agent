@@ -48,6 +48,20 @@ ERROR_REGISTRY: dict[str, dict[str, Any]] = {
         "fix": "Use an appropriate qualified professional instead of a deterministic prediction.",
         "next_action": "consult_qualified_professional",
     },
+    "IDEMPOTENCY_CONFLICT": {
+        "retryable": False,
+        "problem": "The capture identity is already bound to different request material.",
+        "cause": "An idempotency key was reused for another question, place, or rule profile.",
+        "fix": "Use a new privacy-safe idempotency key for the new question anchor.",
+        "next_action": "use_new_idempotency_key",
+    },
+    "GOVERNANCE_INTEGRITY_ERROR": {
+        "retryable": False,
+        "problem": "The Praśna governance pack failed validation.",
+        "cause": "A frozen rule profile, source map, or adjudication checksum is inconsistent.",
+        "fix": "Restore the committed governance package and inspect its source status.",
+        "next_action": "inspect_source_status",
+    },
     "SEARCH_RANGE_TOO_LARGE": {
         "retryable": False,
         "problem": "The requested search range exceeds the supported maximum.",
@@ -105,6 +119,7 @@ ERROR_REGISTRY: dict[str, dict[str, Any]] = {
         "problem": "The run operation payload is invalid or incomplete.",
         "cause": "One or more required operation fields failed schema validation.",
         "fix": "Correct the payload for this run stage and resubmit it.",
+        "next_action": "correct_request",
     },
     "UNSUPPORTED_SCHEMA_VERSION": {
         "retryable": False,
