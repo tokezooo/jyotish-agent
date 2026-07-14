@@ -1,0 +1,25 @@
+{
+  "schema_version": "1.0",
+  "examples": [
+    {
+      "example_id": "kalaprakasika_traveller_zodiac_sunday",
+      "source_id": "kalaprakasika_1982",
+      "profile": "low_risk_travel_planning",
+      "example_kind": "worked_rule_illustration",
+      "source_pdf_pages": [178],
+      "source_printed_pages": [146],
+      "rule_topics": ["traveller_zodiac_calculation"],
+      "observed_outcome_claimed": false
+    },
+    {
+      "example_id": "kalaprakasika_ekargala_business",
+      "source_id": "kalaprakasika_1982",
+      "profile": "product_launch_communication",
+      "example_kind": "worked_rule_illustration",
+      "source_pdf_pages": [201, 202],
+      "source_printed_pages": [169, 170],
+      "rule_topics": ["ekargala_business_illustration"],
+      "observed_outcome_claimed": false
+    }
+  ]
+}
