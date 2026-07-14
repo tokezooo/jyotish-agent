@@ -59,6 +59,6 @@ async def _stdio_initializes_lists_and_calls_profile(tmp_path: Path):
             result = await session.call_tool("get_profile", {"request": {}})
 
     assert initialized.serverInfo.name == "jyotish"
-    assert len(tools.tools) == 6
+    assert len(tools.tools) == 9
     assert result.isError is False
     assert result.structuredContent["profile"]["name"] == "Vlad"

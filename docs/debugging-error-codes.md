@@ -14,12 +14,31 @@ text, prompts, tokens, or rendered answers.
 | `UNEXPECTED_INTERNAL` | privacy-safe unexpected failure | once |
 | `INPUT_INVALID` | malformed run-stage operation payload | no; correct payload |
 | `UNSUPPORTED_CONTRACT_VERSION` | create requested a contract other than server-owned 2.0 | no; omit it or use 2.0 |
+| `EVENT_TIME_REQUIRED` | explicit timezone-aware event time is absent | no; `confirm_anchor` |
+| `EVENT_PLACE_REQUIRED` | event latitude/longitude is absent | no; `provide_event_place` |
+| `ANCHOR_MISMATCH` | follow-up anchor differs from the active anchor | no; `create_new_anchor` |
+| `SEARCH_RANGE_TOO_LARGE` | bounded search maximum was exceeded | no; `narrow_search_range` |
+| `RULE_PROFILE_UNSUPPORTED` | no exact versioned profile matches | no; select a supported profile |
+| `ENGINE_CROSSCHECK_FAILED` | an invariant or independent check failed | once; inspect by request ID |
+| `BIRTH_TIME_RANGE_REQUIRED` | approximate birth range is absent, reversed, or over 120 minutes | no; `provide_birth_range` |
+| `ANCHOR_STALE` | sealed Praśna material no longer matches timezone/config/rules | no; `create_new_anchor` |
+| `TOPIC_UNSUPPORTED` / `TOPIC_COMPOSITE` | no single admitted work/project topic | no; `provide_primary_question` |
+| `IDEMPOTENCY_CONFLICT` | capture key is bound to other request material | no; `use_new_idempotency_key` |
+| `HIGH_STAKES_TOPIC` / `HIGH_STAKES_ACTIVITY` | request crosses the low-risk boundary | no; qualified professional |
+| `ACTIVITY_UNSUPPORTED` | Muhurta activity is outside general/focused work | no; select supported activity |
+| `CIVIL_DATE_UNAVAILABLE` | an IANA transition skipped a requested civil date | no; narrow range |
+| `SEARCH_CANCELLED` / `SEARCH_DEADLINE_EXCEEDED` | cooperative search stopped | no; narrow/retry |
+| `CANDIDATE_LIMIT_EXCEEDED` | partition exceeds 5,000 candidates | no; narrow range |
+| `GOVERNANCE_INTEGRITY_ERROR` | frozen profile/source/fixture checksums disagree | no; restore and inspect source status |
 
 Endpoint-specific codes such as `TIMEZONE_OFFSET_MISMATCH`,
 `AMBIGUOUS_LOCAL_TIME`, `NONEXISTENT_LOCAL_TIME`, `PINNED_VERSION_MISMATCH`, and
 `PROJECTION_HASH_MISMATCH` retain their stable names. Start with `jyotish run inspect
 <rr_id> --json`, verify the event chain and pinned versions, then use offline replay.
 Do not paste private inputs into bug reports.
+For additive tools, retain only the stable request ID/error code. Never retain anchor
+tokens, fingerprints, question text, place, coordinates, event/birth times, profile
+labels, or rule traces in metrics or tickets.
 
 Registry causes are controlled static text. SQLite `busy`/`locked` failures map to
 `SQLITE_BUSY`; `CorpusIntegrityError` maps to `CORPUS_INTEGRITY_ERROR`; exception
@@ -29,3 +48,6 @@ Run-scoped handlers preserve a known run ID and the requested `screen`, `plan`,
 `calculate`, `retrieve`, `answer`, or `replay` stage.
 `RUN_NOT_FOUND`, `OPERATION_CONFLICT`, and `UNSUPPORTED_TIMEZONE` use the same
 controlled registry envelope; route-local problem builders do not invent codes.
+New domain records add `request_id`, `mode`, `next_action`, `invalid_fields`, and
+`supported_values` only when applicable. Legacy registry calls retain their exact
+seven-field envelope.

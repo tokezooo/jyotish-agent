@@ -18,6 +18,8 @@ import re
 from enum import Enum
 
 from .names import PLANETS, SIGNS
+from .rule_profiles import jaimini_source_admission_evidence
+from .signing import get_cached_domain_artifact, verify_domain_artifact
 
 _DIVISIONAL_KEY = re.compile(r"^d\d+$")
 
@@ -218,6 +220,217 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
                 atoms[f"vimshottari.{level}.{field}"] = str(period[field])
 
     return atoms
+
+
+def iter_jaimini_fact_atoms(facts: list[dict]) -> dict[str, str]:
+    """Project a bounded Jaimini artifact fact list into citable atoms."""
+    atoms: dict[str, str] = {}
+    for fact in facts:
+        if not isinstance(fact, dict):
+            continue
+        path = fact.get("fact_id")
+        value = fact.get("value")
+        if (
+            isinstance(path, str)
+            and path.startswith("jaimini.")
+            and isinstance(value, (str, int, float, bool))
+        ):
+            if path in atoms:
+                raise ValueError(f"DUPLICATE_JAIMINI_FACT_ID:{path}")
+            atoms[path] = "true" if value is True else "false" if value is False else str(value)
+    return atoms
+
+
+def iter_prashna_fact_atoms(facts: list[dict]) -> dict[str, str]:
+    """Project signed deterministic Praśna facts; reject duplicate identities."""
+    atoms: dict[str, str] = {}
+    for fact in facts:
+        if not isinstance(fact, dict):
+            continue
+        path, value = fact.get("fact_id"), fact.get("value")
+        if isinstance(path, str) and path.startswith("prashna.") and isinstance(value, (str, int, float, bool)):
+            if path in atoms:
+                raise ValueError(f"DUPLICATE_PRASHNA_FACT_ID:{path}")
+            atoms[path] = "true" if value is True else "false" if value is False else str(value)
+    return atoms
+
+
+def iter_muhurta_fact_atoms(facts: list[dict]) -> dict[str, str]:
+    """Project signed Muhūrta calculations and reject ambiguous duplicate IDs."""
+    atoms: dict[str, str] = {}
+    for fact in facts:
+        if not isinstance(fact, dict):
+            continue
+        path, value = fact.get("fact_id"), fact.get("value")
+        if isinstance(path, str) and path.startswith("muhurta.") and isinstance(value, (str, int, float, bool)):
+            if path in atoms:
+                raise ValueError(f"DUPLICATE_MUHURTA_FACT_ID:{path}")
+            atoms[path] = "true" if value is True else "false" if value is False else str(value)
+    return atoms
+
+
+def validate_muhurta_answer(submission: object) -> list[str]:
+    """Enforce a complete facts-only answer over one signed search/window set."""
+    from pydantic import ValidationError
+
+    from .muhurta_models import MuhurtaAnswerSubmission
+
+    try:
+        value = submission if isinstance(submission, MuhurtaAnswerSubmission) else MuhurtaAnswerSubmission.model_validate(submission)
+    except ValidationError:
+        return ["INVALID_ANSWER_SUBMISSION"]
+    artifact = get_cached_domain_artifact(value.artifact_token)
+    if artifact is None:
+        return ["ARTIFACT_NOT_FOUND"]
+    if not verify_domain_artifact(artifact) or artifact.get("mode") != "muhurta":
+        return ["ARTIFACT_INVALID"]
+    if artifact.get("artifact_id") != value.artifact_id:
+        return ["ARTIFACT_ID_MISMATCH"]
+    if artifact.get("artifact_sha256") != value.artifact_sha256:
+        return ["ARTIFACT_SHA256_MISMATCH"]
+    from . import muhurta_profiles
+    from .config import ephemeris_mode
+    from .muhurta import muhurta_config_sha256
+
+    admission = muhurta_profiles.muhurta_source_admission_evidence()
+    current = {
+        "config_sha256": muhurta_config_sha256(),
+        "rule_profile_sha256": muhurta_profiles.muhurta_rule_profile_sha256(),
+        "source_map_sha256": muhurta_profiles.muhurta_source_map_sha256(),
+        "source_admission_sha256": admission["sha256"],
+        "ephemeris_mode": ephemeris_mode(),
+    }
+    if any(artifact.get(key) != expected for key, expected in current.items()):
+        return ["STALE_RUNTIME_MATERIAL"]
+    profile = muhurta_profiles.load_muhurta_rule_profile()
+    expected_rules = {rule.rule_id: rule for rule in profile.rules}
+    profile_traces = artifact.get("profile_rule_traces")
+    if not isinstance(profile_traces, list) or len(profile_traces) != len(expected_rules):
+        return ["ARTIFACT_RULE_COVERAGE_INVALID"]
+    traced: dict[str, dict] = {}
+    for trace in profile_traces:
+        if not isinstance(trace, dict) or not isinstance(trace.get("rule_id"), str) or trace["rule_id"] in traced:
+            return ["ARTIFACT_RULE_COVERAGE_INVALID"]
+        traced[trace["rule_id"]] = trace
+    if set(traced) != set(expected_rules) or any(
+        traced[rule_id].get("classification") != definition.classification
+        or traced[rule_id].get("source_status") != definition.source_status
+        for rule_id, definition in expected_rules.items()
+    ):
+        return ["ARTIFACT_RULE_COVERAGE_INVALID"]
+    if artifact.get("search_range_sha256") != value.search_range_sha256:
+        return ["SEARCH_RANGE_MISMATCH"]
+    if tuple(artifact.get("window_ids", ())) != value.window_ids:
+        return ["WINDOW_IDS_MISMATCH"]
+    try:
+        atoms = iter_muhurta_fact_atoms(artifact.get("facts", []))
+    except ValueError as exc:
+        return [str(exc)]
+    seen: set[str] = set()
+    violations: list[str] = []
+    for claim in value.claims:
+        if claim.path in seen:
+            return [f"DUPLICATE_CLAIM:{claim.path}"]
+        seen.add(claim.path)
+        if claim.text != f"{claim.path} = {claim.value}":
+            violations.append(f"UNSUPPORTED_CLAIM_TEXT:{claim.path}")
+        elif claim.path not in atoms:
+            violations.append(f"FACT_NOT_IN_ARTIFACT:{claim.path}")
+        elif not _values_match(claim.value, atoms[claim.path]):
+            violations.append(f"FACT_VALUE_MISMATCH:{claim.path}")
+    if value.visible_text != "\n".join(claim.text for claim in value.claims):
+        return ["UNSUPPORTED_VISIBLE_TEXT"]
+    return violations
+
+
+def validate_prashna_answer(submission: object) -> list[str]:
+    """Validate one complete canonical facts-only answer and all replay bindings."""
+    from pydantic import ValidationError
+
+    from .prashna_models import PrashnaAnswerSubmission
+
+    try:
+        value = (
+            submission
+            if isinstance(submission, PrashnaAnswerSubmission)
+            else PrashnaAnswerSubmission.model_validate(submission)
+        )
+    except ValidationError:
+        return ["INVALID_ANSWER_SUBMISSION"]
+
+    artifact = get_cached_domain_artifact(value.artifact_token)
+    if artifact is None:
+        return ["ARTIFACT_NOT_FOUND"]
+    if not verify_domain_artifact(artifact) or artifact.get("mode") != "prashna":
+        return ["ARTIFACT_INVALID"]
+    if artifact.get("artifact_id") != value.artifact_id:
+        return ["ARTIFACT_ID_MISMATCH"]
+    if artifact.get("artifact_sha256") != value.artifact_sha256:
+        return ["ARTIFACT_SHA256_MISMATCH"]
+    if artifact.get("anchor_token") != value.anchor_token:
+        return ["ANCHOR_TOKEN_MISMATCH"]
+    if artifact.get("normalized_anchor_sha256") != value.normalized_anchor_sha256:
+        return ["ANCHOR_MISMATCH"]
+    if artifact.get("question_fingerprint") != value.question_fingerprint:
+        return ["QUESTION_FINGERPRINT_MISMATCH"]
+    if artifact.get("current_question_fingerprint") != value.current_question_fingerprint:
+        return ["CURRENT_QUESTION_FINGERPRINT_MISMATCH"]
+    if artifact.get("question_relation") != value.question_relation:
+        return ["QUESTION_RELATION_MISMATCH"]
+    atoms = iter_prashna_fact_atoms(artifact.get("facts", []))
+    violations: list[str] = []
+    seen: set[str] = set()
+    for claim in value.claims:
+        path, cited = claim.path.strip(), claim.value.strip()
+        if path in seen:
+            return [f"DUPLICATE_CLAIM:{path}"]
+        seen.add(path)
+        if claim.text != f"{path} = {cited}":
+            violations.append(f"UNSUPPORTED_CLAIM_TEXT:{path}")
+            continue
+        if path not in atoms:
+            violations.append(f"FACT_NOT_IN_ARTIFACT:{path}")
+        elif not _values_match(cited, atoms[path]):
+            violations.append(f"FACT_VALUE_MISMATCH:{path}")
+    expected_visible = "\n".join(claim.text for claim in value.claims)
+    if value.visible_text != expected_visible:
+        return ["UNSUPPORTED_VISIBLE_TEXT"]
+    return violations
+
+
+def validate_jaimini_answer(
+    facts_used: list[dict],
+    artifact_token: str,
+    *,
+    interpretation_requested: bool = False,
+    summary: str | None = None,
+) -> list[str]:
+    """Check citations against a server-held artifact and enforce its source gate."""
+    artifact = get_cached_domain_artifact(artifact_token)
+    if artifact is None:
+        return ["ARTIFACT_NOT_FOUND"]
+    if not verify_domain_artifact(artifact):
+        return ["ARTIFACT_INVALID"]
+    if interpretation_requested or summary is not None:
+        admission = jaimini_source_admission_evidence()
+        if not admission["verified"]:
+            return ["INTERPRETATION_SOURCE_UNAVAILABLE"]
+        if artifact.get("source_admission_sha256") != admission["sha256"]:
+            return ["SOURCE_ADMISSION_MISMATCH"]
+        # No governed analysis graph / canonical renderer is admitted yet.  Even a
+        # fully verified future source pack cannot turn caller-authored prose into
+        # validated interpretation merely by citing computed facts.
+        return ["INTERPRETATION_RENDERER_UNAVAILABLE"]
+    atoms = iter_jaimini_fact_atoms(artifact.get("facts", []))
+    violations: list[str] = []
+    for ref in facts_used:
+        path = str(ref.get("path", "")).strip()
+        value = str(ref.get("value", "")).strip()
+        if path not in atoms:
+            violations.append(f"FACT_NOT_IN_ARTIFACT:{path}")
+        elif not _values_match(value, atoms[path]):
+            violations.append(f"FACT_VALUE_MISMATCH:{path}")
+    return violations
 
 
 def _values_match(cited: str, computed: str) -> bool:

@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "tools": {
+    "jaimini": {
+      "annotations": {"destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "readOnlyHint": true, "title": null},
+      "description": "Compute bounded signed Jaimini Core facts for an exact birth time or an explicit 5-minute-step approximate range. Interpretation remains unavailable; a verified source pack and governed analysis renderer are both required.",
+      "inputSchemaSha256": "2fafde446023c2a40585ca53fea63082cd756628e7f5232ba537add78a8fd6ed",
+      "outputSchemaSha256": "4f906cdf7de7f7f0558b5f868f0c99800df8a685ac82a55b52fe2211c1f82018"
+    },
+    "prashna": {
+      "annotations": {"destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "readOnlyHint": true, "title": null},
+      "description": "Compute signed time-chart facts for one low-risk work/project status question. Use an explicit event anchor or capture_now with place; reuse the opaque anchor token only for clarification. capture_now requires an idempotency_key and retries are process-local for the 256 most recent identities. Governed interpretation is unavailable.",
+      "inputSchemaSha256": "b067b8576000425df6643ec683fe516669b13eb09c7e2cca1983041f84594393",
+      "outputSchemaSha256": "8684be3e9218160ca3607eb501a33d946e37503edff1c3b7b74e5d8458f6d849"
+    },
+    "muhurta": {
+      "annotations": {"destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "readOnlyHint": true, "title": null},
+      "description": "Search calendar-ready astronomical boundaries for general or private focused-work sessions. No booking or persistence occurs. Doctrinal ranking and interpretation remain unavailable until a governed source pack is admitted.",
+      "inputSchemaSha256": "a33478a4bcfb6e5f002975a02fc36f7a9817dbe413e4987e2d7575202ba93ff6",
+      "outputSchemaSha256": "764ccfc9b42349663e531cce2146f797fd533a7307ab35f131a72292f68b62ff"
+    }
+  }
+}

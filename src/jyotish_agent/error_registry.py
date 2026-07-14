@@ -6,6 +6,139 @@ from typing import Any
 
 
 ERROR_REGISTRY: dict[str, dict[str, Any]] = {
+    "EVENT_TIME_REQUIRED": {
+        "retryable": False,
+        "problem": "An explicit timezone-aware event time is required.",
+        "cause": "The event anchor is missing a time, timezone, or both.",
+        "fix": "Confirm an explicit event instant and timezone.",
+        "next_action": "confirm_anchor",
+    },
+    "EVENT_PLACE_REQUIRED": {
+        "retryable": False,
+        "problem": "An event place is required.",
+        "cause": "The request has no validated event latitude and longitude.",
+        "fix": "Provide the event place before calculating the chart.",
+        "next_action": "provide_event_place",
+    },
+    "ANCHOR_MISMATCH": {
+        "retryable": False,
+        "problem": "The follow-up does not match the stored event anchor.",
+        "cause": "The supplied anchor identity differs from the active question anchor.",
+        "fix": "Create a new anchor for this question.",
+        "next_action": "create_new_anchor",
+    },
+    "ANCHOR_STALE": {
+        "retryable": False,
+        "problem": "The sealed question anchor cannot be replayed under current material.",
+        "cause": "Timezone, rule-profile, or calculation-configuration material changed.",
+        "fix": "Create a new anchor under the current verified runtime material.",
+        "next_action": "create_new_anchor",
+    },
+    "TOPIC_UNSUPPORTED": {
+        "retryable": False,
+        "problem": "The question is outside the admitted Praśna family.",
+        "cause": "Only one concrete work or project status question is supported.",
+        "fix": "Provide one primary work or project status question.",
+        "next_action": "provide_primary_question",
+    },
+    "TOPIC_COMPOSITE": {
+        "retryable": False,
+        "problem": "The Praśna question combines multiple topics.",
+        "cause": "A single primary house cannot be selected deterministically.",
+        "fix": "Choose one primary work or project status question.",
+        "next_action": "provide_primary_question",
+    },
+    "HIGH_STAKES_TOPIC": {
+        "retryable": False,
+        "problem": "The request is outside the low-risk Praśna boundary.",
+        "cause": "Medical, legal, financial, pregnancy, death, or harm judgement is not supported.",
+        "fix": "Use an appropriate qualified professional instead of a deterministic prediction.",
+        "next_action": "consult_qualified_professional",
+    },
+    "IDEMPOTENCY_CONFLICT": {
+        "retryable": False,
+        "problem": "The capture identity is already bound to different request material.",
+        "cause": "An idempotency key was reused for another question, place, or rule profile.",
+        "fix": "Use a new privacy-safe idempotency key for the new question anchor.",
+        "next_action": "use_new_idempotency_key",
+    },
+    "GOVERNANCE_INTEGRITY_ERROR": {
+        "retryable": False,
+        "problem": "The Praśna governance pack failed validation.",
+        "cause": "A frozen rule profile, source map, or adjudication checksum is inconsistent.",
+        "fix": "Restore the committed governance package and inspect its source status.",
+        "next_action": "inspect_source_status",
+    },
+    "SEARCH_RANGE_TOO_LARGE": {
+        "retryable": False,
+        "problem": "The requested search range exceeds the supported maximum.",
+        "cause": "The bounded search cannot evaluate this many calendar candidates.",
+        "fix": "Narrow the requested search range to a supported value.",
+        "next_action": "narrow_search_range",
+    },
+    "ACTIVITY_UNSUPPORTED": {
+        "retryable": False,
+        "problem": "The requested activity is outside the bounded Muhurta wedge.",
+        "cause": "Only general and private focused-work sessions are supported.",
+        "fix": "Select one of the explicitly supported low-risk activities.",
+        "next_action": "select_supported_activity",
+    },
+    "CIVIL_DATE_UNAVAILABLE": {
+        "retryable": False,
+        "problem": "The requested IANA zone has no physical instants on one local civil date.",
+        "cause": "A historical calendar transition skipped that local date entirely.",
+        "fix": "Narrow the range to local dates that exist in the requested IANA zone.",
+        "next_action": "narrow_search_range",
+    },
+    "HIGH_STAKES_ACTIVITY": {
+        "retryable": False,
+        "problem": "The requested activity is outside the low-risk Muhurta boundary.",
+        "cause": "Medical, legal, financial, marriage, pregnancy, or harm elections are not supported.",
+        "fix": "Consult an appropriately qualified professional instead.",
+        "next_action": "consult_qualified_professional",
+    },
+    "SEARCH_CANCELLED": {
+        "retryable": False,
+        "problem": "The Muhurta search was cooperatively cancelled.",
+        "cause": "The caller requested cancellation before a bounded engine batch.",
+        "fix": "Retry with a narrower search range when calculation is wanted.",
+        "next_action": "narrow_search_range",
+    },
+    "SEARCH_DEADLINE_EXCEEDED": {
+        "retryable": False,
+        "problem": "The Muhurta search deadline was exceeded.",
+        "cause": "The explicit UTC deadline elapsed before ranking could complete.",
+        "fix": "Narrow the search range and provide a later deadline.",
+        "next_action": "narrow_search_range",
+    },
+    "CANDIDATE_LIMIT_EXCEEDED": {
+        "retryable": False,
+        "problem": "The Muhurta candidate interval limit was exceeded.",
+        "cause": "Astronomical partitioning produced more intervals than the explicit budget.",
+        "fix": "Narrow the search range or increase the budget within the supported maximum.",
+        "next_action": "narrow_search_range",
+    },
+    "RULE_PROFILE_UNSUPPORTED": {
+        "retryable": False,
+        "problem": "The requested rule profile is unsupported.",
+        "cause": "No exact versioned profile matches the supplied identifier.",
+        "fix": "Select one of the explicitly supported rule profiles.",
+        "next_action": "select_supported_rule_profile",
+    },
+    "ENGINE_CROSSCHECK_FAILED": {
+        "retryable": True,
+        "problem": "A calculation invariant or independent cross-check failed.",
+        "cause": "The affected facts could not be verified consistently.",
+        "fix": "Retry once, then inspect private diagnostics using the request ID.",
+        "next_action": "retry_calculation",
+    },
+    "BIRTH_TIME_RANGE_REQUIRED": {
+        "retryable": False,
+        "problem": "A bounded approximate birth-time range is required.",
+        "cause": "The range is missing, reversed, or exceeds 120 minutes.",
+        "fix": "Provide earliest and latest times no more than 120 minutes apart.",
+        "next_action": "provide_birth_range",
+    },
     "RUN_NOT_FOUND": {
         "retryable": False,
         "problem": "The requested research run does not exist.",
@@ -35,6 +168,7 @@ ERROR_REGISTRY: dict[str, dict[str, Any]] = {
         "problem": "The run operation payload is invalid or incomplete.",
         "cause": "One or more required operation fields failed schema validation.",
         "fix": "Correct the payload for this run stage and resubmit it.",
+        "next_action": "correct_request",
     },
     "UNSUPPORTED_SCHEMA_VERSION": {
         "retryable": False,
@@ -80,10 +214,15 @@ def error_record(
     *,
     run_id: str | None,
     stage: str,
+    request_id: str | None = None,
+    mode: str | None = None,
+    invalid_fields: list[str] | None = None,
+    supported_values: list[str] | None = None,
+    next_action: str | None = None,
 ) -> dict[str, Any]:
     """Build an actionable envelope from controlled registry text only."""
     definition = ERROR_REGISTRY[error_code]
-    return {
+    record = {
         "error_code": error_code,
         "run_id": run_id,
         "stage": stage,
@@ -92,3 +231,12 @@ def error_record(
         "cause": definition["cause"],
         "fix": definition["fix"],
     }
+    optional = {
+        "request_id": request_id,
+        "mode": mode,
+        "invalid_fields": invalid_fields,
+        "supported_values": supported_values,
+        "next_action": next_action or definition.get("next_action"),
+    }
+    record.update({key: value for key, value in optional.items() if value is not None})
+    return record

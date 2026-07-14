@@ -1,0 +1,14 @@
+{
+  "profile_id": "prashna_work_v1",
+  "rule_profile_version": "1.0.0",
+  "rule_profile_sha256": "9d0ad5702befacf2185ea91a60803929307481d3e0cd574db7705b42cad5190b",
+  "adjudication_fixtures_sha256": "da6c373ccfb9aa115836eb473d8f68ad86f5c99400370cee6771e8d8fe152e82",
+  "interpretation_status": "unavailable",
+  "review": {
+    "status": "pending",
+    "reviewer": null,
+    "reviewer_role": null,
+    "reason": "No licensed or public-domain Praśna interpretation corpus and no qualified human adjudication are admitted."
+  },
+  "rules": []
+}

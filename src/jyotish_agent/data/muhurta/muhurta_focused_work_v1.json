@@ -1,0 +1,20 @@
+{
+  "profile_id": "muhurta_focused_work_v1",
+  "version": "1.0.0",
+  "school": "calculation-only-source-pending",
+  "activities": ["general", "focused_work_session_v1"],
+  "max_range_days": 31,
+  "max_candidates": 5000,
+  "default_result_limit": 5,
+  "transition_canonicalization": {
+    "version": "1.0.0",
+    "tolerance_seconds": 900,
+    "representative": "median_utc_second_by_identity"
+  },
+  "rules": [
+    {"rule_id": "muhurta.constraints.explicit", "classification": "hard", "source_status": "not_required", "weight": null},
+    {"rule_id": "muhurta.boundary.event_duration", "classification": "hard", "source_status": "not_required", "weight": null},
+    {"rule_id": "muhurta.general.doctrinal_eligibility", "classification": "hard", "source_status": "pending", "weight": null},
+    {"rule_id": "muhurta.focused_work.preference", "classification": "soft", "source_status": "pending", "weight": 1}
+  ]
+}

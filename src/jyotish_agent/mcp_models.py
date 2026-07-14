@@ -3,16 +3,50 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from .jaimini_models import AnalysisScope, JaiminiRuleProfileId
+from .prashna_models import PrashnaRequest
+from .muhurta_models import MuhurtaSearchRequest
 from .research_models import ResearchBirthProfileRequest
 
 
 ProfileMode = Literal["default", "inline"]
 AllowedChart = Literal["D1", "D2", "D3", "D7", "D9", "D10", "D12"]
 AllowedModule = Literal["shadbala", "ashtakavarga", "transits", "varshaphal"]
+
+
+class ExactJaiminiBirthSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    confidence: Literal["exact"]
+
+
+class ApproximateJaiminiBirthSelection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    confidence: Literal["approximate"]
+    earliest_time: dt.time
+    latest_time: dt.time
+
+    @model_validator(mode="after")
+    def bounded_range(self) -> "ApproximateJaiminiBirthSelection":
+        start = dt.datetime.combine(dt.date(2000, 1, 1), self.earliest_time)
+        end = dt.datetime.combine(dt.date(2000, 1, 1), self.latest_time)
+        seconds = (end - start).total_seconds()
+        if seconds <= 0:
+            raise ValueError("latest_time must be after earliest_time")
+        if seconds > 120 * 60:
+            raise ValueError("birth time range must not exceed 120 minutes")
+        if seconds % (5 * 60):
+            raise ValueError("birth time range must be divisible by 5 minutes")
+        return self
+
+
+JaiminiBirthSelection = Annotated[
+    ExactJaiminiBirthSelection | ApproximateJaiminiBirthSelection,
+    Field(discriminator="confidence"),
+]
 
 
 class ProfileSelection(BaseModel):
@@ -47,6 +81,34 @@ class CalculateResult(BaseModel):
     facts: dict[str, Any]
     warnings: list[str]
     provenance: dict[str, Any]
+
+
+class JaiminiMcpInput(ProfileSelection):
+    question: str = Field(min_length=1, max_length=2_000)
+    birth: JaiminiBirthSelection = Field(
+        default_factory=lambda: ExactJaiminiBirthSelection(confidence="exact")
+    )
+    rule_profile: JaiminiRuleProfileId = "jaimini_core_v1"
+    analysis_scope: AnalysisScope = "core_with_chara_dasha"
+    gender: Literal["female", "male"] | None = None
+    reference_date: dt.date | None = None
+    include_trace: bool = False
+
+    @model_validator(mode="after")
+    def gender_matches_scope(self) -> "JaiminiMcpInput":
+        if self.analysis_scope == "core_with_chara_dasha" and self.gender is None:
+            raise ValueError("gender is required for core_with_chara_dasha")
+        if self.analysis_scope == "core" and self.gender is not None:
+            raise ValueError("gender is not accepted for core geometry")
+        return self
+
+
+class PrashnaMcpInput(PrashnaRequest):
+    """Additive MCP input; intentionally independent from natal profiles."""
+
+
+class MuhurtaMcpInput(MuhurtaSearchRequest):
+    """Additive event-search input; it never selects or persists a natal profile."""
 
 
 class SourceSearchInput(BaseModel):

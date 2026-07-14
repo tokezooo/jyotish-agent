@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {"case":"jaimini_exact","ephemeris_mode":"moshier","p50_ms":672.75,"p95_ms":674.43,"payload_bytes":42478,"runs":3,"source_status":"pending","status":"completed"},
+    {"case":"jaimini_approximate","ephemeris_mode":"moshier","p50_ms":2009.663,"p95_ms":2027.02,"payload_bytes":42993,"runs":3,"source_status":"pending","status":"completed"},
+    {"case":"prashna_explicit","ephemeris_mode":"moshier","p50_ms":673.556,"p95_ms":679.383,"payload_bytes":9942,"runs":3,"source_status":"pending","status":"completed"},
+    {"case":"prashna_capture","ephemeris_mode":"moshier","p50_ms":678.843,"p95_ms":679.115,"payload_bytes":9942,"runs":3,"source_status":"pending","status":"completed"},
+    {"case":"prashna_replay","ephemeris_mode":"moshier","p50_ms":684.299,"p95_ms":688.766,"payload_bytes":9947,"runs":3,"source_status":"pending","status":"completed"},
+    {"case":"muhurta_one_day","ephemeris_mode":"moshier","p50_ms":478.62,"p95_ms":481.827,"payload_bytes":9820,"runs":3,"source_status":"pending","status":"completed"}
+  ],
+  "environment":{"ephemeris":["moshier"],"platform":"macOS-26.5.1-arm64-arm-64bit","python":"3.12.2"},
+  "input_bounds":{"jaimini_approximate_minutes":10,"muhurta_days":1,"prashna_capture_cache_scope":"process_local"},
+  "interpretation_gate":"pending",
+  "note":"Local warm evidence, not a universal SLO.",
+  "runner":"scripts/benchmark_domains.py",
+  "schema_version":1
+}

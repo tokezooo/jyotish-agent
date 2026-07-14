@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "jyotish-agent/codex-conversational-smoke-v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "runner", "environment", "cases", "excluded_failed_attempts", "summary"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "runner": {"type": "string", "minLength": 1},
+    "environment": {
+      "type": "object", "additionalProperties": false,
+      "required": ["client", "transport", "profile_kind"],
+      "properties": {
+        "client": {"type": "string", "minLength": 1},
+        "transport": {"const": "local_mcp"},
+        "profile_kind": {"enum": ["synthetic_public_safe", "default_private_redacted"]}
+      }
+    },
+    "cases": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "language", "flow", "prompt", "output_redacted", "tool_routing", "result_status", "raw_transcript_sha256", "execution_record", "execution_record_sha256", "checks", "passed"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^cs_[a-z0-9_]+$"},
+          "language": {"enum": ["ru", "en"]},
+          "flow": {"enum": ["quick", "inspection", "deep"]},
+          "prompt": {"type": "string", "minLength": 1, "maxLength": 2000},
+          "output_redacted": {"type": "string", "minLength": 1, "maxLength": 4000},
+          "tool_routing": {"type": "array", "items": {"type": "string"}, "maxItems": 10},
+          "result_status": {"enum": ["completed", "needs_input", "unavailable", "incomplete", "failed"]},
+          "raw_transcript_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "execution_record": {"type": "string", "pattern": "^docs/evidence/codex-smokes/cs_[a-z0-9_]+\\.json$"},
+          "execution_record_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "checks": {
+            "type": "object", "additionalProperties": false,
+            "required": ["natural_answer", "source_gate_honest", "no_internal_ledger", "no_private_material", "expected_route"],
+            "properties": {
+              "natural_answer": {"type": "boolean"},
+              "source_gate_honest": {"type": "boolean"},
+              "no_internal_ledger": {"type": "boolean"},
+              "no_private_material": {"type": "boolean"},
+              "expected_route": {"type": "boolean"}
+            }
+          },
+          "passed": {"type": "boolean"},
+          "failure": {"type": ["string", "null"], "maxLength": 1000}
+        }
+      }
+    },
+    "excluded_failed_attempts": {
+      "type": "array",
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "prompt_summary", "final_output_summary", "failure", "raw_transcript_sha256", "execution_record", "execution_record_sha256", "counted", "corrective_commit"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^cs_failed_[a-z0-9_]+$"},
+          "prompt_summary": {"type": "string", "minLength": 1, "maxLength": 2000},
+          "final_output_summary": {"type": "string", "minLength": 1, "maxLength": 4000},
+          "failure": {"type": "string", "minLength": 1, "maxLength": 1000},
+          "raw_transcript_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "execution_record": {"type": "string", "pattern": "^docs/evidence/codex-smokes/cs_failed_[a-z0-9_]+\\.json$"},
+          "execution_record_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "counted": {"const": false},
+          "corrective_commit": {"type": "string", "pattern": "^[0-9a-f]{7,40}$"}
+        }
+      }
+    },
+    "summary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["passed", "failed", "evidence_gate"],
+      "properties": {
+        "passed": {"type": "integer", "minimum": 0},
+        "failed": {"type": "integer", "minimum": 0},
+        "evidence_gate": {"enum": ["quick_inspection_passed", "failed"]}
+      }
+    }
+  }
+}

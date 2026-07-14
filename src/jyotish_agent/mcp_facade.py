@@ -6,15 +6,33 @@ import datetime as dt
 import json
 import os
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
+
+from pydantic import ValidationError
 
 from .hardening import reject_symlink_ancestors
+from .jaimini import JaiminiFacade
+from .jaimini_models import (
+    ApproximateJaiminiBirthInput,
+    ExactJaiminiBirthInput,
+    JaiminiInput,
+    JaiminiNeedsInputResult,
+    JaiminiPlace,
+    JaiminiResult,
+)
+from .prashna import PrashnaFacade
+from .prashna_models import PrashnaResult
+from .muhurta import MuhurtaFacade
+from .muhurta_models import MuhurtaResult
 from .mcp_models import (
     CalculateInput,
     CalculateResult,
     FinalizedResearch,
     FinalizeResearchInput,
     InspectResearchInput,
+    JaiminiMcpInput,
+    MuhurtaMcpInput,
+    PrashnaMcpInput,
     ProfileInput,
     ProfileResult,
     ResearchBundle,
@@ -129,6 +147,7 @@ class JyotishMcpFacade:
             Path(default_profile_path) if default_profile_path is not None else None
         )
         self.store = ResearchStore(self.data_root)
+        self.clock = clock or (lambda: dt.datetime.now(dt.UTC))
         service_kwargs = {"clock": clock} if clock is not None else {}
         self.service = ResearchService(self.store, **service_kwargs)
 
@@ -230,6 +249,191 @@ class JyotishMcpFacade:
             warnings=profile_warnings(calculation_profile),
             provenance=calculated["provenance"],
         )
+
+    def jaimini(self, value: JaiminiMcpInput) -> JaiminiResult:
+        """Compute stateless Jaimini facts from a selected private/inline profile."""
+        profile = self._select_profile(value)
+        timezone = profile.place.timezone
+        if not isinstance(timezone, (IanaTimezone, IanaWithAssertedOffset)):
+            raise McpFacadeError("JAIMINI_IANA_TIMEZONE_REQUIRED")
+        place = JaiminiPlace(
+            name=profile.place.name,
+            latitude=profile.place.latitude,
+            longitude=profile.place.longitude,
+            timezone=timezone.zone_id,
+            fold=timezone.fold,
+            asserted_offset_hours=(
+                timezone.asserted_offset_hours
+                if isinstance(timezone, IanaWithAssertedOffset)
+                else None
+            ),
+        )
+        if value.birth.confidence == "exact":
+            if str(profile.birth_time_confidence.value) != "exact":
+                raise McpFacadeError("JAIMINI_EXACT_BIRTH_TIME_REQUIRED")
+            birth = ExactJaiminiBirthInput(
+                confidence="exact",
+                date=profile.date,
+                time=profile.time,
+                place=place,
+            )
+        else:
+            birth = ApproximateJaiminiBirthInput(
+                confidence="approximate",
+                date=profile.date,
+                earliest_time=value.birth.earliest_time,
+                latest_time=value.birth.latest_time,
+                place=place,
+            )
+        request = JaiminiInput(
+            profile=profile.name,
+            birth=birth,
+            rule_profile=value.rule_profile,
+            analysis_scope=value.analysis_scope,
+            gender=value.gender,
+            reference_date=value.reference_date,
+            include_trace=value.include_trace,
+        )
+        return JaiminiFacade().calculate(request)
+
+    def jaimini_payload(
+        self,
+        value: object,
+        *,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> JaiminiResult:
+        """Make malformed Jaimini MCP execution total without reflecting inputs."""
+        parsed: JaiminiMcpInput | None = None
+        if not outer_arguments and isinstance(value, dict):
+            try:
+                parsed = JaiminiMcpInput.model_validate(value)
+            except ValidationError:
+                pass
+        if parsed is not None:
+            return self.jaimini(parsed)
+
+        import hashlib
+
+        from .error_registry import error_record
+
+        request_id = "req_" + hashlib.sha256(
+            json.dumps(
+                {"request": value, "outer": outer_arguments},
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            ).encode()
+        ).hexdigest()[:24]
+        record = error_record(
+            "INPUT_INVALID",
+            run_id=None,
+            request_id=request_id,
+            mode="jaimini",
+            stage="input_validation",
+        )
+        fields = {
+            key: record[key]
+            for key in (
+                "error_code",
+                "request_id",
+                "mode",
+                "stage",
+                "retryable",
+                "problem",
+                "cause",
+                "fix",
+                "next_action",
+            )
+        }
+        return JaiminiNeedsInputResult(status="needs_input", **fields)
+
+    def prashna(self, value: PrashnaMcpInput) -> PrashnaResult:
+        """Compute one stateless, sealed question-time Praśna result."""
+        return PrashnaFacade(clock=self.clock).calculate(value)
+
+    def muhurta(self, value: MuhurtaMcpInput) -> MuhurtaResult:
+        """Search calculated event boundaries without persistence or side effects."""
+        return MuhurtaFacade(clock=self.clock).search(value)
+
+    def muhurta_payload(
+        self,
+        value: object,
+        *,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> MuhurtaResult:
+        """Make malformed MCP execution total without reflecting private inputs."""
+        parsed: MuhurtaMcpInput | None = None
+        if not outer_arguments and isinstance(value, dict):
+            try:
+                parsed = MuhurtaMcpInput.model_validate(value)
+            except ValidationError:
+                pass
+        if parsed is not None:
+            return self.muhurta(parsed)
+        import hashlib
+
+        request_id = "muh_" + hashlib.sha256(
+            json.dumps({"request": value, "outer": outer_arguments}, sort_keys=True, separators=(",", ":"), default=str).encode()
+        ).hexdigest()[:24]
+        from .error_registry import error_record
+        from .muhurta_models import MuhurtaNeedsInputResult
+
+        code = "INPUT_INVALID"
+        supported_values = None
+        if isinstance(value, dict):
+            if value.get("rule_profile") not in (None, "muhurta_focused_work_v1"):
+                code = "RULE_PROFILE_UNSUPPORTED"
+                supported_values = ("muhurta_focused_work_v1",)
+            else:
+                try:
+                    start = dt.datetime.fromisoformat(str(value.get("start", "")).replace("Z", "+00:00"))
+                    end = dt.datetime.fromisoformat(str(value.get("end", "")).replace("Z", "+00:00"))
+                    if end - start > dt.timedelta(days=31):
+                        code = "SEARCH_RANGE_TOO_LARGE"
+                except (TypeError, ValueError):
+                    pass
+        record = error_record(code, run_id=None, request_id=request_id, mode="muhurta", stage="input_validation")
+        fields = {key: record[key] for key in ("error_code", "request_id", "mode", "stage", "retryable", "problem", "cause", "fix", "next_action")}
+        return MuhurtaNeedsInputResult(status="needs_input", supported_values=supported_values or ("general", "focused_work_session_v1"), **fields)
+
+    def prashna_payload(
+        self,
+        value: object,
+        *,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> PrashnaResult:
+        """Sanitize adapter validation failures into the stable domain envelope."""
+        parsed: PrashnaMcpInput | None = None
+        if not outer_arguments and isinstance(value, dict):
+            try:
+                parsed = PrashnaMcpInput.model_validate(value)
+            except ValidationError:
+                pass
+        if parsed is None:
+            import hashlib
+
+            request_id = "prq_" + hashlib.sha256(
+                json.dumps(
+                    {"request": value, "outer": outer_arguments},
+                    sort_keys=True, separators=(",", ":"), default=str,
+                ).encode()
+            ).hexdigest()[:24]
+            from .error_registry import error_record
+            from .prashna_models import PrashnaNeedsInputResult
+
+            record = error_record(
+                "INPUT_INVALID", run_id=None, request_id=request_id,
+                mode="prashna", stage="input_validation",
+            )
+            fields = {
+                key: record[key]
+                for key in (
+                    "error_code", "request_id", "mode", "stage", "retryable",
+                    "problem", "cause", "fix", "next_action",
+                )
+            }
+            return PrashnaNeedsInputResult(status="needs_input", **fields)
+        return self.prashna(parsed)
 
     def search_sources(self, value: SourceSearchInput) -> SourceSearchResult:
         results = []

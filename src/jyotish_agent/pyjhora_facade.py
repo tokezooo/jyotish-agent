@@ -13,8 +13,11 @@ That is what makes the golden-fixture test meaningful.
 from __future__ import annotations
 
 import re
+import math
+import threading
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
+from typing import Callable, Generic, TypeVar
 
 from . import ENGINE_VERSION, names
 from .config import ENGINE_LOCK, CalculationConfig, ConfigError, apply_config, ephemeris_mode
@@ -23,6 +26,10 @@ from .yogas import detect_yogas
 
 class EngineOutputError(ValueError):
     """PyJHora returned a shape the facade did not expect (degenerate/changed output)."""
+
+
+class CivilDateUnavailableError(EngineOutputError):
+    """The IANA zone skips the requested local calendar date entirely."""
 
 # Degrees are rounded to this many places everywhere, so float noise across
 # libm/BLAS builds can't break byte-stability or the golden fixture.
@@ -44,8 +51,488 @@ class BirthProfile:
     timezone: float  # offset in hours, e.g. 5.5 for IST
 
 
+@dataclass(frozen=True)
+class _EnginePosition:
+    """Immutable normalized engine position; ``None`` identifies Lagna."""
+
+    planet_index: int | None
+    sign_index: int
+    degrees: float
+
+
+@dataclass(frozen=True)
+class _EngineConfigSnapshot:
+    """Deeply immutable effective configuration exposed to domain callbacks."""
+
+    ayanamsa: str
+    rahu_ketu: str
+    node_aspects: str
+    charts: tuple[str, ...]
+    modules: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class _EngineSnapshot:
+    """Domain-safe D1/D9 primitives captured under one applied configuration."""
+
+    config: _EngineConfigSnapshot
+    d1: tuple[_EnginePosition, ...]
+    d9: tuple[_EnginePosition, ...]
+    sun_longitude_at_sunrise: float | None
+    minutes_since_sunrise: float | None
+    ephemeris_mode: str
+
+
+_DomainT = TypeVar("_DomainT")
+
+
+@dataclass(frozen=True)
+class _EngineSessionResult(Generic[_DomainT]):
+    natal: dict
+    snapshot: _EngineSnapshot
+    domain: _DomainT | None
+
+
+class _EngineSessionReentryError(RuntimeError):
+    """The current thread tried to enter the non-reentrant engine session twice."""
+
+
+@dataclass(frozen=True)
+class _MuhurtaBoundaryPrimitive:
+    kind: str
+    identity: str
+    start_hour: float
+    end_hour: float | None = None
+    start_utc: datetime | None = None
+    end_utc: datetime | None = None
+
+
+@dataclass(frozen=True)
+class _MuhurtaBoundaryEstimate:
+    kind: str
+    identity: str
+    start_utc: datetime
+    end_utc: datetime | None = None
+
+
+@dataclass(frozen=True)
+class _MuhurtaDayPrimitives:
+    civil_date: date
+    values: tuple[_MuhurtaBoundaryPrimitive, ...]
+
+
+@dataclass(frozen=True)
+class _MuhurtaBoundaryDayResult:
+    day: _MuhurtaDayPrimitives
+    config: _EngineConfigSnapshot
+    ephemeris_mode: str
+    probe_offsets: tuple[tuple[int, int], ...]
+    canonicalization_tolerance_seconds: int
+    day_start_utc: datetime
+    day_end_utc: datetime
+
+
+_ENGINE_SESSION_LOCAL = threading.local()
+
+
+def _clock_hour(value: object) -> float:
+    """Convert PyJHora's local clock strings, including ``(+1)``, to day hours."""
+    text = str(value)
+    day_offset = 24.0 if "(+1)" in text else 0.0
+    clock = text.split()[0]
+    hour, minute, second = (int(part) for part in clock.split(":"))
+    return day_offset + hour + minute / 60 + second / 3600
+
+
+def _first_utc_with_local_date_at_least(target: date, zone) -> datetime:
+    """Return the first whole UTC second whose local date is at least ``target``."""
+    nominal = datetime(target.year, target.month, target.day, tzinfo=UTC)
+    low = round((nominal - timedelta(days=2)).timestamp())
+    high = round((nominal + timedelta(days=2)).timestamp())
+    if datetime.fromtimestamp(low, tz=UTC).astimezone(zone).date() >= target:
+        raise EngineOutputError("IANA civil-date lower search bound is invalid")
+    if datetime.fromtimestamp(high, tz=UTC).astimezone(zone).date() < target:
+        raise EngineOutputError("IANA civil-date upper search bound is invalid")
+    while low + 1 < high:
+        middle = (low + high) // 2
+        if datetime.fromtimestamp(middle, tz=UTC).astimezone(zone).date() < target:
+            low = middle
+        else:
+            high = middle
+    return datetime.fromtimestamp(high, tz=UTC)
+
+
+def _civil_day_utc_bounds(civil_date: date, zone) -> tuple[datetime, datetime]:
+    """Resolve the exact physical half-open interval occupied by a local date."""
+    start = _first_utc_with_local_date_at_least(civil_date, zone)
+    end = _first_utc_with_local_date_at_least(civil_date + timedelta(days=1), zone)
+    if start.astimezone(zone).date() != civil_date or start >= end:
+        raise CivilDateUnavailableError("local civil date contains no physical instants")
+    return start, end
+
+
+def _offset_segment_starts(start: datetime, end: datetime, zone) -> tuple[datetime, ...]:
+    """Find each UTC offset segment start within one physical civil-day span."""
+    starts = [start]
+    cursor = start
+    current_offset = cursor.astimezone(zone).utcoffset()
+    while cursor < end:
+        following = min(cursor + timedelta(minutes=1), end)
+        if following == end:
+            break
+        following_offset = following.astimezone(zone).utcoffset()
+        if following_offset != current_offset:
+            low = round(cursor.timestamp())
+            high = round(following.timestamp())
+            while low + 1 < high:
+                middle = (low + high) // 2
+                if datetime.fromtimestamp(middle, tz=UTC).astimezone(zone).utcoffset() == current_offset:
+                    low = middle
+                else:
+                    high = middle
+            transition = datetime.fromtimestamp(high, tz=UTC)
+            starts.append(transition)
+            current_offset = transition.astimezone(zone).utcoffset()
+            cursor = transition
+        else:
+            cursor = following
+    return tuple(starts)
+
+
+def _valid_local_candidates(naive: datetime, zone) -> tuple[datetime, ...]:
+    by_utc = {
+        value.astimezone(UTC): value.astimezone(UTC)
+        for value in (naive.replace(tzinfo=zone, fold=0), naive.replace(tzinfo=zone, fold=1))
+        if value.astimezone(UTC).astimezone(zone).replace(tzinfo=None) == naive
+    }
+    return tuple(sorted(by_utc))
+
+
+def _physical_probe_instants(
+    civil_date: date,
+    zone,
+    day_start: datetime,
+    day_end: datetime,
+) -> tuple[datetime, ...]:
+    """Resolve nominal local probes and all offset-segment starts to valid UTC instants."""
+    instants = set(_offset_segment_starts(day_start, day_end, zone))
+    for hour, minute in ((0, 0), (6, 0), (12, 0), (18, 0), (23, 59)):
+        naive = datetime.combine(civil_date, datetime.min.time()).replace(hour=hour, minute=minute)
+        candidates = tuple(
+            instant for instant in _valid_local_candidates(naive, zone)
+            if day_start <= instant < day_end
+        )
+        if not candidates:
+            # A nominal wall time can be skipped. Advance along the physical day
+            # until the first valid local instant at or after the requested clock.
+            instant = day_start
+            while instant < day_end and instant.astimezone(zone).replace(tzinfo=None) < naive:
+                instant += timedelta(minutes=1)
+            if instant < day_end:
+                candidates = (instant,)
+        instants.update(candidates)
+    return tuple(sorted(instant for instant in instants if day_start <= instant < day_end))
+
+
+def _canonicalize_muhurta_estimates(
+    estimates: tuple[_MuhurtaBoundaryEstimate, ...],
+    *,
+    tolerance_seconds: int,
+) -> tuple[_MuhurtaBoundaryEstimate, ...]:
+    """Cluster repeated estimates by semantic transition identity and UTC proximity."""
+    grouped: dict[tuple[str, str], list[_MuhurtaBoundaryEstimate]] = {}
+    for item in estimates:
+        if item.start_utc.tzinfo is None or item.start_utc.utcoffset() is None:
+            raise EngineOutputError("Muhurta transition estimate must be UTC-aware")
+        grouped.setdefault((item.kind, item.identity), []).append(item)
+    canonical: list[_MuhurtaBoundaryEstimate] = []
+    for key in sorted(grouped):
+        ordered = sorted(grouped[key], key=lambda item: item.start_utc.astimezone(UTC))
+        clusters: list[list[_MuhurtaBoundaryEstimate]] = []
+        for item in ordered:
+            if not clusters or (
+                item.start_utc.astimezone(UTC)
+                - clusters[-1][-1].start_utc.astimezone(UTC)
+            ).total_seconds() > tolerance_seconds:
+                clusters.append([item])
+            else:
+                clusters[-1].append(item)
+        candidates: list[tuple[int, _MuhurtaBoundaryEstimate]] = []
+        interval_identity = any(item.end_utc is not None for item in ordered)
+        for cluster in clusters:
+            starts = sorted(round(item.start_utc.astimezone(UTC).timestamp()) for item in cluster)
+            start = datetime.fromtimestamp(starts[(len(starts) - 1) // 2], tz=UTC)
+            ends = sorted(
+                round(item.end_utc.astimezone(UTC).timestamp())
+                for item in cluster if item.end_utc is not None
+            )
+            if ends and len(ends) != len(cluster):
+                raise EngineOutputError("mixed point/interval estimates share one transition identity")
+            end = datetime.fromtimestamp(ends[(len(ends) - 1) // 2], tz=UTC) if ends else None
+            if end is not None and end <= start:
+                continue
+            candidates.append((len(cluster), _MuhurtaBoundaryEstimate(key[0], key[1], start, end)))
+        if not candidates:
+            if interval_identity:
+                # A fixed-offset engine evaluation can collapse a period across
+                # a civil-time jump. It is not a physical interval and must not
+                # become a partition boundary.
+                continue
+            raise EngineOutputError("Muhurta transition identity has no canonical estimate")
+        # A semantic transition/period identity occurs at most once per civil
+        # day. Prefer the estimate cluster with the most independent probes;
+        # stable chronological order resolves equal-support engine variants.
+        _, selected = sorted(
+            candidates,
+            key=lambda pair: (-pair[0], pair[1].start_utc.astimezone(UTC)),
+        )[0]
+        canonical.append(selected)
+    return tuple(sorted(canonical, key=lambda item: (item.start_utc, item.kind, item.identity)))
+
+
+def _run_muhurta_boundary_day(
+    profile: BirthProfile,
+    civil_date: date,
+    zone_id: str,
+    config: CalculationConfig | None = None,
+    canonicalization_tolerance_seconds: int = 900,
+) -> _MuhurtaBoundaryDayResult:
+    """Collect one civil day's transitions in one configured lock checkpoint.
+
+    Values are copied into immutable, domain-neutral records; raw engine objects do
+    not escape. A range caller invokes this once per day so cancellation/deadline
+    checks happen while the global engine lock is released.
+    """
+    config = config or CalculationConfig(charts=("D1",))
+    resolved_charts = config.resolved_charts()
+    resolved_modules = config.resolved_modules()
+    if getattr(_ENGINE_SESSION_LOCAL, "active", False):
+        raise _EngineSessionReentryError("engine session re-entry is not allowed")
+    _ENGINE_SESSION_LOCAL.active = True
+    try:
+        with ENGINE_LOCK:
+            from . import config as runtime_config
+            from jhora import utils
+            from jhora.panchanga import drik
+
+            from zoneinfo import ZoneInfo
+
+            applied = apply_config(config)
+            zone = ZoneInfo(zone_id)
+            estimates: list[_MuhurtaBoundaryEstimate] = []
+            day_start, day_end = _civil_day_utc_bounds(civil_date, zone)
+            probe_instants = _physical_probe_instants(civil_date, zone, day_start, day_end)
+
+            def jd_at(hour: int, minute: int = 0, second: int = 0):
+                return utils.julian_day_number(
+                    (civil_date.year, civil_date.month, civil_date.day), (hour, minute, second)
+                )
+
+            probe_records = tuple((instant, instant.astimezone(zone)) for instant in probe_instants)
+            offsets = tuple(
+                (
+                    local.hour * 60 + local.minute,
+                    round(local.utcoffset().total_seconds() / 60),  # type: ignore[union-attr]
+                )
+                for _, local in probe_records
+            )
+
+            def to_utc(hour_value: float, engine_offset: float) -> datetime:
+                if not math.isfinite(hour_value):
+                    raise EngineOutputError("Muhurta transition hour is non-finite")
+                return datetime(civil_date.year, civil_date.month, civil_date.day, tzinfo=UTC) + timedelta(
+                    seconds=round((hour_value - engine_offset) * 3600)
+                )
+
+            def add_current_period(
+                kind: str,
+                result: object,
+                start_index: int,
+                end_index: int,
+                cycle: int,
+                engine_offset: float,
+            ) -> None:
+                if not isinstance(result, (tuple, list)) or len(result) <= max(start_index, end_index):
+                    raise EngineOutputError(f"{kind} returned an unsupported transition shape")
+                try:
+                    period_id = int(result[0])
+                    start_hour, end_hour = float(result[start_index]), float(result[end_index])
+                except (TypeError, ValueError) as exc:
+                    raise EngineOutputError(f"{kind} returned a non-numeric transition") from exc
+                if not (math.isfinite(start_hour) and math.isfinite(end_hour) and end_hour > start_hour):
+                    raise EngineOutputError(f"{kind} returned invalid transition bounds")
+                estimates.extend((
+                    _MuhurtaBoundaryEstimate(kind, f"{kind}:to:{period_id}", to_utc(start_hour, engine_offset)),
+                    _MuhurtaBoundaryEstimate(kind, f"{kind}:to:{period_id % cycle + 1}", to_utc(end_hour, engine_offset)),
+                ))
+
+            # Six-hour astronomical probes are not minute brute force. Every
+            # panchanga period here is longer than the probe step; aggregating its
+            # current start/end catches every same-day transition, including the
+            # second karana, while independently validating output variants.
+            for _, local_probe in probe_records:
+                offset = local_probe.utcoffset()
+                assert offset is not None
+                engine_offset = offset.total_seconds() / 3600
+                place = drik.Place(profile.name, profile.latitude, profile.longitude, engine_offset)
+                probe = jd_at(local_probe.hour, local_probe.minute, local_probe.second)
+                add_current_period("tithi_transition", drik.tithi(probe, place), 1, 2, 30, engine_offset)
+                add_current_period("nakshatra_transition", drik.nakshatra(probe, place), 2, 3, 27, engine_offset)
+                add_current_period("yoga_transition", drik.yogam(probe, place), 1, 2, 27, engine_offset)
+                add_current_period("karana_transition", drik.karana(probe, place), 1, 2, 60, engine_offset)
+                varjyam = drik.varjyam(probe, place)
+                if not isinstance(varjyam, (tuple, list)) or len(varjyam) % 2:
+                    raise EngineOutputError("varjyam returned an unsupported transition shape")
+                for index in range(0, len(varjyam), 2):
+                    start_hour, end_hour = float(varjyam[index]), float(varjyam[index + 1])
+                    if not (math.isfinite(start_hour) and math.isfinite(end_hour) and end_hour > start_hour):
+                        raise EngineOutputError("varjyam returned invalid transition bounds")
+                    nak_id = int(drik.nakshatra(probe, place)[0])
+                    estimates.append(_MuhurtaBoundaryEstimate(
+                        "varjyam", f"varjyam:nakshatra:{nak_id}:pair:{index // 2}",
+                        to_utc(start_hour, engine_offset), to_utc(end_hour, engine_offset),
+                    ))
+
+            # Daily functions are evaluated once for every offset segment present
+            # on the civil day. Estimates of the same physical event are then
+            # canonicalized by semantic identity and UTC proximity.
+            distinct_offsets = sorted({minutes / 60 for _, minutes in offsets})
+            daily_anchor = day_start.astimezone(zone)
+
+            def add_daily_estimate(item: _MuhurtaBoundaryEstimate, engine_offset: float) -> None:
+                """Keep the fixed-offset evaluation consistent with IANA at the event."""
+                actual_offset = item.start_utc.astimezone(zone).utcoffset()
+                if actual_offset is not None and round(actual_offset.total_seconds() / 60) == round(engine_offset * 60):
+                    estimates.append(item)
+
+            for engine_offset in distinct_offsets:
+                place = drik.Place(profile.name, profile.latitude, profile.longitude, engine_offset)
+                daily_jd = jd_at(daily_anchor.hour, daily_anchor.minute, daily_anchor.second)
+                sunrise, sunset = drik.sunrise(daily_jd, place), drik.sunset(daily_jd, place)
+                add_daily_estimate(
+                    _MuhurtaBoundaryEstimate("sunrise", "sunrise", to_utc(float(sunrise[0]), engine_offset)),
+                    engine_offset,
+                )
+                add_daily_estimate(
+                    _MuhurtaBoundaryEstimate("sunset", "sunset", to_utc(float(sunset[0]), engine_offset)),
+                    engine_offset,
+                )
+                for sign, start_hour, end_hour in drik.udhaya_lagna_muhurtha(daily_jd, place):
+                    add_daily_estimate(
+                        _MuhurtaBoundaryEstimate(
+                            f"lagna_{int(sign)}", f"lagna:{int(sign)}", to_utc(float(start_hour), engine_offset),
+                            to_utc(float(end_hour) + (24 if float(end_hour) <= float(start_hour) else 0), engine_offset),
+                        ),
+                        engine_offset,
+                    )
+                for kind, function in (
+                    ("rahu_kala", drik.raahu_kaalam), ("yamaganda", drik.yamaganda_kaalam),
+                    ("gulika", drik.gulikai_kaalam), ("abhijit", drik.abhijit_muhurta),
+                ):
+                    period = function(daily_jd, place)
+                    if not period or len(period) < 2:
+                        raise EngineOutputError(f"{kind} returned an unsupported period shape")
+                    add_daily_estimate(
+                        _MuhurtaBoundaryEstimate(
+                            kind, kind, to_utc(_clock_hour(period[0]), engine_offset),
+                            to_utc(_clock_hour(period[1]), engine_offset),
+                        ),
+                        engine_offset,
+                    )
+                dur = drik.durmuhurtam(daily_jd, place)
+                if len(dur) % 2:
+                    raise EngineOutputError("durmuhurta returned an unsupported period shape")
+                for index in range(0, len(dur), 2):
+                    add_daily_estimate(
+                        _MuhurtaBoundaryEstimate(
+                            "durmuhurta", f"durmuhurta:{index // 2}",
+                            to_utc(_clock_hour(dur[index]), engine_offset),
+                            to_utc(_clock_hour(dur[index + 1]), engine_offset),
+                        ),
+                        engine_offset,
+                    )
+                for index, period in enumerate(drik.amrit_kaalam(daily_jd, place) or ()):
+                    if not period or len(period) < 2:
+                        raise EngineOutputError("amrita returned an unsupported period shape")
+                    add_daily_estimate(
+                        _MuhurtaBoundaryEstimate(
+                            "amrita", f"amrita:{index}", to_utc(_clock_hour(period[0]), engine_offset),
+                            to_utc(_clock_hour(period[1]), engine_offset),
+                        ),
+                        engine_offset,
+                    )
+
+            relevant = tuple(
+                item for item in estimates
+                if (
+                    day_start <= item.start_utc < day_end
+                    or item.end_utc is not None
+                    and item.start_utc < day_end
+                    and item.end_utc > day_start
+                )
+            )
+            canonical = _canonicalize_muhurta_estimates(
+                relevant, tolerance_seconds=canonicalization_tolerance_seconds,
+            )
+            midnight_local = datetime.combine(civil_date, datetime.min.time())
+            values: list[_MuhurtaBoundaryPrimitive] = []
+            for item in canonical:
+                start_local = item.start_utc.astimezone(zone)
+                start_hour = (start_local.replace(tzinfo=None) - midnight_local).total_seconds() / 3600
+                end_hour = None
+                if item.end_utc is not None:
+                    end_local = item.end_utc.astimezone(zone)
+                    end_hour = (end_local.replace(tzinfo=None) - midnight_local).total_seconds() / 3600
+                values.append(_MuhurtaBoundaryPrimitive(
+                    item.kind, item.identity, round(start_hour, 6),
+                    None if end_hour is None else round(end_hour, 6), item.start_utc, item.end_utc,
+                ))
+            snapshot = _EngineConfigSnapshot(
+                ayanamsa=applied.ayanamsa.upper(), rahu_ketu=applied.rahu_ketu,
+                node_aspects=applied.node_aspects, charts=tuple(resolved_charts),
+                modules=tuple(sorted(resolved_modules)),
+            )
+            return _MuhurtaBoundaryDayResult(
+                day=_MuhurtaDayPrimitives(
+                    civil_date, tuple(values),
+                ),
+                config=snapshot, ephemeris_mode=runtime_config.ephemeris_mode(),
+                probe_offsets=offsets,
+                canonicalization_tolerance_seconds=canonicalization_tolerance_seconds,
+                day_start_utc=day_start,
+                day_end_utc=day_end,
+            )
+    finally:
+        _ENGINE_SESSION_LOCAL.active = False
+
+
 def _round_deg(value: float) -> float:
     return round(float(value), _DEG_PRECISION)
+
+
+def _immutable_positions(chart) -> tuple[_EnginePosition, ...]:
+    """Copy a mutable PyJHora chart into a stable immutable representation."""
+    return tuple(
+        _EnginePosition(
+            planet_index=None if body == "L" else int(body),
+            sign_index=int(pos[0]),
+            degrees=_round_deg(pos[1]),
+        )
+        for body, pos in chart
+    )
+
+
+def _special_lagna_primitive(drik, jd, place, profile: BirthProfile) -> tuple[float | None, float | None]:
+    """Capture sunrise-anchored inputs; caller owns the configured engine lock."""
+    birth_hour = profile.time[0] + profile.time[1] / 60 + profile.time[2] / 3600
+    sunrise = drik.sunrise(jd, place)
+    if not sunrise or birth_hour < float(sunrise[0]):
+        return None, None
+    sunrise_jd_utc = float(sunrise[2]) - profile.timezone / 24
+    return (
+        _round_deg(drik.solar_longitude(sunrise_jd_utc)),
+        round((birth_hour - float(sunrise[0])) * 60, 6),
+    )
 
 
 def _placements(chart) -> list[dict]:
@@ -577,17 +1064,18 @@ def _vimshottari_current(ref_jd, jd, place) -> dict:
     return levels
 
 
-def compute_chart(
+def _run_engine_session(
     profile: BirthProfile,
     reference_date: DateTuple,
     config: CalculationConfig | None = None,
-) -> dict:
-    """Compute the MVP fact set for a birth profile at a reference date.
+    domain_callback: Callable[[_EngineSnapshot], _DomainT] | None = None,
+) -> _EngineSessionResult[_DomainT]:
+    """Own one apply+compute lock and expose only immutable domain primitives.
 
-    Returns a deterministic, JSON-serializable dict: ascendant, D1, D9, panchanga
-    basics, current Vimshottari period, plus the config and provenance used. Holds
-    ENGINE_LOCK across the whole apply+compute so concurrent callers cannot swap
-    PyJHora's global ayanamsa mid-computation.
+    The callback runs while the same lock and applied PyJHora configuration are
+    active. It receives copied D1/D9 positions, never mutable engine charts. The
+    Raw engine structures remain local to this function. Engine reads and the
+    callback run under the lock; pure natal normalization/assembly runs afterward.
     """
     config = config or CalculationConfig()
     # Pure config validation happens BEFORE acquiring the lock: an invalid request
@@ -595,86 +1083,128 @@ def compute_chart(
     resolved = config.resolved_charts()  # {name: factor}, always includes D1
     modules = config.resolved_modules()
 
-    with ENGINE_LOCK:
-        from jhora import utils
-        from jhora.horoscope.chart import charts
-        from jhora.panchanga import drik
+    if getattr(_ENGINE_SESSION_LOCAL, "active", False):
+        raise _EngineSessionReentryError("engine session re-entry is not allowed")
 
-        applied = apply_config(config)
-        place = drik.Place(profile.name, profile.latitude, profile.longitude, profile.timezone)
-        jd = utils.julian_day_number(profile.date, profile.time)
-        # Anchor the reference at local noon to avoid date-boundary ambiguity.
-        ref_jd = utils.julian_day_number(reference_date, (12, 0, 0))
+    _ENGINE_SESSION_LOCAL.active = True
+    try:
+        with ENGINE_LOCK:
+            from jhora import utils
+            from jhora.horoscope.chart import charts
+            from jhora.panchanga import drik
 
-        raw_charts = {
-            name: charts.divisional_chart(jd, place, divisional_chart_factor=factor)
-            for name, factor in resolved.items()
-        }
-        panchanga = _panchanga(jd, place)
-        vimshottari = _vimshottari_current(ref_jd, jd, place)
-        module_facts: dict[str, dict] = {}
-        if "shadbala" in modules:
-            module_facts["shadbala"] = _shadbala(jd, place)
-        if "ashtakavarga" in modules:
-            module_facts["ashtakavarga"] = _ashtakavarga(raw_charts["D1"])
-        if "transits" in modules:
-            module_facts["transits"] = _transits(
-                ref_jd,
-                place,
-                natal_moon_sign=_planet_sign(raw_charts["D1"], 1),  # Moon = index 1
-                natal_lagna_sign=_lagna_sign(raw_charts["D1"]),
-                reference_date=reference_date,
-                timezone=profile.timezone,
+            applied = apply_config(config)
+            place = drik.Place(
+                profile.name, profile.latitude, profile.longitude, profile.timezone
             )
-        if "varshaphal" in modules:
-            module_facts["varshaphal"] = _varshaphal(
-                jd,
-                place,
-                ref_jd,
-                natal_lagna_sign=_lagna_sign(raw_charts["D1"]),
-                birth_date=profile.date,
-                reference_date=reference_date,
-            )
-        if "yogas_engine" in modules:
-            # The ONLY module allowed to degrade instead of failing the compute: it
-            # dispatches ~284 unaudited engine functions, any of which may raise
-            # under a particular ephemeris/date; the rest of the chart must survive.
+            jd = utils.julian_day_number(profile.date, profile.time)
+            # Anchor the reference at local noon to avoid date-boundary ambiguity.
+            ref_jd = utils.julian_day_number(reference_date, (12, 0, 0))
+
+            # D1/D9 are the shared domain primitives even when a natal caller elects
+            # not to publish D9. Additional requested charts retain their resolved
+            # order in the natal response below.
+            kernel_charts = dict(resolved)
+            kernel_charts.setdefault("D9", 9)
+            raw_charts = {
+                name: charts.divisional_chart(
+                    jd, place, divisional_chart_factor=factor
+                )
+                for name, factor in kernel_charts.items()
+            }
+            # Jaimini special-lagna primitive, captured under the same configured
+            # engine lock as D1/D9.  For a pre-sunrise birth the frozen profile's
+            # "minutes since sunrise" anchor is not satisfied; surface unavailable
+            # rather than silently switching to the previous civil date.
             try:
-                module_facts["yogas_engine"] = _yogas_engine(jd, place, resolved)
-            except ConfigError:
-                raise  # a config defect is a caller error, never "engine unavailable"
+                (
+                    sun_longitude_at_sunrise,
+                    minutes_since_sunrise,
+                ) = _special_lagna_primitive(drik, jd, place, profile)
             except Exception:
-                module_facts["yogas_engine"] = dict(_YOGAS_ENGINE_UNAVAILABLE)
+                # Optional domain primitive: the Jaimini facade converts absence
+                # into a typed privacy-safe incomplete result.
+                sun_longitude_at_sunrise = None
+                minutes_since_sunrise = None
+            panchanga = _panchanga(jd, place)
+            vimshottari = _vimshottari_current(ref_jd, jd, place)
+            module_facts: dict[str, dict] = {}
+            if "shadbala" in modules:
+                module_facts["shadbala"] = _shadbala(jd, place)
+            if "ashtakavarga" in modules:
+                module_facts["ashtakavarga"] = _ashtakavarga(raw_charts["D1"])
+            if "transits" in modules:
+                module_facts["transits"] = _transits(
+                    ref_jd,
+                    place,
+                    natal_moon_sign=_planet_sign(raw_charts["D1"], 1),  # Moon = index 1
+                    natal_lagna_sign=_lagna_sign(raw_charts["D1"]),
+                    reference_date=reference_date,
+                    timezone=profile.timezone,
+                )
+            if "varshaphal" in modules:
+                module_facts["varshaphal"] = _varshaphal(
+                    jd,
+                    place,
+                    ref_jd,
+                    natal_lagna_sign=_lagna_sign(raw_charts["D1"]),
+                    birth_date=profile.date,
+                    reference_date=reference_date,
+                )
+            if "yogas_engine" in modules:
+                # The ONLY module allowed to degrade instead of failing the compute: it
+                # dispatches ~284 unaudited engine functions, any of which may raise
+                # under a particular ephemeris/date; the rest of the chart must survive.
+                try:
+                    module_facts["yogas_engine"] = _yogas_engine(jd, place, resolved)
+                except ConfigError:
+                    raise  # a config defect is a caller error, never "engine unavailable"
+                except Exception:
+                    module_facts["yogas_engine"] = dict(_YOGAS_ENGINE_UNAVAILABLE)
 
-        # Cross-module joins run AFTER all modules are computed so they never depend
-        # on module execution order. Gochara×SAV: each transit planet gets the SAV
-        # bindus of its transited sign (classical transit strength).
-        if "transits" in module_facts and "ashtakavarga" in module_facts:
-            sav = module_facts["ashtakavarga"]["sav"]
-            for planet in module_facts["transits"]["planets"].values():
-                planet["sav_points"] = sav[planet["sign"]]
+            snapshot = _EngineSnapshot(
+                config=_EngineConfigSnapshot(
+                    ayanamsa=applied.ayanamsa,
+                    rahu_ketu=applied.rahu_ketu,
+                    node_aspects=applied.node_aspects,
+                    charts=tuple(resolved),
+                    modules=tuple(sorted(modules)),
+                ),
+                d1=_immutable_positions(raw_charts["D1"]),
+                d9=_immutable_positions(raw_charts["D9"]),
+                sun_longitude_at_sunrise=sun_longitude_at_sunrise,
+                minutes_since_sunrise=minutes_since_sunrise,
+                ephemeris_mode=ephemeris_mode(),
+            )
+            # Last action under the lock: no callback-side config mutation can alter
+            # engine-dependent values already captured for the natal response.
+            domain_result = (
+                domain_callback(snapshot) if domain_callback is not None else None
+            )
+    finally:
+        _ENGINE_SESSION_LOCAL.active = False
 
-    # Each divisional chart becomes a lowercase fact key (d1, d9, d10, ...). The
-    # ascendant is taken from D1, which resolved_charts guarantees is present.
-    divisional_facts = {name.lower(): _placements(chart) for name, chart in raw_charts.items()}
+    # Cross-module joins and all natal normalization are pure over captured values.
+    if "transits" in module_facts and "ashtakavarga" in module_facts:
+        sav = module_facts["ashtakavarga"]["sav"]
+        for planet in module_facts["transits"]["planets"].values():
+            planet["sav_points"] = sav[planet["sign"]]
+
+    divisional_facts = {
+        name.lower(): _placements(raw_charts[name]) for name in resolved
+    }
     ascendant = _ascendant(raw_charts["D1"])
-    yogas = detect_yogas(divisional_facts["d1"])  # narrow geometric set, D1 only
+    yogas = detect_yogas(divisional_facts["d1"])
     if "yogas_engine" in module_facts:
-        # Two-tier cross-check, run after BOTH tiers exist so it never depends on
-        # module execution order. Always present (possibly empty) so the agent can
-        # rely on the field; strings are context to surface, deliberately NOT atoms.
         module_facts["yogas_engine"]["mismatches"] = _yoga_tier_mismatches(
             yogas, module_facts["yogas_engine"]
         )
-    # D1 ascendant/houses are retained as top-level aliases for back-compat; the
-    # general per-chart forms are `lagnas` and `bhava` (which include D1). Keys are
-    # lowercased (d1, d9, ...) to match the divisional placement key convention.
     houses = _houses(raw_charts["D1"])
-    lagnas = {name.lower(): _ascendant(chart) for name, chart in raw_charts.items()}
-    bhava = {name.lower(): _houses(chart) for name, chart in raw_charts.items()}
+    lagnas = {name.lower(): _ascendant(raw_charts[name]) for name in resolved}
+    bhava = {name.lower(): _houses(raw_charts[name]) for name in resolved}
     aspects = _aspects(raw_charts["D1"], applied.node_aspects)
 
-    return {
+    natal = {
         "normalized_input": {
             "name": profile.name,
             "date": list(profile.date),
@@ -690,8 +1220,6 @@ def compute_chart(
             "node_aspects": applied.node_aspects,
             "charts": list(resolved),
             "modules": sorted(modules),
-            # reference_date drives the running Vimshottari period; surfaced here so a
-            # quoted/cached result is fully reproducible from calculation_config alone.
             "reference_date": list(reference_date),
         },
         "facts": {
@@ -712,3 +1240,14 @@ def compute_chart(
             "ephemeris_mode": ephemeris_mode(),
         },
     }
+
+    return _EngineSessionResult(natal=natal, snapshot=snapshot, domain=domain_result)
+
+
+def compute_chart(
+    profile: BirthProfile,
+    reference_date: DateTuple,
+    config: CalculationConfig | None = None,
+) -> dict:
+    """Compute the deterministic natal fact set through the locked engine session."""
+    return _run_engine_session(profile, reference_date, config).natal

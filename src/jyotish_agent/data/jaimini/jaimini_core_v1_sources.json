@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "rule_profile_id": "jaimini_core_v1",
+  "rule_profile_version": "1.0.0",
+  "rule_profile_sha256": "8a97c43e8438351ae73a59fed731cf5e48ef3c25c347ddf3570dea5818696b58",
+  "calculation_status": "available",
+  "interpretation_status": "unavailable",
+  "review": {
+    "status": "pending",
+    "reviewer": null,
+    "reviewer_role": null,
+    "approval_criteria": [
+      "licensed or public-domain source identity and rights are verified",
+      "every rule has an exact fragment locator and SHA-256 checksum",
+      "five independent expected outputs are adjudicated",
+      "material disagreements are resolved and recorded"
+    ],
+    "adjudication_procedure": "A qualified human reviewer compares independently produced expectations with the named source fragments and records disagreements before approval.",
+    "note": "No qualified human source or calculation review has occurred. Interpretation therefore fails closed."
+  },
+  "rules": [
+    {"rule_id": "karakas.scheme", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "karakas.rahu_reversal", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "karakas.tie_policy", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "arudha.exception", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "rasi_drishti.modal_sign_aspects", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "argala.houses", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "argala.count_obstruction", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "svamsa.d9_lagna", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "karakamsa.d9_atmakaraka", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "special_lagnas.selected_rates", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "co_lords.resolution", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "chara_dasha.progression", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "chara_dasha.duration", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "chara_dasha.antardasha", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "chara_dasha.gender_semantics", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "time.boundaries", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"}
+  ]
+}

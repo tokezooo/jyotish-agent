@@ -1,0 +1,62 @@
+[
+  {
+    "fixture_id": "jx_synthetic_karaka_tie",
+    "coverage": "karaka_tie",
+    "synthetic": true,
+    "public_safe": true,
+    "input": {"profile": "Synthetic Karaka Tie", "birth": {"confidence": "exact", "date": "1992-03-21", "time": "06:15:00", "place": {"name": "Synthetic East", "latitude": 12.5, "longitude": 77.25, "timezone": "Asia/Kolkata"}}, "rule_profile": "jaimini_core_v1", "analysis_scope": "core"},
+    "scenario_parameters": {"planet_longitudes_arcseconds": {"Mars": 65123, "Mercury": 65123}, "purpose": "exact tie must require adjudication"},
+    "expected_calculation_status": "pending_independent_implementation",
+    "rule_profile_sha256": "8a97c43e8438351ae73a59fed731cf5e48ef3c25c347ddf3570dea5818696b58",
+    "source_map_sha256": "5e494796568722aff34fdc6a9fc43634809928d5afb6c1771574119c04ea3095",
+    "review": {"status": "pending", "reviewer": null, "reviewer_role": null, "approval_criteria": ["independent expected output", "source mapping approved"], "adjudication_procedure": "A qualified reviewer compares two independent calculations and the mapped rule source.", "note": "Input is synthetic; expected geometry is intentionally pending."}
+  },
+  {
+    "fixture_id": "jx_synthetic_arudha_exception",
+    "coverage": "arudha_exception",
+    "synthetic": true,
+    "public_safe": true,
+    "input": {"profile": "Synthetic Arudha Exception", "birth": {"confidence": "exact", "date": "1987-08-04", "time": "14:20:00", "place": {"name": "Synthetic West", "latitude": 19.1, "longitude": 72.9, "timezone": "Asia/Kolkata"}}, "rule_profile": "jaimini_core_v1", "analysis_scope": "core"},
+    "scenario_parameters": {"house_sign": "Aries", "lord_sign": "Aries", "purpose": "same-sign path invokes tenth-sign exception"},
+    "expected_calculation_status": "pending_independent_implementation",
+    "rule_profile_sha256": "8a97c43e8438351ae73a59fed731cf5e48ef3c25c347ddf3570dea5818696b58",
+    "source_map_sha256": "5e494796568722aff34fdc6a9fc43634809928d5afb6c1771574119c04ea3095",
+    "review": {"status": "pending", "reviewer": null, "reviewer_role": null, "approval_criteria": ["independent expected output", "source mapping approved"], "adjudication_procedure": "A qualified reviewer compares two independent calculations and the mapped rule source.", "note": "Input is synthetic; expected geometry is intentionally pending."}
+  },
+  {
+    "fixture_id": "jx_synthetic_co_lord",
+    "coverage": "co_lord_case",
+    "synthetic": true,
+    "public_safe": true,
+    "input": {"profile": "Synthetic Co-lord", "birth": {"confidence": "exact", "date": "2001-11-09", "time": "22:05:00", "place": {"name": "Synthetic North", "latitude": 28.6, "longitude": 77.2, "timezone": "Asia/Kolkata"}}, "rule_profile": "jaimini_core_v1", "analysis_scope": "core"},
+    "scenario_parameters": {"sign": "Scorpio", "candidate_lords": ["Mars", "Ketu"], "purpose": "co-lord resolution ordering"},
+    "expected_calculation_status": "pending_independent_implementation",
+    "rule_profile_sha256": "8a97c43e8438351ae73a59fed731cf5e48ef3c25c347ddf3570dea5818696b58",
+    "source_map_sha256": "5e494796568722aff34fdc6a9fc43634809928d5afb6c1771574119c04ea3095",
+    "review": {"status": "pending", "reviewer": null, "reviewer_role": null, "approval_criteria": ["independent expected output", "source mapping approved"], "adjudication_procedure": "A qualified reviewer compares two independent calculations and the mapped rule source.", "note": "Input is synthetic; expected geometry is intentionally pending."}
+  },
+  {
+    "fixture_id": "jx_synthetic_exact_boundary",
+    "coverage": "exact_dasha_boundary",
+    "synthetic": true,
+    "public_safe": true,
+    "input": {"profile": "Synthetic Dasha Boundary", "birth": {"confidence": "exact", "date": "1978-12-31", "time": "23:59:30", "place": {"name": "Synthetic UTC", "latitude": 0.0, "longitude": 0.0, "timezone": "Etc/UTC"}}, "rule_profile": "jaimini_core_v1", "analysis_scope": "core_with_chara_dasha", "gender": "male", "reference_date": "2026-01-01"},
+    "scenario_parameters": {"reference_instant": "2026-01-01T00:00:00Z", "purpose": "instant at prior end and next start selects next half-open period"},
+    "expected_calculation_status": "pending_independent_implementation",
+    "rule_profile_sha256": "8a97c43e8438351ae73a59fed731cf5e48ef3c25c347ddf3570dea5818696b58",
+    "source_map_sha256": "5e494796568722aff34fdc6a9fc43634809928d5afb6c1771574119c04ea3095",
+    "review": {"status": "pending", "reviewer": null, "reviewer_role": null, "approval_criteria": ["independent expected output", "source mapping approved"], "adjudication_procedure": "A qualified reviewer compares two independent calculations and the mapped rule source.", "note": "Input is synthetic; expected timing is intentionally pending."}
+  },
+  {
+    "fixture_id": "jx_synthetic_approximate_range",
+    "coverage": "approximate_time_sensitivity",
+    "synthetic": true,
+    "public_safe": true,
+    "input": {"profile": "Synthetic Approximate Time", "birth": {"confidence": "approximate", "date": "1995-05-17", "earliest_time": "08:00:00", "latest_time": "10:00:00", "place": {"name": "Synthetic South", "latitude": -33.9, "longitude": 151.2, "timezone": "Australia/Sydney"}}, "rule_profile": "jaimini_core_v1", "analysis_scope": "core_with_chara_dasha", "gender": "female"},
+    "scenario_parameters": {"required_samples": 25, "purpose": "material facts must be assessed across the full five-minute sweep"},
+    "expected_calculation_status": "pending_independent_implementation",
+    "rule_profile_sha256": "8a97c43e8438351ae73a59fed731cf5e48ef3c25c347ddf3570dea5818696b58",
+    "source_map_sha256": "5e494796568722aff34fdc6a9fc43634809928d5afb6c1771574119c04ea3095",
+    "review": {"status": "pending", "reviewer": null, "reviewer_role": null, "approval_criteria": ["independent expected output", "source mapping approved"], "adjudication_procedure": "A qualified reviewer compares two independent calculations and the mapped rule source.", "note": "Input is synthetic; expected sensitivity facts are intentionally pending."}
+  }
+]

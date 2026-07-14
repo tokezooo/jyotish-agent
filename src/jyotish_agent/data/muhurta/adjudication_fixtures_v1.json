@@ -1,0 +1,13 @@
+{
+  "gate_status": "pending",
+  "reviewer": null,
+  "reviewer_role": null,
+  "reason": "Synthetic calculation cases are frozen, but no qualified doctrinal review has occurred.",
+  "cases": [
+    {"case_id": "moscow_work_day", "criterion": "one_day", "activity": "focused_work_session_v1", "zone_id": "Europe/Moscow", "review_status": "pending"},
+    {"case_id": "kolkata_generic", "criterion": "multi_day", "activity": "general", "zone_id": "Asia/Kolkata", "review_status": "pending"},
+    {"case_id": "explicit_empty", "criterion": "empty", "activity": "focused_work_session_v1", "zone_id": "Europe/Moscow", "review_status": "pending"},
+    {"case_id": "cancelled", "criterion": "cancellation", "activity": "general", "zone_id": "Europe/London", "review_status": "pending"},
+    {"case_id": "unsafe_activity", "criterion": "high_stakes", "activity": "unsupported", "zone_id": "America/New_York", "review_status": "pending"}
+  ]
+}
