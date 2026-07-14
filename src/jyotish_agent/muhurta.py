@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+from dataclasses import dataclass
 from typing import Callable
 from zoneinfo import ZoneInfo
 
@@ -144,12 +145,30 @@ def _deadline_expired(request: MuhurtaSearchRequest, now: Callable[[], dt.dateti
     return request.deadline_utc is not None and now().astimezone(dt.UTC) >= request.deadline_utc
 
 
+@dataclass(frozen=True)
+class MuhurtaInternalCandidateSet:
+    """Complete bounded candidates for the private doctrine layer only."""
+
+    status: str
+    windows: tuple[MuhurtaWindow, ...]
+    near_misses: tuple[MuhurtaNearMiss, ...]
+
+
 class MuhurtaFacade:
     def __init__(self, *, clock: Callable[[], dt.datetime] | None = None, cancel_check: Callable[[], bool] | None = None):
         self._clock = clock or (lambda: dt.datetime.now(dt.UTC))
         self._cancel_check = cancel_check or (lambda: False)
 
-    def search(self, request: MuhurtaSearchRequest) -> MuhurtaResult:
+    def search(
+        self,
+        request: MuhurtaSearchRequest,
+        *,
+        internal_result_limit: int | None = None,
+    ) -> MuhurtaResult | MuhurtaInternalCandidateSet:
+        if internal_result_limit is not None and not (
+            1 <= internal_result_limit <= request.max_candidate_intervals
+        ):
+            raise ValueError("internal result limit must fit the candidate bound")
         range_hash = _sha(_request_material(request))
         request_id = "muh_" + range_hash[:24]
         if request.activity in _HIGH_STAKES:
@@ -334,7 +353,14 @@ class MuhurtaFacade:
         # score is applied while the governed pack is pending.
         accepted.sort(key=lambda item: (item.start.astimezone(dt.UTC), item.end.astimezone(dt.UTC), item.window_id))
         rejected.sort(key=lambda item: (len(item.rejection_rule_ids), item.start.astimezone(dt.UTC), item.candidate_id))
-        returned, near = tuple(accepted[:request.result_limit]), tuple(rejected[:request.near_miss_limit])
+        if internal_result_limit is not None:
+            return MuhurtaInternalCandidateSet(
+                status="completed",
+                windows=tuple(accepted[:internal_result_limit]),
+                near_misses=tuple(rejected[:internal_result_limit]),
+            )
+        returned = tuple(accepted[:request.result_limit])
+        near = tuple(rejected[:request.near_miss_limit])
         profile_rule_traces = (
             MuhurtaRuleTrace(
                 rule_id="muhurta.constraints.explicit", classification="hard",

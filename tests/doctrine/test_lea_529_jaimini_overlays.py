@@ -1,0 +1,111 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import pytest
+
+from jaimini_helpers import build_jaimini_graph
+from jyotish_agent.doctrine.jaimini_pack import (
+    JaiminiOverlayFailure,
+    JaiminiOverlayRegistry,
+    JaiminiTopic,
+    analyze_jaimini_topic,
+    compare_jaimini_overlays,
+)
+
+
+ROOT = Path(__file__).parents[2]
+REGISTRY = ROOT / "src/jyotish_agent/data/doctrine/jaimini-overlays.json"
+
+
+def _analysis(school: str, rule_id: str):
+    graph = build_jaimini_graph(
+        facts={"jaimini.karakas.7.AK": "Mercury"},
+        rules=[
+            {
+                "rule_id": rule_id,
+                "topic": "self",
+                "premises": [
+                    {
+                        "path": "jaimini.karakas.7.AK",
+                        "operator": "exists",
+                        "value": None,
+                    }
+                ],
+            }
+        ],
+        school=school,
+        artifact_id=f"dom_{school}",
+    )
+    return analyze_jaimini_topic(graph, JaiminiTopic.SELF)
+
+
+def test_overlay_registry_names_sources_and_keeps_unacquired_profiles_disabled() -> (
+    None
+):
+    registry = JaiminiOverlayRegistry.model_validate_json(
+        REGISTRY.read_text(encoding="utf-8")
+    )
+
+    assert {item.overlay_id for item in registry.overlays} == {
+        "sanjay_rath",
+        "kn_rao_practical",
+    }
+    assert all(item.activation_status == "unavailable" for item in registry.overlays)
+    assert all(item.source_ids == () for item in registry.overlays)
+
+
+def test_overlay_requires_explicit_activation_and_preserves_baseline_identity() -> None:
+    baseline = _analysis("nilakantha_baseline", "self.baseline")
+    overlay = _analysis("sanjay_rath", "self.rath")
+    baseline_before = baseline.model_dump_json()
+
+    inactive = compare_jaimini_overlays(
+        baseline, overlay, overlay_id="sanjay_rath", activate=False
+    )
+    active = compare_jaimini_overlays(
+        baseline, overlay, overlay_id="sanjay_rath", activate=True
+    )
+
+    assert inactive.overlay_active is False
+    assert inactive.overlay_signals == ()
+    assert active.overlay_active is True
+    assert active.baseline_graph_sha256 == baseline.graph_sha256
+    assert active.overlay_graph_sha256 == overlay.graph_sha256
+    assert active.baseline_signals == baseline.signals
+    assert active.overlay_signals == overlay.signals
+    assert baseline.model_dump_json() == baseline_before
+
+
+def test_side_by_side_overlay_comparison_is_deterministic_and_explicit() -> None:
+    baseline = _analysis("nilakantha_baseline", "self.baseline")
+    overlay = _analysis("kn_rao_practical", "self.kn_rao")
+
+    first = compare_jaimini_overlays(
+        baseline, overlay, overlay_id="kn_rao_practical", activate=True
+    )
+    second = compare_jaimini_overlays(
+        baseline, overlay, overlay_id="kn_rao_practical", activate=True
+    )
+
+    assert first == second
+    assert first.school_ids == ("kn_rao_practical", "nilakantha_baseline")
+    assert first.divergences == (("self.baseline", "self.kn_rao"),)
+
+
+def test_hidden_school_blending_is_rejected() -> None:
+    baseline = _analysis("nilakantha_baseline", "self.baseline")
+    disguised = _analysis("nilakantha_baseline", "self.hidden_overlay")
+
+    with pytest.raises(JaiminiOverlayFailure) as hidden:
+        compare_jaimini_overlays(
+            baseline, disguised, overlay_id="sanjay_rath", activate=True
+        )
+    assert hidden.value.code == "OVERLAY_SCHOOL_NOT_EXPLICIT"
+
+
+def test_registry_file_contains_no_rules_or_copyrighted_text() -> None:
+    payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    assert all("rules" not in item for item in payload["overlays"])
+    assert all("text" not in item for item in payload["overlays"])

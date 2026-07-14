@@ -30,8 +30,14 @@ from .mcp_models import (
     FinalizedResearch,
     FinalizeResearchInput,
     InspectResearchInput,
+    JaiminiFullMcpInput,
+    JaiminiFullReleaseResult,
     JaiminiMcpInput,
+    MuhurtaFullMcpInput,
+    MuhurtaFullReleaseResult,
     MuhurtaMcpInput,
+    PrashnaFullMcpInput,
+    PrashnaFullReleaseResult,
     PrashnaMcpInput,
     ProfileInput,
     ProfileResult,
@@ -168,7 +174,9 @@ class JyotishMcpFacade:
         except Exception as exc:
             raise McpFacadeError("DEFAULT_PROFILE_INVALID") from exc
 
-    def _select_profile(self, value: ProfileInput | CalculateInput | ResearchInput) -> ResearchBirthProfileRequest:
+    def _select_profile(
+        self, value: ProfileInput | CalculateInput | ResearchInput
+    ) -> ResearchBirthProfileRequest:
         if value.profile == "inline":
             if value.inline_profile is None:
                 raise McpFacadeError("INLINE_PROFILE_REQUIRED")
@@ -191,8 +199,14 @@ class JyotishMcpFacade:
         civil = dt.datetime.combine(profile.date, profile.time)
         timezone = profile.place.timezone
         if isinstance(timezone, (int, float, FixedOffsetLegacy)):
-            offset = timezone.offset_hours if isinstance(timezone, FixedOffsetLegacy) else float(timezone)
-            resolved = resolve_fixed(civil, offset_hours=offset, longitude=profile.place.longitude)
+            offset = (
+                timezone.offset_hours
+                if isinstance(timezone, FixedOffsetLegacy)
+                else float(timezone)
+            )
+            resolved = resolve_fixed(
+                civil, offset_hours=offset, longitude=profile.place.longitude
+            )
         elif isinstance(timezone, (IanaTimezone, IanaWithAssertedOffset)):
             resolved = resolve_iana(
                 civil,
@@ -234,7 +248,11 @@ class JyotishMcpFacade:
         reference_date = value.reference_date or dt.datetime.now(dt.UTC).date()
         calculated = compute_chart(
             calculation_profile.to_birth_profile(),
-            reference_date=(reference_date.year, reference_date.month, reference_date.day),
+            reference_date=(
+                reference_date.year,
+                reference_date.month,
+                reference_date.day,
+            ),
             config=config.to_calculation_config(),
         )
         return CalculateResult(
@@ -316,14 +334,17 @@ class JyotishMcpFacade:
 
         from .error_registry import error_record
 
-        request_id = "req_" + hashlib.sha256(
-            json.dumps(
-                {"request": value, "outer": outer_arguments},
-                sort_keys=True,
-                separators=(",", ":"),
-                default=str,
-            ).encode()
-        ).hexdigest()[:24]
+        request_id = (
+            "req_"
+            + hashlib.sha256(
+                json.dumps(
+                    {"request": value, "outer": outer_arguments},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    default=str,
+                ).encode()
+            ).hexdigest()[:24]
+        )
         record = error_record(
             "INPUT_INVALID",
             run_id=None,
@@ -347,13 +368,173 @@ class JyotishMcpFacade:
         }
         return JaiminiNeedsInputResult(status="needs_input", **fields)
 
+    def jaimini_full(self, value: JaiminiFullMcpInput) -> JaiminiFullReleaseResult:
+        """Expose the governed Full Jaimini surface only when its audit permits it."""
+
+        from .doctrine.jaimini_pack import JaiminiReleaseAudit
+
+        audit_path = Path(__file__).parent / "data/doctrine/jaimini-release.json"
+        audit = JaiminiReleaseAudit.model_validate_json(
+            audit_path.read_text(encoding="utf-8")
+        )
+        if audit.available:  # pragma: no cover - requires future admitted source pack
+            raise McpFacadeError("JAIMINI_FULL_RUNTIME_NOT_CONFIGURED")
+        return JaiminiFullReleaseResult(
+            status="unavailable",
+            request_mode=value.mode,
+            locale=value.locale,
+            topics=value.topics,
+            admission_state="blocked_sources",
+            blockers=list(audit.blockers),
+            external_review_missing=audit.external_review_missing,
+            report=None,
+        )
+
+    def jaimini_full_payload(
+        self,
+        value: object,
+        *,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> JaiminiFullReleaseResult:
+        parsed: JaiminiFullMcpInput | None = None
+        if not outer_arguments and isinstance(value, dict):
+            try:
+                parsed = JaiminiFullMcpInput.model_validate(value)
+            except ValidationError:
+                pass
+        if parsed is not None:
+            return self.jaimini_full(parsed)
+        return JaiminiFullReleaseResult(
+            status="needs_input",
+            external_review_missing=True,
+            error_code="INPUT_INVALID",
+        )
+
     def prashna(self, value: PrashnaMcpInput) -> PrashnaResult:
         """Compute one stateless, sealed question-time Praśna result."""
         return PrashnaFacade(clock=self.clock).calculate(value)
 
+    def prashna_full(self, value: PrashnaFullMcpInput) -> PrashnaFullReleaseResult:
+        """Expose Full Prashna only when the packaged release audit permits it."""
+
+        from .doctrine.prashna_pack import PrashnaReleaseAudit
+
+        audit = PrashnaReleaseAudit.model_validate_json(
+            (Path(__file__).parent / "data/doctrine/prashna-release.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        if audit.available:  # pragma: no cover - future admitted production release
+            raise McpFacadeError("PRASHNA_FULL_RUNTIME_NOT_CONFIGURED")
+        return PrashnaFullReleaseResult(
+            status="unavailable",
+            request_mode=value.mode,
+            locale=value.locale,
+            admission_state="blocked_sources",
+            blockers=list(audit.blockers),
+            external_review_missing=audit.external_review_missing,
+            report=None,
+        )
+
+    def prashna_full_payload(
+        self,
+        value: object,
+        *,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> PrashnaFullReleaseResult:
+        parsed: PrashnaFullMcpInput | None = None
+        if not outer_arguments and isinstance(value, dict):
+            try:
+                parsed = PrashnaFullMcpInput.model_validate(value)
+            except ValidationError:
+                pass
+        if parsed is not None:
+            return self.prashna_full(parsed)
+        return PrashnaFullReleaseResult(
+            status="needs_input",
+            external_review_missing=True,
+            error_code="INPUT_INVALID",
+        )
+
     def muhurta(self, value: MuhurtaMcpInput) -> MuhurtaResult:
         """Search calculated event boundaries without persistence or side effects."""
         return MuhurtaFacade(clock=self.clock).search(value)
+
+    def muhurta_full(self, value: MuhurtaFullMcpInput) -> MuhurtaFullReleaseResult:
+        """Run the immutable private experimental baseline with no side effects."""
+
+        from .doctrine.muhurta_pack import (
+            load_muhurta_release_audit,
+            route_muhurta_activity,
+        )
+        from .doctrine.muhurta_release import execute_muhurta_full
+
+        audit = load_muhurta_release_audit()
+        if not audit.available:
+            route = route_muhurta_activity(value.activity, locale=value.locale)
+            if route.status == "unsupported_high_stakes":
+                error_code = "HIGH_STAKES_ACTIVITY"
+                status = "unavailable"
+            elif route.status != "supported":
+                error_code = route.reason_code or "ACTIVITY_UNSUPPORTED"
+                status = "needs_input"
+            elif value.natal is not None:
+                error_code = "NATAL_PERSONALIZATION_NOT_COMPILED"
+                status = "unavailable"
+            else:
+                error_code = "RELEASE_GATES_INCOMPLETE"
+                status = "unavailable"
+            return MuhurtaFullReleaseResult(
+                status=status,
+                request_mode=value.mode,
+                locale=value.locale,
+                profile=route.profile,
+                admission_state=audit.admission_state,
+                public_release_blockers=list(audit.public_release_blockers),
+                external_review_missing=audit.external_review_missing,
+                report=None,
+                error_code=error_code,
+            )
+        execution = execute_muhurta_full(
+            value,
+            locale=value.locale,
+            mode=value.mode,
+        )
+        return MuhurtaFullReleaseResult(
+            status=execution.status,
+            request_mode=value.mode,
+            locale=value.locale,
+            profile=execution.profile,
+            admission_state=audit.admission_state,
+            public_release_blockers=list(audit.public_release_blockers),
+            external_review_missing=audit.external_review_missing,
+            report=(
+                execution.report.model_dump(mode="json")
+                if execution.report is not None
+                else None
+            ),
+            error_code=execution.reason_code,
+        )
+
+    def muhurta_full_payload(
+        self,
+        value: object,
+        *,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> MuhurtaFullReleaseResult:
+        parsed: MuhurtaFullMcpInput | None = None
+        if not outer_arguments and isinstance(value, dict):
+            try:
+                parsed = MuhurtaFullMcpInput.model_validate(value)
+            except ValidationError:
+                pass
+        if parsed is not None:
+            return self.muhurta_full(parsed)
+        return MuhurtaFullReleaseResult(
+            status="needs_input",
+            external_review_missing=True,
+            error_code="INPUT_INVALID",
+        )
 
     def muhurta_payload(
         self,
@@ -372,9 +553,17 @@ class JyotishMcpFacade:
             return self.muhurta(parsed)
         import hashlib
 
-        request_id = "muh_" + hashlib.sha256(
-            json.dumps({"request": value, "outer": outer_arguments}, sort_keys=True, separators=(",", ":"), default=str).encode()
-        ).hexdigest()[:24]
+        request_id = (
+            "muh_"
+            + hashlib.sha256(
+                json.dumps(
+                    {"request": value, "outer": outer_arguments},
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    default=str,
+                ).encode()
+            ).hexdigest()[:24]
+        )
         from .error_registry import error_record
         from .muhurta_models import MuhurtaNeedsInputResult
 
@@ -386,15 +575,42 @@ class JyotishMcpFacade:
                 supported_values = ("muhurta_focused_work_v1",)
             else:
                 try:
-                    start = dt.datetime.fromisoformat(str(value.get("start", "")).replace("Z", "+00:00"))
-                    end = dt.datetime.fromisoformat(str(value.get("end", "")).replace("Z", "+00:00"))
+                    start = dt.datetime.fromisoformat(
+                        str(value.get("start", "")).replace("Z", "+00:00")
+                    )
+                    end = dt.datetime.fromisoformat(
+                        str(value.get("end", "")).replace("Z", "+00:00")
+                    )
                     if end - start > dt.timedelta(days=31):
                         code = "SEARCH_RANGE_TOO_LARGE"
                 except (TypeError, ValueError):
                     pass
-        record = error_record(code, run_id=None, request_id=request_id, mode="muhurta", stage="input_validation")
-        fields = {key: record[key] for key in ("error_code", "request_id", "mode", "stage", "retryable", "problem", "cause", "fix", "next_action")}
-        return MuhurtaNeedsInputResult(status="needs_input", supported_values=supported_values or ("general", "focused_work_session_v1"), **fields)
+        record = error_record(
+            code,
+            run_id=None,
+            request_id=request_id,
+            mode="muhurta",
+            stage="input_validation",
+        )
+        fields = {
+            key: record[key]
+            for key in (
+                "error_code",
+                "request_id",
+                "mode",
+                "stage",
+                "retryable",
+                "problem",
+                "cause",
+                "fix",
+                "next_action",
+            )
+        }
+        return MuhurtaNeedsInputResult(
+            status="needs_input",
+            supported_values=supported_values or ("general", "focused_work_session_v1"),
+            **fields,
+        )
 
     def prashna_payload(
         self,
@@ -412,28 +628,83 @@ class JyotishMcpFacade:
         if parsed is None:
             import hashlib
 
-            request_id = "prq_" + hashlib.sha256(
-                json.dumps(
-                    {"request": value, "outer": outer_arguments},
-                    sort_keys=True, separators=(",", ":"), default=str,
-                ).encode()
-            ).hexdigest()[:24]
+            request_id = (
+                "prq_"
+                + hashlib.sha256(
+                    json.dumps(
+                        {"request": value, "outer": outer_arguments},
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        default=str,
+                    ).encode()
+                ).hexdigest()[:24]
+            )
             from .error_registry import error_record
             from .prashna_models import PrashnaNeedsInputResult
 
             record = error_record(
-                "INPUT_INVALID", run_id=None, request_id=request_id,
-                mode="prashna", stage="input_validation",
+                "INPUT_INVALID",
+                run_id=None,
+                request_id=request_id,
+                mode="prashna",
+                stage="input_validation",
             )
             fields = {
                 key: record[key]
                 for key in (
-                    "error_code", "request_id", "mode", "stage", "retryable",
-                    "problem", "cause", "fix", "next_action",
+                    "error_code",
+                    "request_id",
+                    "mode",
+                    "stage",
+                    "retryable",
+                    "problem",
+                    "cause",
+                    "fix",
+                    "next_action",
                 )
             }
             return PrashnaNeedsInputResult(status="needs_input", **fields)
         return self.prashna(parsed)
+
+    def prashna_full_render_payload(self, value: object) -> dict[str, object]:
+        """Total privacy-safe adapter for the experimental Full Prashna renderer."""
+        try:
+            if not isinstance(value, dict):
+                raise ValueError("invalid payload")
+            from .doctrine.prashna_pack import (
+                PrashnaOutcomeGraph,
+                render_prashna_outcome,
+            )
+
+            language = value.get("language", "en")
+            depth = value.get("depth", "full")
+            include_evidence = value.get("include_evidence", False)
+            if (
+                language not in {"ru", "en"}
+                or depth
+                not in {
+                    "quick",
+                    "full",
+                    "deep",
+                }
+                or not isinstance(include_evidence, bool)
+            ):
+                raise ValueError("invalid render options")
+            graph = PrashnaOutcomeGraph.model_validate(value.get("graph"))
+            report = render_prashna_outcome(
+                graph,
+                language=language,
+                depth=depth,
+                include_evidence=include_evidence,
+            )
+            return report.model_dump(mode="json")
+        except (TypeError, ValueError, ValidationError):
+            return {
+                "status": "unavailable",
+                "error_code": "INPUT_INVALID",
+                "problem": "The Full Prashna render request is invalid.",
+                "next_action": "Submit a validated graph and supported render options.",
+            }
 
     def search_sources(self, value: SourceSearchInput) -> SourceSearchResult:
         results = []
@@ -451,7 +722,9 @@ class JyotishMcpFacade:
                 expected_revision=0,
                 question=value.question,
                 birth_profile=profile,
-                calculation_config=CalculationConfigRequest(reference_date=value.reference_date),
+                calculation_config=CalculationConfigRequest(
+                    reference_date=value.reference_date
+                ),
                 model_version=value.model_version,
                 planner_version="career-planner-v1",
                 corpus_version="governed-corpus-v1",
@@ -497,7 +770,9 @@ class JyotishMcpFacade:
                 status=planned.status,
                 safe=True,
                 plan=planned.plan.model_dump(mode="json"),
-                limitations=["The deterministic planner did not support this question."],
+                limitations=[
+                    "The deterministic planner did not support this question."
+                ],
             )
         calculated = self.service.calculate_run(
             created.run_id,
@@ -552,8 +827,14 @@ class JyotishMcpFacade:
             raise McpFacadeError("RUN_NOT_FOUND")
         if run["revision"] != value.expected_revision:
             raise McpFacadeError("REVISION_CONFLICT")
-        evidence = {item["evidence_id"]: item for item in self.store.list_evidence(value.run_id)}
-        requested = list(dict.fromkeys(support for finding in value.findings for support in finding.supports))
+        evidence = {
+            item["evidence_id"]: item for item in self.store.list_evidence(value.run_id)
+        }
+        requested = list(
+            dict.fromkeys(
+                support for finding in value.findings for support in finding.supports
+            )
+        )
         if any(support not in evidence for support in requested):
             raise McpFacadeError("EVIDENCE_MISSING")
 
@@ -574,7 +855,9 @@ class JyotishMcpFacade:
                     )
                 )
             elif item["evidence_type"] == "source_fragment":
-                source_text = item["payload"].get("quote") or item["payload"].get("text")
+                source_text = item["payload"].get("quote") or item["payload"].get(
+                    "text"
+                )
                 if not isinstance(source_text, str) or not source_text:
                     raise McpFacadeError("SOURCE_EVIDENCE_INVALID")
                 claims.append(
@@ -639,7 +922,9 @@ class JyotishMcpFacade:
                 "claims_hash": replayed.claims_hash,
                 "memo_hash": replayed.memo_hash,
             }
-        claims = self.store.list_claims(value.run_id) if value.include_provenance else None
+        claims = (
+            self.store.list_claims(value.run_id) if value.include_provenance else None
+        )
         return ResearchInspection(
             run_id=value.run_id,
             status=inspected.run.status,
@@ -666,5 +951,7 @@ def facade_from_environment() -> JyotishMcpFacade:
         )
     )
     raw_profile = os.environ.get("JYOTISH_DEFAULT_PROFILE_PATH")
-    profile_path = Path(raw_profile) if raw_profile else data_root / "profiles" / "vlad.json"
+    profile_path = (
+        Path(raw_profile) if raw_profile else data_root / "profiles" / "vlad.json"
+    )
     return JyotishMcpFacade(data_root, profile_path)

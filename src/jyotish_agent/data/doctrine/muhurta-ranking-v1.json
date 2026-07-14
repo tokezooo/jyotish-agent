@@ -1,0 +1,11 @@
+{
+  "schema_version": "1.0",
+  "profiles": [
+    {"profile": "focused_work", "version": "1.0.0", "doctrine_weight": 5, "natal_weight": 2, "user_preference_weight": 1, "tie_break": "start_utc_then_candidate_id"},
+    {"profile": "study_learning", "version": "1.0.0", "doctrine_weight": 5, "natal_weight": 2, "user_preference_weight": 1, "tie_break": "start_utc_then_candidate_id"},
+    {"profile": "creative_production", "version": "1.0.0", "doctrine_weight": 5, "natal_weight": 2, "user_preference_weight": 1, "tie_break": "start_utc_then_candidate_id"},
+    {"profile": "product_launch_communication", "version": "1.0.0", "doctrine_weight": 5, "natal_weight": 2, "user_preference_weight": 1, "tie_break": "start_utc_then_candidate_id"},
+    {"profile": "low_risk_travel_planning", "version": "1.0.0", "doctrine_weight": 5, "natal_weight": 2, "user_preference_weight": 1, "tie_break": "start_utc_then_candidate_id"},
+    {"profile": "general_private_task", "version": "1.0.0", "doctrine_weight": 5, "natal_weight": 2, "user_preference_weight": 1, "tie_break": "start_utc_then_candidate_id"}
+  ]
+}

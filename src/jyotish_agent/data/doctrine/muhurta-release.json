@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0",
+  "release_id": "expanded_muhurta_v1",
+  "corpus_manifest_sha256": "e6643be2f730e67b2cd6b80f64cfe46894240bb112a0ff26cae22a0c390c2e07",
+  "compiled_profile_sha256": "4552d6fa9c5c9b99849927586731dccb71bbd88695149d899f07ffef008c78d2",
+  "admission_state": "blocked_evaluation",
+  "available": false,
+  "public_release_ready": false,
+  "external_review_missing": true,
+  "gates": [
+    {"gate_id": "source_manifest", "status": "passed", "evidence": "Three public-domain source files verify by SHA-256 with explicit PDF-to-print offsets."},
+    {"gate_id": "profile_identity", "status": "passed", "evidence": "The release identity binds the source manifest, corpus, examples, profiles, admitted rules, and ranking catalog."},
+    {"gate_id": "private_baseline_profile", "status": "passed", "evidence": "The immutable private baseline admits only Yamaganda and Rahu-kala intervals anchored to Kalaprakasika PDF page 208 / printed page 176."},
+    {"gate_id": "profile_rule_fixture_suite", "status": "passed", "evidence": "RU/EN routing, hard/soft eligibility, DST, personalization, ranking, privacy, and report fixtures pass."},
+    {"gate_id": "private_runtime_e2e", "status": "passed", "evidence": "The internal read-only engine returns ranked calendar-ready windows in direct E2E tests; MCP and HTTP remain fail-closed while required release gates are missing."},
+    {"gate_id": "independent_held_out_evaluation", "status": "missing", "evidence": null},
+    {"gate_id": "modern_overlay", "status": "optional_missing", "evidence": null},
+    {"gate_id": "specialist_review", "status": "missing", "evidence": null},
+    {"gate_id": "cross_domain_concierge_sessions", "status": "missing", "evidence": null},
+    {"gate_id": "whole_project_independent_review", "status": "passed", "evidence": "Independent read-only review of origin/main..a07c068 reported zero Critical and zero Important findings and a Ready to merge verdict."}
+  ],
+  "domain_metrics": [
+    {"domain": "jaimini", "automated_held_out_count": 0, "material_error_count": null, "material_error_rate": null, "concierge_session_count": 0, "value_score": null},
+    {"domain": "prashna", "automated_held_out_count": 0, "material_error_count": null, "material_error_rate": null, "concierge_session_count": 0, "value_score": null},
+    {"domain": "muhurta", "automated_held_out_count": 0, "material_error_count": null, "material_error_rate": null, "concierge_session_count": 0, "value_score": null}
+  ],
+  "completed_evidence": [
+    "The private baseline, deterministic runtime, ranking, reports, and privacy projections are automated and packaged.",
+    "High-stakes activity routing, DST folds, half-open intervals, score manipulation, and prose tampering are covered.",
+    "Independent whole-project code review completed with no Critical or Important findings."
+  ],
+  "future_follow_up": [
+    "Run 10-20 opt-in concierge sessions across Jaimini, Prashna, and Muhurta and record domain value scores.",
+    "Obtain specialist review of the private Muhurta rule pack.",
+    "Acquire and review the named modern B. V. Raman overlay before enabling overlay comparison results."
+  ],
+  "public_release_blockers": [
+    "independent_held_out_evaluation: no independently designed outcome corpus and evaluator result exists",
+    "specialist_review: external rule-pack review is missing",
+    "cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
+    "modern_overlay: the named modern source has not been lawfully supplied and reviewed"
+  ]
+}

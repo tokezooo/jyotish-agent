@@ -54,6 +54,7 @@ class ProfileSelection(BaseModel):
     profile: ProfileMode = "default"
     inline_profile: ResearchBirthProfileRequest | None = None
 
+
 class ProfileInput(ProfileSelection):
     pass
 
@@ -67,7 +68,9 @@ class ProfileResult(BaseModel):
 
 class CalculateInput(ProfileSelection):
     question: str = Field(min_length=1, max_length=2_000)
-    charts: list[AllowedChart] = Field(default_factory=lambda: ["D1", "D9"], min_length=1, max_length=7)
+    charts: list[AllowedChart] = Field(
+        default_factory=lambda: ["D1", "D9"], min_length=1, max_length=7
+    )
     modules: list[AllowedModule] = Field(default_factory=list, max_length=4)
     reference_date: dt.date | None = None
 
@@ -103,12 +106,142 @@ class JaiminiMcpInput(ProfileSelection):
         return self
 
 
+class JaiminiFullMcpInput(ProfileSelection):
+    question: str = Field(min_length=1, max_length=2_000)
+    mode: Literal["quick", "full", "deep", "inspection"] = "full"
+    locale: Literal["ru", "en"] = "ru"
+    topics: list[Literal["self", "career", "relationships", "timing"]] = Field(
+        default_factory=lambda: ["self", "career", "relationships", "timing"],
+        min_length=1,
+        max_length=4,
+    )
+    include_evidence: bool = False
+
+    @model_validator(mode="after")
+    def _inspection_owns_evidence(self) -> "JaiminiFullMcpInput":
+        if len(self.topics) != len(set(self.topics)):
+            raise ValueError("topics must be unique")
+        if self.include_evidence and self.mode != "inspection":
+            raise ValueError("include_evidence is available only in inspection mode")
+        return self
+
+
+class JaiminiFullReleaseResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    surface: Literal["experimental_full"] = "experimental_full"
+    status: Literal["unavailable", "needs_input"]
+    request_mode: Literal["quick", "full", "deep", "inspection"] | None = None
+    locale: Literal["ru", "en"] | None = None
+    topics: list[Literal["self", "career", "relationships", "timing"]] = Field(
+        default_factory=list
+    )
+    admission_state: Literal["blocked_sources"] | None = None
+    blockers: list[str] = Field(default_factory=list)
+    external_review_missing: bool
+    report: str | None = None
+    error_code: Literal["INPUT_INVALID"] | None = None
+
+    @model_validator(mode="after")
+    def _status_contract(self) -> "JaiminiFullReleaseResult":
+        if self.status == "unavailable":
+            if self.admission_state != "blocked_sources" or self.error_code is not None:
+                raise ValueError("unavailable release requires a blocked source audit")
+        elif self.error_code != "INPUT_INVALID" or self.admission_state is not None:
+            raise ValueError("needs_input release requires a sanitized input error")
+        return self
+
+
 class PrashnaMcpInput(PrashnaRequest):
     """Additive MCP input; intentionally independent from natal profiles."""
 
 
+class PrashnaFullMcpInput(PrashnaRequest):
+    """Governed Full Prashna request over the existing sealed-anchor contract."""
+
+    mode: Literal["quick", "full", "deep", "inspection"] = "full"
+    locale: Literal["ru", "en"] = "ru"
+    include_evidence: bool = False
+
+    @model_validator(mode="after")
+    def _inspection_owns_evidence(self) -> "PrashnaFullMcpInput":
+        if self.include_evidence and self.mode != "inspection":
+            raise ValueError("include_evidence is available only in inspection mode")
+        return self
+
+
+class PrashnaFullReleaseResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    surface: Literal["experimental_full"] = "experimental_full"
+    status: Literal["unavailable", "needs_input"]
+    request_mode: Literal["quick", "full", "deep", "inspection"] | None = None
+    locale: Literal["ru", "en"] | None = None
+    admission_state: Literal["blocked_sources"] | None = None
+    blockers: list[str] = Field(default_factory=list)
+    external_review_missing: bool
+    report: dict[str, Any] | None = None
+    error_code: Literal["INPUT_INVALID"] | None = None
+
+    @model_validator(mode="after")
+    def _status_contract(self) -> "PrashnaFullReleaseResult":
+        if self.status == "unavailable":
+            if self.admission_state != "blocked_sources" or self.error_code is not None:
+                raise ValueError("unavailable release requires blocked source audit")
+        elif self.error_code != "INPUT_INVALID" or self.admission_state is not None:
+            raise ValueError("needs_input release requires sanitized input error")
+        return self
+
+
 class MuhurtaMcpInput(MuhurtaSearchRequest):
     """Additive event-search input; it never selects or persists a natal profile."""
+
+
+class MuhurtaFullMcpInput(MuhurtaSearchRequest):
+    """Private source-bound Muhurta request over the existing event-search contract."""
+
+    mode: Literal["quick", "full", "deep", "inspection"] = "full"
+    locale: Literal["ru", "en"] = "ru"
+    include_evidence: bool = False
+
+    @model_validator(mode="after")
+    def _inspection_owns_evidence(self) -> "MuhurtaFullMcpInput":
+        if self.include_evidence and self.mode != "inspection":
+            raise ValueError("include_evidence is available only in inspection mode")
+        return self
+
+
+class MuhurtaFullReleaseResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    surface: Literal["experimental_full"] = "experimental_full"
+    status: Literal["completed", "no_window", "unavailable", "needs_input", "incomplete"]
+    request_mode: Literal["quick", "full", "deep", "inspection"] | None = None
+    locale: Literal["ru", "en"] | None = None
+    profile: Literal[
+        "focused_work",
+        "study_learning",
+        "creative_production",
+        "product_launch_communication",
+        "low_risk_travel_planning",
+        "general_private_task",
+    ] | None = None
+    admission_state: Literal["blocked_evaluation", "private_experimental"] | None = None
+    public_release_blockers: list[str] = Field(default_factory=list)
+    external_review_missing: bool
+    report: dict[str, Any] | None = None
+    error_code: str | None = None
+
+    @model_validator(mode="after")
+    def _status_contract(self) -> "MuhurtaFullReleaseResult":
+        if self.status in {"completed", "no_window"}:
+            if (
+                self.admission_state != "private_experimental"
+                or self.profile is None
+                or self.report is None
+                or self.error_code is not None
+            ):
+                raise ValueError("successful private release requires profile and report")
+        elif self.report is not None or self.error_code is None:
+            raise ValueError("non-success release requires a sanitized error")
+        return self
 
 
 class SourceSearchInput(BaseModel):

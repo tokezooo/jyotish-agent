@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "profile_id": "prasna_marga_radicality_v1",
+  "school": "prasna_marga_baseline",
+  "profile_kind": "baseline",
+  "overlay_profile_id": null,
+  "confidence_ceiling": 0.65,
+  "criteria": [
+    {
+      "criterion_id": "anchor_exact",
+      "source_id": "prasna_marga_bv_raman_part_1_1991",
+      "pdf_page": 34,
+      "printed_page": 34,
+      "page_sha256": "8e1c28727999782c1366b4766b8bfd3d54293ca12f4b590b73320f7af3a65e73",
+      "source_locator": "Chapter II, stanza 12"
+    },
+    {
+      "criterion_id": "question_not_test",
+      "source_id": "prasna_marga_bv_raman_part_1_1991",
+      "pdf_page": 33,
+      "printed_page": 33,
+      "page_sha256": "70b938d61d5d386f9a4902345a7c3071314c3a0c2abfd78d739d081364a524f9",
+      "source_locator": "Chapter II, stanzas 4-6"
+    },
+    {
+      "criterion_id": "question_once",
+      "source_id": "daivajna_vallabha_2003_scan",
+      "pdf_page": 2,
+      "printed_page": 2,
+      "page_sha256": "96b73720d766ce2eddad7907e7c4177538bee19c66c9fccd6bcf30b2d000235e",
+      "source_locator": "Prasnavatara, stanzas 9-10"
+    },
+    {
+      "criterion_id": "question_proper_form",
+      "source_id": "prasna_marga_bv_raman_part_1_1991",
+      "pdf_page": 35,
+      "printed_page": 35,
+      "page_sha256": "87c8c16048cd554ad63357c643dcb421e0b1d03a78dcbfb592e5b7643aa5f776",
+      "source_locator": "Chapter II, stanzas 14-15"
+    }
+  ]
+}

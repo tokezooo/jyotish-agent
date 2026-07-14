@@ -1,0 +1,16 @@
+{
+  "required_phrases": [
+    "Jaimini career",
+    "admission not evaluated",
+    "Status: available",
+    "Source-bound symbolic signal",
+    "Conflicting admitted rules",
+    "not a guaranteed event forecast"
+  ],
+  "forbidden_phrases": [
+    "guaranteed promotion",
+    "definitely",
+    "private_sources",
+    "token="
+  ]
+}

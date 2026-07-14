@@ -1,0 +1,171 @@
+{
+  "schema_version": "1.0",
+  "school": "nilakantha_baseline",
+  "candidates": [
+    {
+      "rule_id": "karakas.scheme",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.karakas.*"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "Seven-versus-eight karaka schemes must remain separate variants.",
+      "discrepancy": "Exact sutra and reviewed fragment have not been located."
+    },
+    {
+      "rule_id": "karakas.rahu_reversal",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.karakas.8.Rahu.*"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "Rahu degree reversal differs across practical schools.",
+      "discrepancy": "Exact sutra and reviewed fragment have not been located."
+    },
+    {
+      "rule_id": "karakas.tie_policy",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.karakas.*.near_ties"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "The current exact-tie fail-closed policy is an engineering policy, not yet a sourced doctrine rule.",
+      "discrepancy": "No source anchor establishes the current threshold or tie behavior."
+    },
+    {
+      "rule_id": "arudha.exception",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.arudha.*", "jaimini.trace.arudha.*"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "Same/seventh exceptions have competing readings.",
+      "discrepancy": "Exact sutra and reviewed fragment have not been located."
+    },
+    {
+      "rule_id": "rasi_drishti.modal_sign_aspects",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.rasi_drishti.*"],
+      "anchor": {
+        "pdf_page": 20,
+        "printed_page": 3,
+        "sutra": "1.1.2-1.1.4",
+        "fragment_sha256": "943903e77a24252beff0d07cd06316849e5432c5444de87b16fce14b5abbe822"
+      },
+      "status": "anchored_unreviewed",
+      "ambiguity": "The scan supports modal sign aspects, but Sanskrit and OCR alignment still require specialist review.",
+      "discrepancy": null
+    },
+    {
+      "rule_id": "argala.houses",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.argala.*"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "Primary and secondary argala houses must not be collapsed.",
+      "discrepancy": "Exact sutra and reviewed fragment have not been located."
+    },
+    {
+      "rule_id": "argala.count_obstruction",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.argala.*.status", "jaimini.trace.argala.*"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "Obstruction strength and count comparisons vary by commentary.",
+      "discrepancy": "Exact sutra and reviewed fragment have not been located."
+    },
+    {
+      "rule_id": "svamsa.d9_lagna",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.svamsa.sign"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "Svamsa terminology is not interchangeable with karakamsa.",
+      "discrepancy": "Exact sutra and reviewed fragment have not been located."
+    },
+    {
+      "rule_id": "karakamsa.d9_atmakaraka",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.karakamsa.sign"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "Karakamsa chart construction differs across commentators.",
+      "discrepancy": "Exact sutra and reviewed fragment have not been located."
+    },
+    {
+      "rule_id": "special_lagnas.selected_rates",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.special_lagnas.*", "jaimini.trace.special_lagnas.*"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "The selected bhava, hora, and ghati rates need separate source confirmation.",
+      "discrepancy": "No reviewed anchor establishes all current rates."
+    },
+    {
+      "rule_id": "co_lords.resolution",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.co_lords.*", "jaimini.trace.co_lords.*"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "Scorpio and Aquarius co-lord resolution is school-sensitive.",
+      "discrepancy": "Exact sutra and reviewed fragment have not been located."
+    },
+    {
+      "rule_id": "chara_dasha.progression",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.chara_dasha.*.sign"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "Progression direction has material commentary variants.",
+      "discrepancy": "Exact sutra and reviewed fragment have not been located."
+    },
+    {
+      "rule_id": "chara_dasha.duration",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.chara_dasha.*.start", "jaimini.chara_dasha.*.end"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "Duration and exception rules differ across schools.",
+      "discrepancy": "Exact sutra and reviewed fragment have not been located."
+    },
+    {
+      "rule_id": "chara_dasha.antardasha",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.chara_antardasha.*"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "Antardasha ordering is not uniform across practical schools.",
+      "discrepancy": "Exact sutra and reviewed fragment have not been located."
+    },
+    {
+      "rule_id": "chara_dasha.gender_semantics",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.chara_dasha.*"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "The current binary input branch is not yet source-admitted and must not be interpreted doctrinally.",
+      "discrepancy": "No reviewed anchor establishes the current input semantics."
+    },
+    {
+      "rule_id": "time.boundaries",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.chara_dasha.*.start", "jaimini.chara_dasha.*.end"],
+      "anchor": null,
+      "status": "quarantined_missing_anchor",
+      "ambiguity": "Year length, rounding, and half-open intervals are engineering conventions.",
+      "discrepancy": "No doctrine source should be claimed for the engineering time convention."
+    }
+  ]
+}

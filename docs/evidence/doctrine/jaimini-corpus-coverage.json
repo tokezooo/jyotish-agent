@@ -1,0 +1,44 @@
+{
+  "schema_version": "1.0",
+  "manifest_sha256": "f7da1f4badda556e5cd772f0687a05936d1d522eb779dcf88f16a07ef4c9603e",
+  "verified_source_ids": [
+    "jaimini_sutras_b_suryanarain_rao_1949",
+    "jaimini_sutras_vimala_achyutananda_jha_1943"
+  ],
+  "unverified_source_ids": [],
+  "covered_requirements": [
+    "independent_translation",
+    "sanskrit_upadesa_sutras"
+  ],
+  "missing_requirements": [
+    "kn_rao_overlay",
+    "nilakantha_subodhini_translation",
+    "practical_chara_dasha",
+    "published_worked_charts",
+    "sanjay_rath_overlay"
+  ],
+  "covered_topics": [
+    "argala",
+    "arudha",
+    "chara_dasha",
+    "karaka",
+    "karakamsa",
+    "rasi_drishti",
+    "relationships",
+    "svamsa"
+  ],
+  "missing_topics": [],
+  "low_quality_source_ids": [
+    "jaimini_sutras_b_suryanarain_rao_1949"
+  ],
+  "verified_worked_chart_count": 0,
+  "missing_worked_chart_count": 20,
+  "acquisition_blockers": [
+    "kn_rao_overlay: A selected licensed K. N. Rao practical Jaimini source has not been supplied.",
+    "nilakantha_subodhini_translation: The specified 2025 K. Guru Rajesh English translation must be lawfully purchased or supplied as local bytes.",
+    "practical_chara_dasha: A licensed practical Chara Dasha work has not been supplied.",
+    "published_worked_charts: Twenty traceable published worked charts with exact page anchors are still required.",
+    "sanjay_rath_overlay: Sanjay Rath's licensed Upadesa Sutra or course-book bytes have not been supplied."
+  ],
+  "ready": false
+}

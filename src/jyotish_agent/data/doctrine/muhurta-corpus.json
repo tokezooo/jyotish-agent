@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "safe_profiles": [
+    "creative_production",
+    "focused_work",
+    "general_private_task",
+    "low_risk_travel_planning",
+    "product_launch_communication",
+    "study_learning"
+  ],
+  "unsupported_high_stakes_profiles": [
+    "dangerous_activity",
+    "fertility",
+    "investment",
+    "legal_filing",
+    "marriage",
+    "medical"
+  ],
+  "requirements": [
+    {
+      "requirement": "muhurta_cintamani",
+      "school_role": "baseline",
+      "source_ids": ["muhurta_cintamani_1907"],
+      "rule_topics": ["panchanga", "dosa", "lagna", "activity_election"],
+      "applicable_safe_profiles": ["creative_production", "focused_work", "general_private_task", "low_risk_travel_planning", "product_launch_communication", "study_learning"],
+      "acquisition_blocker": null
+    },
+    {
+      "requirement": "kalaprakasika",
+      "school_role": "commentary",
+      "source_ids": ["kalaprakasika_1982"],
+      "rule_topics": ["panchanga", "dosa", "weekday_periods", "travel", "education", "business"],
+      "applicable_safe_profiles": ["creative_production", "focused_work", "general_private_task", "low_risk_travel_planning", "product_launch_communication", "study_learning"],
+      "acquisition_blocker": null
+    },
+    {
+      "requirement": "panchanga_dosa_reference",
+      "school_role": "commentary",
+      "source_ids": ["muhurta_martanda_1819"],
+      "rule_topics": ["panchanga", "dosa", "weekday_periods"],
+      "applicable_safe_profiles": ["creative_production", "focused_work", "general_private_task", "low_risk_travel_planning", "product_launch_communication", "study_learning"],
+      "acquisition_blocker": null
+    },
+    {
+      "requirement": "modern_overlay",
+      "school_role": "overlay",
+      "source_ids": [],
+      "rule_topics": ["modern_electional_interpretation"],
+      "applicable_safe_profiles": ["creative_production", "focused_work", "general_private_task", "low_risk_travel_planning", "product_launch_communication", "study_learning"],
+      "acquisition_blocker": "A lawful local copy of the named B. V. Raman modern electional reference must be supplied and reviewed before this optional overlay can be admitted."
+    },
+    {
+      "requirement": "published_worked_elections",
+      "school_role": "worked_examples",
+      "source_ids": ["kalaprakasika_1982"],
+      "rule_topics": ["traveller_zodiac_calculation", "ekargala_business_illustration"],
+      "applicable_safe_profiles": ["low_risk_travel_planning", "product_launch_communication"],
+      "acquisition_blocker": null
+    }
+  ]
+}

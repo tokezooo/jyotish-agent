@@ -15,6 +15,7 @@ import logging
 import threading
 import time
 from contextvars import ContextVar
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -38,6 +39,14 @@ from .models import (
     ValidateAnswerResponse,
     ValidateRequest,
     ValidateResponse,
+)
+from .mcp_models import (
+    JaiminiFullMcpInput,
+    JaiminiFullReleaseResult,
+    MuhurtaFullMcpInput,
+    MuhurtaFullReleaseResult,
+    PrashnaFullMcpInput,
+    PrashnaFullReleaseResult,
 )
 from .pyjhora_facade import compute_chart
 from .research_models import (
@@ -195,19 +204,27 @@ async def create_research_run(
         )
     except UnsupportedContractVersion:
         return registry_problem_response(
-            "UNSUPPORTED_CONTRACT_VERSION", status=422, run_id=None,
-            stage="create", title="Unsupported answer contract",
+            "UNSUPPORTED_CONTRACT_VERSION",
+            status=422,
+            run_id=None,
+            stage="create",
+            title="Unsupported answer contract",
         )
     except TimezoneResolutionError as exc:
         response = _research_problem(
-            422, "Timezone resolution failed", exc.error_code,
+            422,
+            "Timezone resolution failed",
+            exc.error_code,
             "Correct the civil time, fold, zone ID, or asserted offset and retry.",
         )
         body = bytes(response.body)
         import json as _json
+
         content = _json.loads(body)
         content["error_code"] = exc.error_code
-        return JSONResponse(status_code=422, media_type="application/problem+json", content=content)
+        return JSONResponse(
+            status_code=422, media_type="application/problem+json", content=content
+        )
 
 
 @app.get("/v2/research-runs/{run_id}", response_model=ResearchRunResponse)
@@ -248,7 +265,9 @@ async def inspect_research_run(
         return _research_service(request).inspect_run(run_id)
     except RunNotFound:
         return _research_problem(
-            404, "Research run not found", "No persisted research run has that ID.",
+            404,
+            "Research run not found",
+            "No persisted research run has that ID.",
             "Check the rr_ run ID and retry.",
         )
 
@@ -258,29 +277,38 @@ async def replay_research_run(run_id: str, request: Request):
     try:
         return _research_service(request).replay_run(run_id)
     except RunNotFound:
-        return _research_problem(404, "Research run not found",
-                                 "No persisted research run has that ID.",
-                                 "Check the rr_ run ID and retry.")
+        return _research_problem(
+            404,
+            "Research run not found",
+            "No persisted research run has that ID.",
+            "Check the rr_ run ID and retry.",
+        )
     except ReplayError as exc:
         if exc.error_code in {"MISSING_PINNED_VERSION", "MEMO_HASH_MISMATCH"}:
             return registry_problem_response(
-                exc.error_code, status=409, run_id=run_id, stage="replay",
+                exc.error_code,
+                status=409,
+                run_id=run_id,
+                stage="replay",
                 title="Offline replay failed",
             )
         problem = _research_problem(
-            409, "Offline replay failed", exc.error_code,
+            409,
+            "Offline replay failed",
+            exc.error_code,
             "Restore the pinned ledger material/version and retry.",
         )
         import json as _json
+
         content = _json.loads(problem.body)
         content["error_code"] = exc.error_code
         content["run_id"] = run_id
-        return JSONResponse(status_code=409, media_type="application/problem+json", content=content)
+        return JSONResponse(
+            status_code=409, media_type="application/problem+json", content=content
+        )
 
 
-@app.post(
-    "/v2/research-runs/{run_id}/screen", response_model=ResearchScreenResponse
-)
+@app.post("/v2/research-runs/{run_id}/screen", response_model=ResearchScreenResponse)
 async def screen_research_run(
     run_id: str, req: ResearchOperationRequest, request: Request
 ) -> ResearchScreenResponse | JSONResponse:
@@ -288,12 +316,15 @@ async def screen_research_run(
         return _research_service(request).screen_run(run_id, req)
     except RunNotFound:
         return _research_problem(
-            404, "Research run not found", "No persisted research run has that ID.",
+            404,
+            "Research run not found",
+            "No persisted research run has that ID.",
             "Check the rr_ run ID and retry.",
         )
     except (OptimisticConflict, InvalidRunTransition):
         return _research_problem(
-            409, "Research operation conflict",
+            409,
+            "Research operation conflict",
             "The operation is stale, duplicated with changed input, or invalid in this state.",
             "Refresh the run, use its current revision, and keep one operation ID per request.",
         )
@@ -307,12 +338,15 @@ async def plan_research_run(
         return _research_service(request).plan_run(run_id, req)
     except RunNotFound:
         return _research_problem(
-            404, "Research run not found", "No persisted research run has that ID.",
+            404,
+            "Research run not found",
+            "No persisted research run has that ID.",
             "Check the rr_ run ID and retry.",
         )
     except (OptimisticConflict, InvalidRunTransition):
         return _research_problem(
-            409, "Research plan conflict",
+            409,
+            "Research plan conflict",
             "Planning is stale or invalid for the run's current state.",
             "Screen safely, then retry with the current revision and a fresh operation ID.",
         )
@@ -328,12 +362,15 @@ async def retrieve_research_run(
         return _research_service(request).retrieve_run(run_id, req)
     except RunNotFound:
         return _research_problem(
-            404, "Research run not found", "No persisted research run has that ID.",
+            404,
+            "Research run not found",
+            "No persisted research run has that ID.",
             "Check the rr_ run ID and retry.",
         )
     except (OptimisticConflict, InvalidRunTransition):
         return _research_problem(
-            409, "Research retrieval conflict",
+            409,
+            "Research retrieval conflict",
             "Retrieval is stale, unsafe, or has no supported plan.",
             "Create a supported plan, then retry with the current revision and a fresh operation ID.",
         )
@@ -349,7 +386,8 @@ async def ingest_corpus_source(
         return _research_service(request).ingest_source(req)
     except (OptimisticConflict, SourceConflict):
         return _research_problem(
-            409, "Corpus source conflict",
+            409,
+            "Corpus source conflict",
             "The source identifier conflicts with persisted provenance.",
             "Use the exact original manifest or a new source-version identifier.",
         )
@@ -367,7 +405,8 @@ async def ingest_corpus_fragments(
         return _research_service(request).ingest_fragments(source_version_id, req)
     except (OptimisticConflict, SourceConflict):
         return _research_problem(
-            409, "Corpus fragment conflict",
+            409,
+            "Corpus fragment conflict",
             "A fragment checksum, locator, or identifier conflicts with persisted data.",
             "Correct the manifest or create a new immutable source version.",
         )
@@ -384,7 +423,8 @@ async def review_corpus_source(
         return _research_service(request).review_source(source_version_id, req)
     except (OptimisticConflict, SourceConflict):
         return _research_problem(
-            409, "Corpus source review conflict",
+            409,
+            "Corpus source review conflict",
             "The review is stale, conflicts with its operation, manifest, or terminal state.",
             "Refresh the pending source revision or create a new immutable source version.",
         )
@@ -401,7 +441,8 @@ async def review_corpus_fragment(
         return _research_service(request).review_fragment(fragment_id, req)
     except (OptimisticConflict, SourceConflict):
         return _research_problem(
-            409, "Corpus fragment review conflict",
+            409,
+            "Corpus fragment review conflict",
             "The review is stale, conflicts with its operation, parent approval, or terminal state.",
             "Refresh the pending fragment revision or create a new immutable source version.",
         )
@@ -417,12 +458,15 @@ async def calculate_research_run(
         return _research_service(request).calculate_run(run_id, req)
     except RunNotFound:
         return _research_problem(
-            404, "Research run not found", "No persisted research run has that ID.",
+            404,
+            "Research run not found",
+            "No persisted research run has that ID.",
             "Check the rr_ run ID and retry.",
         )
     except (OptimisticConflict, InvalidRunTransition):
         return _research_problem(
-            409, "Research operation conflict",
+            409,
+            "Research operation conflict",
             "Calculation is stale or invalid for the run's current state.",
             "Create a supported deterministic plan, then retry with the current revision and a fresh operation ID.",
         )
@@ -430,18 +474,21 @@ async def calculate_research_run(
         raise CalculationError(str(exc)) from exc
     except TimezoneResolutionError as exc:
         problem = _research_problem(
-            422, "Timezone resolution failed", exc.error_code,
+            422,
+            "Timezone resolution failed",
+            exc.error_code,
             "Restore pinned timezone material or correct the civil time/fold.",
         )
         import json as _json
+
         content = _json.loads(problem.body)
         content["error_code"] = exc.error_code
-        return JSONResponse(status_code=422, media_type="application/problem+json", content=content)
+        return JSONResponse(
+            status_code=422, media_type="application/problem+json", content=content
+        )
 
 
-@app.post(
-    "/v2/research-runs/{run_id}/answers", response_model=ResearchAnswerResponse
-)
+@app.post("/v2/research-runs/{run_id}/answers", response_model=ResearchAnswerResponse)
 async def submit_research_answer(
     run_id: str, req: SubmitAnswerRequest, request: Request
 ) -> ResearchAnswerResponse | JSONResponse:
@@ -497,8 +544,128 @@ async def compute(req: ChartComputeRequest) -> ChartComputeResponse:
     )
 
 
+@app.post(
+    "/v2/doctrine/jaimini/full",
+    response_model=JaiminiFullReleaseResult,
+)
+async def jaimini_full_release(
+    req: JaiminiFullMcpInput,
+) -> JaiminiFullReleaseResult:
+    """Fail closed until the packaged source/admission audit allows Full Jaimini."""
+
+    from .doctrine.jaimini_pack import JaiminiReleaseAudit
+
+    audit = JaiminiReleaseAudit.model_validate_json(
+        (Path(__file__).parent / "data/doctrine/jaimini-release.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    if audit.available:  # pragma: no cover - future admitted production release
+        raise RuntimeError("Full Jaimini runtime is not configured")
+    return JaiminiFullReleaseResult(
+        status="unavailable",
+        request_mode=req.mode,
+        locale=req.locale,
+        topics=req.topics,
+        admission_state="blocked_sources",
+        blockers=list(audit.blockers),
+        external_review_missing=audit.external_review_missing,
+        report=None,
+    )
+
+
+@app.post(
+    "/v2/doctrine/prashna/full",
+    response_model=PrashnaFullReleaseResult,
+)
+async def prashna_full_release(
+    req: PrashnaFullMcpInput,
+) -> PrashnaFullReleaseResult:
+    """Fail closed until the packaged Full Prashna audit permits release."""
+
+    from .doctrine.prashna_pack import PrashnaReleaseAudit
+
+    audit = PrashnaReleaseAudit.model_validate_json(
+        (Path(__file__).parent / "data/doctrine/prashna-release.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    if audit.available:  # pragma: no cover - future admitted production release
+        raise RuntimeError("Full Prashna runtime is not configured")
+    return PrashnaFullReleaseResult(
+        status="unavailable",
+        request_mode=req.mode,
+        locale=req.locale,
+        admission_state="blocked_sources",
+        blockers=list(audit.blockers),
+        external_review_missing=audit.external_review_missing,
+        report=None,
+    )
+
+
+@app.post(
+    "/v2/doctrine/muhurta/full",
+    response_model=MuhurtaFullReleaseResult,
+)
+async def muhurta_full_release(
+    req: MuhurtaFullMcpInput,
+) -> MuhurtaFullReleaseResult:
+    """Run the read-only private Expanded Muhurta baseline."""
+
+    from .doctrine.muhurta_pack import (
+        load_muhurta_release_audit,
+        route_muhurta_activity,
+    )
+    from .doctrine.muhurta_release import execute_muhurta_full
+
+    audit = load_muhurta_release_audit()
+    if not audit.available:
+        route = route_muhurta_activity(req.activity, locale=req.locale)
+        if route.status == "unsupported_high_stakes":
+            error_code = "HIGH_STAKES_ACTIVITY"
+            status = "unavailable"
+        elif route.status != "supported":
+            error_code = route.reason_code or "ACTIVITY_UNSUPPORTED"
+            status = "needs_input"
+        elif req.natal is not None:
+            error_code = "NATAL_PERSONALIZATION_NOT_COMPILED"
+            status = "unavailable"
+        else:
+            error_code = "RELEASE_GATES_INCOMPLETE"
+            status = "unavailable"
+        return MuhurtaFullReleaseResult(
+            status=status,
+            request_mode=req.mode,
+            locale=req.locale,
+            profile=route.profile,
+            admission_state=audit.admission_state,
+            public_release_blockers=list(audit.public_release_blockers),
+            external_review_missing=audit.external_review_missing,
+            report=None,
+            error_code=error_code,
+        )
+    execution = execute_muhurta_full(req, locale=req.locale, mode=req.mode)
+    return MuhurtaFullReleaseResult(
+        status=execution.status,
+        request_mode=req.mode,
+        locale=req.locale,
+        profile=execution.profile,
+        admission_state=audit.admission_state,
+        public_release_blockers=list(audit.public_release_blockers),
+        external_review_missing=audit.external_review_missing,
+        report=(
+            execution.report.model_dump(mode="json")
+            if execution.report is not None
+            else None
+        ),
+        error_code=execution.reason_code,
+    )
+
+
 @app.post("/answers/validate", response_model=ValidateAnswerResponse)
-async def validate_answer_endpoint(req: ValidateAnswerRequest) -> ValidateAnswerResponse:
+async def validate_answer_endpoint(
+    req: ValidateAnswerRequest,
+) -> ValidateAnswerResponse:
     # Resolve facts from the server-side cache by token (the agent passes only the
     # token). Fall back to HMAC-verified client-supplied facts if the token isn't
     # cached (e.g. after a restart). This is what binds validation to real output —

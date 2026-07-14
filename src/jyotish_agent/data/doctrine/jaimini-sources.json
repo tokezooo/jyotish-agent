@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "sources": [
+    {
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "title": "Jaimini Sutras",
+      "author_or_commentator": "Maharshi Jaimini",
+      "translator_editor": "B. Suryanarain Rao",
+      "edition": "Raman Publications scan, 1949",
+      "publisher": "Raman Publications, Bangalore",
+      "year": 1949,
+      "isbn": null,
+      "languages": ["sa", "en"],
+      "domain": "jaimini",
+      "school_role": "root_text",
+      "license_class": "copyrighted_local",
+      "local_file": "jaimini/jaimini-sutras-b-suryanarain-rao-1949.pdf",
+      "sha256": "06953f710d7a52e548fd7b7badeeef0c163debd02b8b08178c3833905aaa76ce",
+      "page_offset": -17,
+      "scan_quality": "poor",
+      "ocr_required": true,
+      "ocr_status": "required"
+    },
+    {
+      "source_id": "jaimini_sutras_vimala_achyutananda_jha_1943",
+      "title": "The Jaiminisutras with the Vimala Sanskrit Commentary",
+      "author_or_commentator": "Maharshi Jaimini; Achyutananda Jha",
+      "translator_editor": "Achyutananda Jha",
+      "edition": "Haridas Sanskrit Series 159, 1943",
+      "publisher": "Chowkhamba Sanskrit Series Office, Benares",
+      "year": 1943,
+      "isbn": null,
+      "languages": ["sa"],
+      "domain": "jaimini",
+      "school_role": "commentary",
+      "license_class": "copyrighted_local",
+      "local_file": "jaimini/jaimini-sutras-vimala-achyutananda-jha-1943.pdf",
+      "sha256": "4156f41c3080a0e0b696aa0cef4143286f76da1c92e61badb93734f3602e72fe",
+      "page_offset": -3,
+      "scan_quality": "good",
+      "ocr_required": true,
+      "ocr_status": "required"
+    }
+  ]
+}

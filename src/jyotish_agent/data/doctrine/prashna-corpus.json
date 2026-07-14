@@ -1,0 +1,64 @@
+{
+  "schema_version": "1.0",
+  "required_published_case_count": 2,
+  "safe_question_classes": [
+    "work_project_status",
+    "communication_noncritical",
+    "travel_noncritical",
+    "lost_object_noncritical"
+  ],
+  "unsupported_question_classes": [
+    "medical",
+    "longevity_death",
+    "legal",
+    "financial_investment",
+    "pregnancy_fertility",
+    "relationship_marriage",
+    "dangerous_activity"
+  ],
+  "missing_doctrine": [
+    "Tajika applying/separating passages still require OCR, translation, and human review.",
+    "Prasna Marga radicality rules still require exact fragment admission.",
+    "A second published case with a traceable observed outcome is not yet acquired."
+  ],
+  "requirements": [
+    {
+      "requirement": "prasna_marga_baseline",
+      "school": "prasna_marga_baseline",
+      "source_ids": [
+        "prasna_marga_bv_raman_part_1_1991",
+        "prasna_marga_bv_raman_part_2_1992"
+      ],
+      "doctrine_topics": ["radicality", "significators", "outcomes", "timing"],
+      "acquisition_blocker": null
+    },
+    {
+      "requirement": "daivajna_vallabha",
+      "school": "daivajna_vallabha_comparison",
+      "source_ids": ["daivajna_vallabha_2003_scan"],
+      "doctrine_topics": ["significators", "outcomes"],
+      "acquisition_blocker": null
+    },
+    {
+      "requirement": "satpancasika",
+      "school": "satpancasika_root_text",
+      "source_ids": ["satpancasika_sanskritdocuments_2016"],
+      "doctrine_topics": ["significators", "outcomes"],
+      "acquisition_blocker": null
+    },
+    {
+      "requirement": "tajika_aspect_overlay",
+      "school": "tajika_nilakanthi_overlay",
+      "source_ids": ["tajika_nilakanthi_1893"],
+      "doctrine_topics": ["applying_separating", "perfection"],
+      "acquisition_blocker": null
+    },
+    {
+      "requirement": "published_cases",
+      "school": "published_outcome_cases",
+      "source_ids": ["prasna_marga_bv_raman_part_2_1992"],
+      "doctrine_topics": ["outcome_validation"],
+      "acquisition_blocker": "At least two complete, traceable outcome cases are required."
+    }
+  ]
+}

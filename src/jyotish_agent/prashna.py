@@ -20,6 +20,9 @@ from .config import CalculationConfig, ConfigError
 from .error_registry import error_record
 from .event_models import EventAnchor, EventPlace
 from .prashna_models import (
+    PrashnaAspectDoctrineProfile,
+    PrashnaAspectGeometryInput,
+    PrashnaAspectGeometryResult,
     PrashnaCompletedResult,
     PrashnaFact,
     PrashnaIncompleteResult,
@@ -41,24 +44,140 @@ from .prashna_profiles import (
     prashna_source_map_sha256,
 )
 from .pyjhora_facade import BirthProfile, EngineOutputError, _run_engine_session
-from .signing import cache_domain_artifact, get_cached_domain_artifact, sign_facts, verify_domain_artifact
+from .signing import (
+    cache_domain_artifact,
+    get_cached_domain_artifact,
+    sign_facts,
+    verify_domain_artifact,
+)
 
 _WORD = re.compile(r"[^\w]+", re.UNICODE)
-_WORK = ("work", "project", "job", "career", "business", "founder", "startup", "работ", "проект", "карьер", "бизнес", "стартап", "делов")
-_RELATIONSHIP = ("relationship", "partner", "love", "marriage", "отнош", "любов", "брак")
+_WORK = (
+    "work",
+    "project",
+    "job",
+    "career",
+    "business",
+    "founder",
+    "startup",
+    "работ",
+    "проект",
+    "карьер",
+    "бизнес",
+    "стартап",
+    "делов",
+)
+_RELATIONSHIP = (
+    "relationship",
+    "partner",
+    "love",
+    "marriage",
+    "отнош",
+    "любов",
+    "брак",
+)
 _HIGH_STAKES = (
-    "medical", "health", "surgery", "cancer", "pregnan", "death", "die", "harm",
-    "lawsuit", "court", "legal", "invest", "stock", "crypto", "loan",
-    "здоров", "операц", "рак", "беремен", "смерт", "умр", "вред", "суд", "юрид", "инвест", "крипт", "кредит",
+    "medical",
+    "health",
+    "surgery",
+    "cancer",
+    "pregnan",
+    "death",
+    "die",
+    "harm",
+    "lawsuit",
+    "court",
+    "legal",
+    "invest",
+    "stock",
+    "crypto",
+    "loan",
+    "здоров",
+    "операц",
+    "рак",
+    "беремен",
+    "смерт",
+    "умр",
+    "вред",
+    "суд",
+    "юрид",
+    "инвест",
+    "крипт",
+    "кредит",
 )
 
 
 def _canonical(value: object) -> bytes:
-    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode()
 
 
 def _sha(value: object) -> str:
     return hashlib.sha256(_canonical(value)).hexdigest()
+
+
+def _angular_separation(left: float, right: float) -> float:
+    delta = (right - left) % 360.0
+    return min(delta, 360.0 - delta)
+
+
+def calculate_prashna_aspect_geometry(
+    value: PrashnaAspectGeometryInput,
+    profile: PrashnaAspectDoctrineProfile,
+) -> PrashnaAspectGeometryResult:
+    """Classify longitudinal motion without timezone or wall-clock recomputation."""
+
+    separation = _angular_separation(value.longitude_a, value.longitude_b)
+    orb = abs(separation - value.aspect_degrees)
+    relative_speed = abs(value.speed_b - value.speed_a)
+    state: str
+    reason: str | None
+    confidence: float
+
+    if not profile.source_admitted:
+        state, reason, confidence = "unavailable", "SOURCE_ADMISSION_MISSING", 0.0
+    elif value.aspect_degrees not in profile.allowed_aspects:
+        state, reason, confidence = "prohibited", "ASPECT_NOT_IN_PROFILE", 0.0
+    elif abs(orb - profile.max_orb_degrees) <= profile.boundary_tolerance_degrees:
+        state, reason, confidence = "unavailable", "ORB_BOUNDARY_AMBIGUOUS", 0.35
+    elif orb > profile.max_orb_degrees:
+        state, reason, confidence = "prohibited", "OUTSIDE_PROFILE_ORB", 0.0
+    elif orb <= profile.exact_tolerance_degrees:
+        state, reason, confidence = "exact", None, 0.8
+    elif relative_speed < profile.relative_speed_floor:
+        state, reason, confidence = "unavailable", "RELATIVE_MOTION_UNCERTAIN", 0.25
+    else:
+        future_a = (value.longitude_a + value.speed_a * profile.probe_days) % 360.0
+        future_b = (value.longitude_b + value.speed_b * profile.probe_days) % 360.0
+        future_orb = abs(_angular_separation(future_a, future_b) - value.aspect_degrees)
+        change = future_orb - orb
+        if abs(change) <= 1e-9:
+            state, reason, confidence = (
+                "unavailable",
+                "MOTION_DIRECTION_UNCERTAIN",
+                0.25,
+            )
+        elif change < 0:
+            state, reason, confidence = "applying", None, 0.75
+        else:
+            state, reason, confidence = "separating", None, 0.75
+
+    payload = {
+        "schema_version": "1.0",
+        "anchor_sha256": value.anchor_sha256,
+        "profile_id": profile.profile_id,
+        "school": profile.school,
+        "state": state,
+        "separation_degrees": round(separation, 8),
+        "orb_degrees": round(orb, 8),
+        "relative_speed": round(relative_speed, 8),
+        "confidence": confidence,
+        "reason_code": reason,
+        "timing_unit": "doctrine_controlled",
+        "source_refs": profile.source_refs if profile.source_admitted else (),
+    }
+    return PrashnaAspectGeometryResult(**payload, geometry_sha256=_sha(payload))
 
 
 def _normalized_question(question: str) -> str:
@@ -98,7 +217,9 @@ def _contains_any(text: str, fragments: tuple[str, ...]) -> bool:
     return any(fragment in text for fragment in fragments)
 
 
-def route_prashna_topic(question: str, profile: PrashnaRuleProfile | None = None) -> TopicRoute:
+def route_prashna_topic(
+    question: str, profile: PrashnaRuleProfile | None = None
+) -> TopicRoute:
     profile = profile or load_prashna_rule_profile()
     normalized = _normalized_question(question)
     if _contains_any(normalized, _HIGH_STAKES):
@@ -154,18 +275,23 @@ def _anchor_payload(anchor: EventAnchor) -> dict:
 
 
 def _request_id(fingerprint: str, anchor_hash: str) -> str:
-    return "prq_" + hashlib.sha256(f"{fingerprint}:{anchor_hash}".encode()).hexdigest()[:24]
+    return (
+        "prq_"
+        + hashlib.sha256(f"{fingerprint}:{anchor_hash}".encode()).hexdigest()[:24]
+    )
 
 
 def _prashna_config_sha256() -> str:
     config = CalculationConfig(charts=("D1",))
-    return _sha({
-        "ayanamsa": config.ayanamsa,
-        "rahu_ketu": config.rahu_ketu,
-        "node_aspects": config.node_aspects,
-        "charts": tuple(config.resolved_charts()),
-        "modules": tuple(sorted(config.resolved_modules())),
-    })
+    return _sha(
+        {
+            "ayanamsa": config.ayanamsa,
+            "rahu_ketu": config.rahu_ketu,
+            "node_aspects": config.node_aspects,
+            "charts": tuple(config.resolved_charts()),
+            "modules": tuple(sorted(config.resolved_modules())),
+        }
+    )
 
 
 @dataclass
@@ -209,8 +335,15 @@ def _error_fields(code: str, *, request_id: str, stage: str) -> dict:
     return {
         key: record[key]
         for key in (
-            "error_code", "request_id", "mode", "stage", "retryable",
-            "problem", "cause", "fix", "next_action",
+            "error_code",
+            "request_id",
+            "mode",
+            "stage",
+            "retryable",
+            "problem",
+            "cause",
+            "fix",
+            "next_action",
         )
     }
 
@@ -219,12 +352,35 @@ def _provable_clarification(original: str, current: str) -> bool:
     """Allow only the exact original normalized question plus a short suffix."""
     if not current.startswith(original + " "):
         return False
-    suffix = current[len(original):].strip().split()
+    suffix = current[len(original) :].strip().split()
     allowed = {
-        "which", "obstacle", "is", "most", "visible", "strongest", "primary",
-        "now", "please", "clarify", "detail", "what", "does", "this", "mean",
-        "какое", "препятствие", "сейчас", "самое", "заметное", "главное",
-        "уточни", "поясни", "пожалуйста", "что", "это", "значит",
+        "which",
+        "obstacle",
+        "is",
+        "most",
+        "visible",
+        "strongest",
+        "primary",
+        "now",
+        "please",
+        "clarify",
+        "detail",
+        "what",
+        "does",
+        "this",
+        "mean",
+        "какое",
+        "препятствие",
+        "сейчас",
+        "самое",
+        "заметное",
+        "главное",
+        "уточни",
+        "поясни",
+        "пожалуйста",
+        "что",
+        "это",
+        "значит",
     }
     return 2 <= len(suffix) <= 20 and set(suffix) <= allowed
 
@@ -255,10 +411,12 @@ class PrashnaFacade:
         route: TopicRoute,
     ) -> tuple[EventAnchor, str, str, PrashnaCompletedResult | None]:
         assert request.place is not None and request.idempotency_key is not None
-        identity = sign_facts({
-            "mode": "prashna_capture_identity",
-            "idempotency_key": request.idempotency_key,
-        })
+        identity = sign_facts(
+            {
+                "mode": "prashna_capture_identity",
+                "idempotency_key": request.idempotency_key,
+            }
+        )
         material_sha256 = _sha(_capture_request_material(request, fingerprint))
         with _CAPTURE_CONDITION:
             cached = _CAPTURE_CACHE.get(identity)
@@ -345,7 +503,8 @@ class PrashnaFacade:
             or artifact.get("artifact_token") != cached.anchor_token
             or artifact.get("rule_profile_sha256") != cached.rule_profile_sha256
             or artifact.get("config_sha256") != cached.config_sha256
-            or artifact.get("normalized_anchor_sha256") != cached.normalized_anchor_sha256
+            or artifact.get("normalized_anchor_sha256")
+            != cached.normalized_anchor_sha256
         ):
             raise _CaptureAnchorStale
 
@@ -359,7 +518,9 @@ class PrashnaFacade:
         with _CAPTURE_CONDITION:
             cached = _CAPTURE_CACHE.get(identity)
             if cached is not None:
-                cached.result = result.model_copy(deep=True) if result is not None else None
+                cached.result = (
+                    result.model_copy(deep=True) if result is not None else None
+                )
                 cached.in_flight = False
             _CAPTURE_CONDITION.notify_all()
 
@@ -391,7 +552,9 @@ class PrashnaFacade:
         if route.status == "high_stakes":
             return PrashnaUnavailableResult(
                 status="unavailable",
-                **_error_fields("HIGH_STAKES_TOPIC", request_id=request_id, stage="topic_routing"),
+                **_error_fields(
+                    "HIGH_STAKES_TOPIC", request_id=request_id, stage="topic_routing"
+                ),
             )
         code = "TOPIC_COMPOSITE" if route.status == "composite" else "TOPIC_UNSUPPORTED"
         return PrashnaNeedsInputResult(
@@ -443,7 +606,9 @@ class PrashnaFacade:
 
         if request.anchor_token is not None:
             sealed = get_cached_domain_artifact(request.anchor_token)
-            original_fingerprint = None if sealed is None else str(sealed.get("question_fingerprint", ""))
+            original_fingerprint = (
+                None if sealed is None else str(sealed.get("question_fingerprint", ""))
+            )
             exact = current_fingerprint == original_fingerprint
             clarified = bool(
                 sealed is not None
@@ -498,8 +663,10 @@ class PrashnaFacade:
                     )
                     anchor_token = sealed["artifact_token"]
                 else:
-                    anchor, anchor_token, capture_identity, cached_result = self._capture_idempotently(
-                        request, fingerprint=current_fingerprint, route=route
+                    anchor, anchor_token, capture_identity, cached_result = (
+                        self._capture_idempotently(
+                            request, fingerprint=current_fingerprint, route=route
+                        )
                     )
                     if cached_result is not None:
                         return cached_result
@@ -599,42 +766,70 @@ class PrashnaFacade:
         placements = chart["d1"]
         moon = next(item for item in placements if item["planet"] == "Moon")
         primary = chart["houses"][route.primary_house - 1]  # type: ignore[operator]
-        primary_lord = next(item for item in placements if item["planet"] == primary["lord"])
+        primary_lord = next(
+            item for item in placements if item["planet"] == primary["lord"]
+        )
         lagna_lord = chart["houses"][0]["lord"]
-        lagna_lord_placement = next(item for item in placements if item["planet"] == lagna_lord)
+        lagna_lord_placement = next(
+            item for item in placements if item["planet"] == lagna_lord
+        )
         panchanga = chart["panchanga"]
         tithi_index = int(panchanga["tithi"]["index"])
         moon_phase = "waxing" if tithi_index <= 15 else "waning"
 
         facts: list[PrashnaFact] = [
-            PrashnaFact(fact_id="prashna.geometry.applying_separating", value="unsupported_by_verified_primitive"),
+            PrashnaFact(
+                fact_id="prashna.geometry.applying_separating",
+                value="unsupported_by_verified_primitive",
+            ),
             PrashnaFact(fact_id="prashna.lagna.degrees", value=ascendant["degrees"]),
             PrashnaFact(fact_id="prashna.lagna.lord", value=lagna_lord),
-            PrashnaFact(fact_id="prashna.lagna.lord_house", value=lagna_lord_placement["house"]),
-            PrashnaFact(fact_id="prashna.lagna.lord_sign", value=lagna_lord_placement["sign"]),
+            PrashnaFact(
+                fact_id="prashna.lagna.lord_house", value=lagna_lord_placement["house"]
+            ),
+            PrashnaFact(
+                fact_id="prashna.lagna.lord_sign", value=lagna_lord_placement["sign"]
+            ),
             PrashnaFact(fact_id="prashna.lagna.method", value="time_chart"),
             PrashnaFact(fact_id="prashna.lagna.sign", value=ascendant["sign"]),
             PrashnaFact(fact_id="prashna.moon.house", value=moon["house"]),
             PrashnaFact(fact_id="prashna.moon.phase", value=moon_phase),
             PrashnaFact(fact_id="prashna.moon.sign", value=moon["sign"]),
             PrashnaFact(fact_id="prashna.topic.family", value=route.family),
-            PrashnaFact(fact_id="prashna.topic.primary_house", value=route.primary_house),
+            PrashnaFact(
+                fact_id="prashna.topic.primary_house", value=route.primary_house
+            ),
             PrashnaFact(fact_id="prashna.topic.primary_lord", value=primary["lord"]),
-            PrashnaFact(fact_id="prashna.topic.primary_lord_house", value=primary_lord["house"]),
-            PrashnaFact(fact_id="prashna.topic.primary_lord_sign", value=primary_lord["sign"]),
-            PrashnaFact(fact_id="prashna.topic.secondary_houses", value=",".join(map(str, route.secondary_houses))),
+            PrashnaFact(
+                fact_id="prashna.topic.primary_lord_house", value=primary_lord["house"]
+            ),
+            PrashnaFact(
+                fact_id="prashna.topic.primary_lord_sign", value=primary_lord["sign"]
+            ),
+            PrashnaFact(
+                fact_id="prashna.topic.secondary_houses",
+                value=",".join(map(str, route.secondary_houses)),
+            ),
         ]
         for key in ("weekday", "tithi", "nakshatra", "yoga", "karana"):
             entry = panchanga[key]
-            facts.append(PrashnaFact(fact_id=f"prashna.panchanga.{key}", value=entry["name"]))
+            facts.append(
+                PrashnaFact(fact_id=f"prashna.panchanga.{key}", value=entry["name"])
+            )
         occupants: dict[int, list[str]] = {}
         for body in placements:
             occupants.setdefault(body["sign_index"], []).append(body["planet"])
         for house in chart["houses"]:
             facts.extend(
                 (
-                    PrashnaFact(fact_id=f"prashna.bhava.{house['house']}.sign", value=house["sign"]),
-                    PrashnaFact(fact_id=f"prashna.bhava.{house['house']}.lord", value=house["lord"]),
+                    PrashnaFact(
+                        fact_id=f"prashna.bhava.{house['house']}.sign",
+                        value=house["sign"],
+                    ),
+                    PrashnaFact(
+                        fact_id=f"prashna.bhava.{house['house']}.lord",
+                        value=house["lord"],
+                    ),
                 )
             )
         for sign_index, sign_name in enumerate(names.SIGNS):
@@ -647,7 +842,14 @@ class PrashnaFacade:
                     ),
                     PrashnaFact(
                         fact_id=f"prashna.rasi_drishti.sign.{sign_name}.planets",
-                        value=",".join(sorted(body for index in targets for body in occupants.get(index, ()))) or "none",
+                        value=",".join(
+                            sorted(
+                                body
+                                for index in targets
+                                for body in occupants.get(index, ())
+                            )
+                        )
+                        or "none",
                     ),
                 )
             )
@@ -655,12 +857,22 @@ class PrashnaFacade:
             planet = body["planet"]
             facts.extend(
                 (
-                    PrashnaFact(fact_id=f"prashna.planets.{planet}.degrees", value=body["degrees"]),
-                    PrashnaFact(fact_id=f"prashna.planets.{planet}.house", value=body["house"]),
-                    PrashnaFact(fact_id=f"prashna.planets.{planet}.sign", value=body["sign"]),
+                    PrashnaFact(
+                        fact_id=f"prashna.planets.{planet}.degrees",
+                        value=body["degrees"],
+                    ),
+                    PrashnaFact(
+                        fact_id=f"prashna.planets.{planet}.house", value=body["house"]
+                    ),
+                    PrashnaFact(
+                        fact_id=f"prashna.planets.{planet}.sign", value=body["sign"]
+                    ),
                     PrashnaFact(
                         fact_id=f"prashna.rasi_drishti.{planet}.signs",
-                        value=",".join(names.SIGNS[index] for index in _rasi_drishti(body["sign_index"])),
+                        value=",".join(
+                            names.SIGNS[index]
+                            for index in _rasi_drishti(body["sign_index"])
+                        ),
                     ),
                 )
             )
@@ -694,25 +906,42 @@ class PrashnaFacade:
                 source_status=definition.source_status,
             )
 
-        all_rules = tuple(sorted((
-            evaluated_rule(
-                "prashna.readability.anchor_complete", status="pass", severity="info",
-                inputs=("normalized_utc", "zone_id", "place"), outputs=("sealed",),
-            ),
-            evaluated_rule(
-                "prashna.readability.single_topic", status="pass", severity="info",
-                inputs=(route.family or "",), outputs=(f"house_{rule_profile.primary_house}",),
-            ),
-            evaluated_rule(
-                "prashna.geometry.applying_separating", status="not_applicable", severity="warning",
-                inputs=(), outputs=("unsupported_by_verified_primitive",),
-            ),
-            evaluated_rule(
-                "prashna.radicality.source_gate", status="not_applicable", severity="warning",
-                inputs=(), outputs=("no_admitted_doctrinal_rule",),
-            ),
-        ), key=lambda item: item.rule_id))
-        rules = all_rules[:rule_profile.rule_result_limit]
+        all_rules = tuple(
+            sorted(
+                (
+                    evaluated_rule(
+                        "prashna.readability.anchor_complete",
+                        status="pass",
+                        severity="info",
+                        inputs=("normalized_utc", "zone_id", "place"),
+                        outputs=("sealed",),
+                    ),
+                    evaluated_rule(
+                        "prashna.readability.single_topic",
+                        status="pass",
+                        severity="info",
+                        inputs=(route.family or "",),
+                        outputs=(f"house_{rule_profile.primary_house}",),
+                    ),
+                    evaluated_rule(
+                        "prashna.geometry.applying_separating",
+                        status="not_applicable",
+                        severity="warning",
+                        inputs=(),
+                        outputs=("unsupported_by_verified_primitive",),
+                    ),
+                    evaluated_rule(
+                        "prashna.radicality.source_gate",
+                        status="not_applicable",
+                        severity="warning",
+                        inputs=(),
+                        outputs=("no_admitted_doctrinal_rule",),
+                    ),
+                ),
+                key=lambda item: item.rule_id,
+            )
+        )
+        rules = all_rules[: rule_profile.rule_result_limit]
         source_map = load_prashna_source_map()
         provenance = PrashnaProvenance(
             normalized_utc=anchor_data["normalized_utc"],
@@ -747,10 +976,16 @@ class PrashnaFacade:
                 "provenance": provenance.model_dump(mode="json"),
             }
         )
-        trace = tuple(
-            PrashnaFact(fact_id=f"prashna.trace.rule.{index}.status", value=rule.status)
-            for index, rule in enumerate(rules)
-        ) if request.include_trace else None
+        trace = (
+            tuple(
+                PrashnaFact(
+                    fact_id=f"prashna.trace.rule.{index}.status", value=rule.status
+                )
+                for index, rule in enumerate(rules)
+            )
+            if request.include_trace
+            else None
+        )
         return PrashnaCompletedResult(
             status="completed",
             request_id=request_id,
@@ -770,7 +1005,9 @@ class PrashnaFacade:
             limitations=(
                 "Computed chart and geometry facts only; governed Praśna interpretation is unavailable.",
                 "Applying/separating geometry is unavailable because no independently verified primitive is admitted.",
-                "Unsupported lagna methods: " + ", ".join(rule_profile.unsupported_lagna_methods) + ".",
+                "Unsupported lagna methods: "
+                + ", ".join(rule_profile.unsupported_lagna_methods)
+                + ".",
                 "Captured-now retry idempotency is process-local and bounded to the 256 most recent identities.",
             ),
             provenance=provenance,
