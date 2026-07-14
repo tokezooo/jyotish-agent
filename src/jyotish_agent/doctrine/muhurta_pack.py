@@ -8,6 +8,7 @@ observed outcome claim.
 from __future__ import annotations
 
 import json
+import datetime as dt
 from enum import StrEnum
 from importlib import resources
 from typing import Literal
@@ -323,4 +324,176 @@ def route_muhurta_activity(
             if profile == MuhurtaActivityProfile.FOCUSED_WORK
             else None
         ),
+    )
+
+
+class MuhurtaRuleInterval(FrozenModel):
+    rule_id: str = Field(pattern=r"^muhurta\.[A-Za-z0-9_.-]+$")
+    classification: Literal["hard", "soft"]
+    start: dt.datetime
+    end: dt.datetime
+    source_locator: str = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _valid_half_open_interval(self) -> "MuhurtaRuleInterval":
+        if any(
+            value.tzinfo is None or value.utcoffset() is None
+            for value in (self.start, self.end)
+        ):
+            raise ValueError("rule interval endpoints must be timezone-aware")
+        if self.end.astimezone(dt.UTC) <= self.start.astimezone(dt.UTC):
+            raise ValueError("rule interval end must be after start")
+        return self
+
+
+class MuhurtaEligibilityInput(FrozenModel):
+    profile: MuhurtaActivityProfile
+    start: dt.datetime
+    end: dt.datetime
+    zone_id: str = Field(min_length=1)
+    panchanga_status: Literal["allowed", "prohibited", "unavailable"]
+    dosa_status: Literal["clear", "active", "unavailable"]
+    weekday_status: Literal["allowed", "prohibited", "unavailable"]
+    daylight_status: Literal["inside", "outside", "unavailable"]
+    lagna_status: Literal["available", "prohibited", "unavailable"]
+    require_daylight: bool
+    require_lagna: bool
+    source_rule_intervals: tuple[MuhurtaRuleInterval, ...] = ()
+    source_admitted: bool
+
+    @model_validator(mode="after")
+    def _valid_candidate(self) -> "MuhurtaEligibilityInput":
+        if any(
+            value.tzinfo is None or value.utcoffset() is None
+            for value in (self.start, self.end)
+        ):
+            raise ValueError("candidate endpoints must be timezone-aware")
+        if self.end.astimezone(dt.UTC) <= self.start.astimezone(dt.UTC):
+            raise ValueError("candidate end must be after start")
+        return self
+
+
+class MuhurtaEligibilityTrace(FrozenModel):
+    rule_id: str = Field(pattern=r"^muhurta\.[A-Za-z0-9_.-]+$")
+    classification: Literal["hard", "soft"]
+    applicability: Literal["applicable", "not_applicable"]
+    result: Literal["pass", "fail", "preferred", "neutral"]
+    source_locator: str = Field(min_length=1)
+
+
+class MuhurtaEligibilityResult(FrozenModel):
+    status: Literal["eligible", "ineligible", "unavailable"]
+    hard_failures: tuple[str, ...] = ()
+    soft_signals: tuple[str, ...] = ()
+    rule_traces: tuple[MuhurtaEligibilityTrace, ...] = ()
+    reason_code: str | None = None
+
+
+_ELIGIBILITY_LOCATORS = {
+    "muhurta.eligibility.panchanga": "Kalaprakasika, Introduction, printed p. xvii",
+    "muhurta.eligibility.dosa": "Kalaprakasika, adverse periods, printed pp. 167-177",
+    "muhurta.eligibility.weekday": "Kalaprakasika, weekday periods, printed p. 176",
+    "muhurta.eligibility.daylight": "request hard constraint; source not required",
+    "muhurta.eligibility.lagna": "Kalaprakasika, rising-sign conditions, printed pp. 178-185",
+    "muhurta.preference.daylight": "request soft preference; source not required",
+}
+
+
+def _overlaps_half_open(
+    left_start: dt.datetime,
+    left_end: dt.datetime,
+    right_start: dt.datetime,
+    right_end: dt.datetime,
+) -> bool:
+    left_start_utc, left_end_utc = left_start.astimezone(dt.UTC), left_end.astimezone(dt.UTC)
+    right_start_utc, right_end_utc = (
+        right_start.astimezone(dt.UTC),
+        right_end.astimezone(dt.UTC),
+    )
+    return left_start_utc < right_end_utc and right_start_utc < left_end_utc
+
+
+def evaluate_muhurta_eligibility(
+    value: MuhurtaEligibilityInput,
+) -> MuhurtaEligibilityResult:
+    """Apply admitted hard gates before soft signals, with a full rule trace."""
+
+    if not value.source_admitted:
+        return MuhurtaEligibilityResult(
+            status="unavailable",
+            reason_code="SOURCE_RULES_NOT_ADMITTED",
+        )
+
+    hard_checks = (
+        ("muhurta.eligibility.panchanga", value.panchanga_status == "allowed", True),
+        ("muhurta.eligibility.dosa", value.dosa_status == "clear", True),
+        ("muhurta.eligibility.weekday", value.weekday_status == "allowed", True),
+        (
+            "muhurta.eligibility.daylight",
+            value.daylight_status == "inside",
+            value.require_daylight,
+        ),
+        (
+            "muhurta.eligibility.lagna",
+            value.lagna_status == "available",
+            value.require_lagna,
+        ),
+    )
+    traces: list[MuhurtaEligibilityTrace] = []
+    hard_failures: list[str] = []
+    for rule_id, passed, applicable in hard_checks:
+        if applicable and not passed:
+            hard_failures.append(rule_id)
+        traces.append(
+            MuhurtaEligibilityTrace(
+                rule_id=rule_id,
+                classification="hard",
+                applicability="applicable" if applicable else "not_applicable",
+                result=("pass" if passed else "fail") if applicable else "neutral",
+                source_locator=_ELIGIBILITY_LOCATORS[rule_id],
+            )
+        )
+
+    soft_signals: list[str] = []
+    daylight_preferred = value.daylight_status == "inside"
+    if daylight_preferred:
+        soft_signals.append("daylight_preferred")
+    traces.append(
+        MuhurtaEligibilityTrace(
+            rule_id="muhurta.preference.daylight",
+            classification="soft",
+            applicability="applicable",
+            result="preferred" if daylight_preferred else "neutral",
+            source_locator=_ELIGIBILITY_LOCATORS["muhurta.preference.daylight"],
+        )
+    )
+
+    for interval in value.source_rule_intervals:
+        applies = _overlaps_half_open(value.start, value.end, interval.start, interval.end)
+        if applies and interval.classification == "hard":
+            hard_failures.append(interval.rule_id)
+        elif applies:
+            soft_signals.append(interval.rule_id)
+        traces.append(
+            MuhurtaEligibilityTrace(
+                rule_id=interval.rule_id,
+                classification=interval.classification,
+                applicability="applicable" if applies else "not_applicable",
+                result=(
+                    "fail"
+                    if applies and interval.classification == "hard"
+                    else "preferred"
+                    if applies
+                    else "neutral"
+                ),
+                source_locator=interval.source_locator,
+            )
+        )
+
+    failures = tuple(sorted(set(hard_failures)))
+    return MuhurtaEligibilityResult(
+        status="ineligible" if failures else "eligible",
+        hard_failures=failures,
+        soft_signals=tuple(sorted(set(soft_signals))),
+        rule_traces=tuple(traces),
     )
