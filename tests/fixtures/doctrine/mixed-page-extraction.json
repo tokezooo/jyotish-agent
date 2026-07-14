@@ -1,0 +1,28 @@
+{
+  "pages": [
+    {
+      "page_number": 1,
+      "printed_page": 11,
+      "text": "अध्याय एक\nSūtra 1.1\nMixed Sanskrit and English.",
+      "source_method": "embedded_text",
+      "confidence": 1.0,
+      "admission_status": "admitted",
+      "anchors": [
+        {"kind": "heading", "label": "अध्याय एक", "start": 0, "end": 9},
+        {"kind": "sutra", "label": "1.1", "start": 10, "end": 19}
+      ]
+    },
+    {
+      "page_number": 2,
+      "printed_page": 12,
+      "text": "Chapter Two\nSutra 2.3\nMixed OCR text.",
+      "source_method": "ocr",
+      "confidence": 0.72,
+      "admission_status": "quarantined_low_confidence",
+      "anchors": [
+        {"kind": "heading", "label": "Chapter Two", "start": 0, "end": 11},
+        {"kind": "sutra", "label": "2.3", "start": 12, "end": 21}
+      ]
+    }
+  ]
+}
