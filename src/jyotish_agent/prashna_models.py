@@ -26,7 +26,9 @@ class PrashnaRequest(_Strict):
     capture_now: bool = False
     place: EventPlace | None = None
     anchor_token: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    clarification_of_fingerprint: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    clarification_of_fingerprint: str | None = Field(
+        default=None, pattern=r"^[0-9a-f]{64}$"
+    )
     idempotency_key: str | None = Field(
         default=None, pattern=r"^[A-Za-z0-9._:-]{16,128}$"
     )
@@ -36,14 +38,25 @@ class PrashnaRequest(_Strict):
     @model_validator(mode="after")
     def anchor_lifecycle(self) -> "PrashnaRequest":
         if self.anchor_token is not None:
-            if self.anchor is not None or self.capture_now or self.place is not None or self.idempotency_key is not None:
+            if (
+                self.anchor is not None
+                or self.capture_now
+                or self.place is not None
+                or self.idempotency_key is not None
+            ):
                 raise ValueError("follow-up supplies a token or new anchor, never both")
             return self
         if self.clarification_of_fingerprint is not None:
             raise ValueError("clarification_of_fingerprint requires an anchor token")
         if self.anchor is not None:
-            if self.capture_now or self.place is not None or self.idempotency_key is not None:
-                raise ValueError("explicit anchor and capture_now are mutually exclusive")
+            if (
+                self.capture_now
+                or self.place is not None
+                or self.idempotency_key is not None
+            ):
+                raise ValueError(
+                    "explicit anchor and capture_now are mutually exclusive"
+                )
             return self
         if not self.capture_now:
             raise ValueError("a new request requires an anchor or capture_now")
@@ -135,14 +148,30 @@ class PrashnaCompletedResult(_BaseResult):
 
 class PrashnaNeedsInputResult(_ErrorResultBase):
     status: Literal["needs_input"]
-    error_code: Literal["ANCHOR_MISMATCH", "ANCHOR_STALE", "TOPIC_UNSUPPORTED", "TOPIC_COMPOSITE", "IDEMPOTENCY_CONFLICT", "INPUT_INVALID"]
-    next_action: Literal["create_new_anchor", "provide_primary_question", "use_new_idempotency_key", "correct_request"]
+    error_code: Literal[
+        "ANCHOR_MISMATCH",
+        "ANCHOR_STALE",
+        "TOPIC_UNSUPPORTED",
+        "TOPIC_COMPOSITE",
+        "IDEMPOTENCY_CONFLICT",
+        "INPUT_INVALID",
+    ]
+    next_action: Literal[
+        "create_new_anchor",
+        "provide_primary_question",
+        "use_new_idempotency_key",
+        "correct_request",
+    ]
     supported_values: tuple[str, ...] = ("work_project_status_and_obstacles",)
 
 
 class PrashnaUnavailableResult(_ErrorResultBase):
     status: Literal["unavailable"]
-    error_code: Literal["HIGH_STAKES_TOPIC", "INTERPRETATION_SOURCE_UNAVAILABLE", "GOVERNANCE_INTEGRITY_ERROR"]
+    error_code: Literal[
+        "HIGH_STAKES_TOPIC",
+        "INTERPRETATION_SOURCE_UNAVAILABLE",
+        "GOVERNANCE_INTEGRITY_ERROR",
+    ]
     next_action: Literal["consult_qualified_professional", "inspect_source_status"]
     interpretation_status: Literal["unavailable"] = "unavailable"
 
@@ -154,7 +183,10 @@ class PrashnaIncompleteResult(_ErrorResultBase):
 
 
 PrashnaResult = Annotated[
-    PrashnaCompletedResult | PrashnaNeedsInputResult | PrashnaUnavailableResult | PrashnaIncompleteResult,
+    PrashnaCompletedResult
+    | PrashnaNeedsInputResult
+    | PrashnaUnavailableResult
+    | PrashnaIncompleteResult,
     Field(discriminator="status"),
 ]
 
@@ -183,3 +215,69 @@ class PrashnaAnswerSubmission(_Strict):
     question_relation: Literal["new_anchor", "exact_duplicate", "bounded_clarification"]
     claims: tuple[PrashnaAnswerClaim, ...] = Field(min_length=1, max_length=100)
     visible_text: str = Field(max_length=100_000)
+
+
+class PrashnaAspectGeometryInput(_Frozen):
+    """Engine-derived longitudes and motions bound to one sealed anchor."""
+
+    anchor_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    body_a: str = Field(pattern=r"^[a-z][a-z0-9_]{1,63}$")
+    body_b: str = Field(pattern=r"^[a-z][a-z0-9_]{1,63}$")
+    longitude_a: float = Field(ge=0.0, lt=360.0)
+    longitude_b: float = Field(ge=0.0, lt=360.0)
+    speed_a: float = Field(ge=-20.0, le=20.0)
+    speed_b: float = Field(ge=-20.0, le=20.0)
+    aspect_degrees: float = Field(ge=0.0, le=180.0)
+
+    @model_validator(mode="after")
+    def distinct_bodies(self) -> "PrashnaAspectGeometryInput":
+        if self.body_a == self.body_b:
+            raise ValueError("aspect geometry requires two distinct bodies")
+        return self
+
+
+class PrashnaAspectDoctrineProfile(_Frozen):
+    profile_id: Literal[
+        "prasna_marga_baseline_geometry_v1", "tajika_nilakanthi_geometry_v1"
+    ]
+    school: Literal["prasna_marga_baseline", "tajika_nilakanthi_overlay"]
+    profile_kind: Literal["baseline", "overlay"]
+    base_profile_id: str | None = None
+    allowed_aspects: tuple[float, ...]
+    max_orb_degrees: float = Field(gt=0.0, le=15.0)
+    exact_tolerance_degrees: float = Field(gt=0.0, le=0.1)
+    boundary_tolerance_degrees: float = Field(gt=0.0, le=0.25)
+    relative_speed_floor: float = Field(gt=0.0, le=0.1)
+    probe_days: float = Field(gt=0.0, le=0.01)
+    source_admitted: bool
+    source_refs: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def explicit_layer(self) -> "PrashnaAspectDoctrineProfile":
+        if len(set(self.allowed_aspects)) != len(self.allowed_aspects):
+            raise ValueError("allowed aspects must be unique")
+        if tuple(sorted(self.allowed_aspects)) != self.allowed_aspects:
+            raise ValueError("allowed aspects must be canonical")
+        if self.profile_kind == "baseline" and self.base_profile_id is not None:
+            raise ValueError("baseline geometry cannot name a base profile")
+        if self.profile_kind == "overlay" and self.base_profile_id is None:
+            raise ValueError("overlay geometry requires an explicit base profile")
+        if self.source_admitted != bool(self.source_refs):
+            raise ValueError("source admission and source references must agree")
+        return self
+
+
+class PrashnaAspectGeometryResult(_Frozen):
+    schema_version: Literal["1.0"] = "1.0"
+    anchor_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    profile_id: str
+    school: str
+    state: Literal["applying", "exact", "separating", "prohibited", "unavailable"]
+    separation_degrees: float = Field(ge=0.0, le=180.0)
+    orb_degrees: float = Field(ge=0.0, le=180.0)
+    relative_speed: float = Field(ge=0.0, le=40.0)
+    confidence: float = Field(ge=0.0, le=0.9)
+    reason_code: str | None = None
+    timing_unit: Literal["doctrine_controlled"] = "doctrine_controlled"
+    source_refs: tuple[str, ...] = ()
+    geometry_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")

@@ -637,3 +637,38 @@ def validate_prashna_significator_claim(
     if claimed_significators != route.significators:
         failures.append("SIGNIFICATORS_SUBSTITUTED")
     return tuple(failures)
+
+
+def prashna_aspect_profile(
+    school: Literal["prasna_marga_baseline", "tajika_nilakanthi_overlay"],
+):
+    """Return an explicit fail-closed geometry profile for the selected school."""
+
+    from ..prashna_models import PrashnaAspectDoctrineProfile
+
+    common = {
+        "max_orb_degrees": 6.0,
+        "exact_tolerance_degrees": 0.01,
+        "boundary_tolerance_degrees": 0.05,
+        "relative_speed_floor": 0.01,
+        "probe_days": 1.0 / 1440.0,
+        "source_admitted": False,
+        "source_refs": (),
+    }
+    if school == "prasna_marga_baseline":
+        return PrashnaAspectDoctrineProfile(
+            profile_id="prasna_marga_baseline_geometry_v1",
+            school=school,
+            profile_kind="baseline",
+            base_profile_id=None,
+            allowed_aspects=(0.0,),
+            **common,
+        )
+    return PrashnaAspectDoctrineProfile(
+        profile_id="tajika_nilakanthi_geometry_v1",
+        school=school,
+        profile_kind="overlay",
+        base_profile_id="prasna_marga_baseline_geometry_v1",
+        allowed_aspects=(0.0, 60.0, 90.0, 120.0, 180.0),
+        **common,
+    )
