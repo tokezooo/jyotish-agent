@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import datetime as dt
+import hashlib
 from enum import StrEnum
 from importlib import resources
 from typing import Literal
@@ -770,3 +771,195 @@ def rank_muhurta_candidates(
         ranked=ranked,
         near_misses=near_misses,
     )
+
+
+class MuhurtaRenderedWindow(FrozenModel):
+    rank: int = Field(ge=1)
+    interval: str
+    strength: str
+    score_components: dict[str, int]
+    confidence: float = Field(ge=0.0, le=1.0)
+    tradeoffs: tuple[str, ...]
+
+
+class MuhurtaRenderedNearMiss(FrozenModel):
+    interval: str
+    reasons: tuple[str, ...] = Field(min_length=1)
+
+
+class MuhurtaOverlayComparison(FrozenModel):
+    baseline_profile: Literal["classical_baseline_v1"]
+    overlay_profile: Literal["bv_raman_modern_overlay_v1"]
+    overlay_status: Literal["available", "unavailable"]
+    baseline_window_count: int = Field(ge=0)
+    overlay_window_count: int | None = Field(default=None, ge=0)
+    explanation: str
+
+
+class MuhurtaInspectionRecord(FrozenModel):
+    candidate_id: str
+    zone_id: str
+    start_local: str
+    end_local: str
+    start_utc: str
+    end_utc: str
+    start_fold: Literal[0, 1]
+    end_fold: Literal[0, 1]
+
+
+class MuhurtaRenderedReport(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    locale: Literal["ru", "en"]
+    mode: Literal["quick", "full", "deep"]
+    title: str
+    summary: str
+    top_windows: tuple[MuhurtaRenderedWindow, ...]
+    alternatives: tuple[MuhurtaRenderedWindow, ...]
+    near_misses: tuple[MuhurtaRenderedNearMiss, ...]
+    overlay_comparison: MuhurtaOverlayComparison
+    limitations: tuple[str, ...]
+    booking_performed: Literal[False] = False
+    inspection: tuple[MuhurtaInspectionRecord, ...] | None = None
+    visible_text_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+
+_REPORT_COPY = {
+    "en": {
+        "title": "Muhūrta window comparison",
+        "summary_completed": "Eligible windows are ordered by bounded preferences, not certainty.",
+        "summary_empty": "No eligible window was found under the admitted hard constraints.",
+        "strength": "Relative preference score",
+        "tradeoff": "Review components and confidence before choosing.",
+        "near_dosa": "A hard doṣa interval excludes this candidate.",
+        "near_generic": "A hard eligibility rule excludes this candidate.",
+        "overlay": "The named modern overlay is unavailable pending lawful acquisition and review.",
+        "limitations": (
+            "Astrological ranking is a bounded comparison, not a guarantee.",
+            "No calendar event, booking, or external side effect is created.",
+        ),
+    },
+    "ru": {
+        "title": "Сравнение окон мухурты",
+        "summary_completed": "Допустимые окна упорядочены по ограниченным предпочтениям, а не по обещанию результата.",
+        "summary_empty": "По допущенным жёстким ограничениям подходящее окно не найдено.",
+        "strength": "Относительная оценка предпочтительности",
+        "tradeoff": "Перед выбором сопоставьте компоненты и уверенность.",
+        "near_dosa": "Кандидат исключён жёстким интервалом доши.",
+        "near_generic": "Кандидат исключён жёстким правилом допустимости.",
+        "overlay": "Именованный современный overlay недоступен до легального получения и ревью.",
+        "limitations": (
+            "Астрологический рейтинг — ограниченное сравнение, а не гарантия.",
+            "Событие в календаре, бронирование и другие внешние действия не создаются.",
+        ),
+    },
+}
+
+
+def _visible_report_hash(report: MuhurtaRenderedReport) -> str:
+    payload = report.model_dump(mode="json")
+    payload.pop("visible_text_sha256", None)
+    payload.pop("inspection", None)
+    encoded = json.dumps(
+        payload, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _rendered_window(
+    item: MuhurtaRankedWindow, copy: dict[str, object]
+) -> MuhurtaRenderedWindow:
+    return MuhurtaRenderedWindow(
+        rank=item.rank,
+        interval=f"{item.start.isoformat()} / {item.end.isoformat()}",
+        strength=f"{copy['strength']}: {item.total_score}",
+        score_components=item.score_components,
+        confidence=item.confidence,
+        tradeoffs=(str(copy["tradeoff"]),),
+    )
+
+
+def _inspection(item: MuhurtaRankedWindow) -> MuhurtaInspectionRecord:
+    zone_id = getattr(item.start.tzinfo, "key", str(item.start.tzinfo))
+    return MuhurtaInspectionRecord(
+        candidate_id=item.candidate_id,
+        zone_id=zone_id,
+        start_local=item.start.isoformat(),
+        end_local=item.end.isoformat(),
+        start_utc=item.start.astimezone(dt.UTC).isoformat(timespec="seconds").replace(
+            "+00:00", "Z"
+        ),
+        end_utc=item.end.astimezone(dt.UTC).isoformat(timespec="seconds").replace(
+            "+00:00", "Z"
+        ),
+        start_fold=item.start.fold,
+        end_fold=item.end.fold,
+    )
+
+
+def render_muhurta_report(
+    ranking: MuhurtaRankingResult,
+    *,
+    locale: Literal["ru", "en"],
+    mode: Literal["quick", "full", "deep"],
+    include_inspection: bool,
+) -> MuhurtaRenderedReport:
+    """Render only validated ranking fields through a fixed RU/EN phrase set."""
+
+    copy = _REPORT_COPY[locale]
+    alternative_limits = {"quick": 0, "full": 2, "deep": 5}
+    near_limits = {"quick": 1, "full": 3, "deep": 5}
+    top = tuple(_rendered_window(item, copy) for item in ranking.ranked[:1])
+    alternatives = tuple(
+        _rendered_window(item, copy)
+        for item in ranking.ranked[1 : 1 + alternative_limits[mode]]
+    )
+    near_misses = tuple(
+        MuhurtaRenderedNearMiss(
+            interval=f"{item.start.isoformat()} / {item.end.isoformat()}",
+            reasons=tuple(
+                str(copy["near_dosa"])
+                if rule_id == "muhurta.eligibility.dosa"
+                else str(copy["near_generic"])
+                for rule_id in item.hard_failure_ids
+            ),
+        )
+        for item in ranking.near_misses[: near_limits[mode]]
+    )
+    inspection = (
+        tuple(_inspection(item) for item in ranking.ranked)
+        if include_inspection
+        else None
+    )
+    report = MuhurtaRenderedReport(
+        locale=locale,
+        mode=mode,
+        title=str(copy["title"]),
+        summary=str(
+            copy["summary_completed"]
+            if ranking.ranked
+            else copy["summary_empty"]
+        ),
+        top_windows=top,
+        alternatives=alternatives,
+        near_misses=near_misses,
+        overlay_comparison=MuhurtaOverlayComparison(
+            baseline_profile="classical_baseline_v1",
+            overlay_profile="bv_raman_modern_overlay_v1",
+            overlay_status="unavailable",
+            baseline_window_count=len(ranking.ranked),
+            overlay_window_count=None,
+            explanation=str(copy["overlay"]),
+        ),
+        limitations=tuple(str(item) for item in copy["limitations"]),  # type: ignore[union-attr]
+        inspection=inspection,
+        visible_text_sha256="0" * 64,
+    )
+    return report.model_copy(update={"visible_text_sha256": _visible_report_hash(report)})
+
+
+def validate_muhurta_visible_report(report: MuhurtaRenderedReport) -> list[str]:
+    """Reject any visible mutation after the template renderer has sealed output."""
+
+    if report.visible_text_sha256 != _visible_report_hash(report):
+        return ["VISIBLE_REPORT_MISMATCH"]
+    return []
