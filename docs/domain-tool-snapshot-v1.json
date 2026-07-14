@@ -4,8 +4,8 @@
     "jaimini": {
       "annotations": {"destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "readOnlyHint": true, "title": null},
       "description": "Compute bounded signed Jaimini Core facts for an exact birth time or an explicit 5-minute-step approximate range. Interpretation remains unavailable; a verified source pack and governed analysis renderer are both required.",
-      "inputSchemaSha256": "f538b4ecc1e757e50a1dd706c76698e9061b80be58277744f3dbed9b7c143fbf",
-      "outputSchemaSha256": "244dc6cd8d38ccdaf3e900dffede0d7c5944bbda344dbba25fcd8aae90fc2111"
+      "inputSchemaSha256": "2fafde446023c2a40585ca53fea63082cd756628e7f5232ba537add78a8fd6ed",
+      "outputSchemaSha256": "4f906cdf7de7f7f0558b5f868f0c99800df8a685ac82a55b52fe2211c1f82018"
     },
     "prashna": {
       "annotations": {"destructiveHint": false, "idempotentHint": true, "openWorldHint": false, "readOnlyHint": true, "title": null},
