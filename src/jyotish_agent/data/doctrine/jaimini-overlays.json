@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "overlays": [
+    {
+      "overlay_id": "sanjay_rath",
+      "display_name": "Sanjay Rath practical overlay",
+      "source_ids": [],
+      "activation_status": "unavailable",
+      "missing_reason": "Licensed local source bytes and reviewed fragments have not been supplied."
+    },
+    {
+      "overlay_id": "kn_rao_practical",
+      "display_name": "K. N. Rao selected practical overlay",
+      "source_ids": [],
+      "activation_status": "unavailable",
+      "missing_reason": "A selected licensed local source and reviewed fragments have not been supplied."
+    }
+  ]
+}
