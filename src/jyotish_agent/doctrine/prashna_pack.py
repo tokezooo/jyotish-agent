@@ -209,3 +209,164 @@ def render_prashna_corpus_coverage(
     """Return a deterministic projection without local paths or copyrighted text."""
 
     return report.model_dump(mode="json")
+
+
+class PrashnaRadicalityCriterion(FrozenModel):
+    criterion_id: Literal[
+        "anchor_exact", "question_not_test", "question_once", "question_proper_form"
+    ]
+    source_id: SourceId
+    pdf_page: int = Field(ge=1)
+    printed_page: int = Field(ge=1)
+    page_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source_locator: str = Field(min_length=1)
+
+
+class PrashnaRadicalityProfile(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    profile_id: Literal["prasna_marga_radicality_v1"]
+    school: Literal["prasna_marga_baseline"]
+    profile_kind: Literal["baseline"]
+    overlay_profile_id: str | None = None
+    confidence_ceiling: float = Field(ge=0.0, le=0.65)
+    criteria: tuple[PrashnaRadicalityCriterion, ...] = Field(min_length=4)
+
+    @model_validator(mode="after")
+    def _pure_complete_baseline(self) -> "PrashnaRadicalityProfile":
+        if self.overlay_profile_id is not None:
+            raise ValueError("baseline radicality profile cannot include an overlay")
+        ids = [criterion.criterion_id for criterion in self.criteria]
+        expected = {
+            "anchor_exact",
+            "question_not_test",
+            "question_once",
+            "question_proper_form",
+        }
+        if set(ids) != expected or len(ids) != len(expected):
+            raise ValueError("baseline radicality criteria must be complete and unique")
+        return self
+
+
+class PrashnaRadicalityInput(FrozenModel):
+    """Privacy-safe adjudication facts; raw question and place never enter this layer."""
+
+    anchor_state: Literal["sealed", "stale", "invalid"]
+    question_relation: Literal[
+        "new_anchor", "exact_duplicate", "bounded_clarification", "material_mismatch"
+    ]
+    topic_state: Literal["single_safe", "composite", "unclear", "unsuitable"]
+    question_form: Literal["proper", "improper"]
+    intent_state: Literal["sincere", "testing", "unknown"]
+    sources_admitted: bool
+
+
+class PrashnaRadicalityResult(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    status: Literal["readable", "conflicting", "unavailable"]
+    outcome_allowed: bool
+    anchor_action: Literal[
+        "reuse_sealed_anchor",
+        "create_new_anchor",
+        "require_single_question",
+        "inspect_source_admission",
+    ]
+    confidence_ceiling: float = Field(ge=0.0, le=0.65)
+    reason_codes: tuple[str, ...]
+    school: Literal["prasna_marga_baseline"]
+    source_refs: tuple[str, ...]
+
+    @model_validator(mode="after")
+    def _outcome_requires_readability(self) -> "PrashnaRadicalityResult":
+        if self.outcome_allowed != (self.status == "readable"):
+            raise ValueError(
+                "only readable radicality results may reach an outcome path"
+            )
+        return self
+
+
+def evaluate_prashna_radicality(
+    value: PrashnaRadicalityInput,
+    profile: PrashnaRadicalityProfile,
+) -> PrashnaRadicalityResult:
+    """Evaluate the source-bound gate before any significator or outcome logic."""
+
+    source_refs = tuple(
+        f"{item.source_id}:pdf:{item.pdf_page}:sha256:{item.page_sha256}"
+        for item in sorted(
+            profile.criteria, key=lambda criterion: criterion.criterion_id
+        )
+    )
+    common = {
+        "confidence_ceiling": profile.confidence_ceiling,
+        "school": profile.school,
+        "source_refs": source_refs,
+    }
+    if not value.sources_admitted:
+        return PrashnaRadicalityResult(
+            status="unavailable",
+            outcome_allowed=False,
+            anchor_action="inspect_source_admission",
+            reason_codes=("SOURCE_ADMISSION_MISSING",),
+            **common,
+        )
+    if value.anchor_state != "sealed":
+        return PrashnaRadicalityResult(
+            status="unavailable",
+            outcome_allowed=False,
+            anchor_action="create_new_anchor",
+            reason_codes=(
+                "ANCHOR_STALE" if value.anchor_state == "stale" else "ANCHOR_INVALID",
+            ),
+            **common,
+        )
+    if value.question_relation == "material_mismatch":
+        return PrashnaRadicalityResult(
+            status="unavailable",
+            outcome_allowed=False,
+            anchor_action="create_new_anchor",
+            reason_codes=("MATERIAL_MISMATCH",),
+            **common,
+        )
+    if value.topic_state != "single_safe":
+        reason = {
+            "composite": "TOPIC_COMPOSITE",
+            "unclear": "TOPIC_UNCLEAR",
+            "unsuitable": "TOPIC_UNSUITABLE",
+        }[value.topic_state]
+        return PrashnaRadicalityResult(
+            status="unavailable",
+            outcome_allowed=False,
+            anchor_action="require_single_question",
+            reason_codes=(reason,),
+            **common,
+        )
+    if value.question_form == "improper" or value.intent_state != "sincere":
+        reasons = []
+        if value.question_form == "improper":
+            reasons.append("FORM_IMPROPER")
+        if value.intent_state == "testing":
+            reasons.append("INTENT_TESTING")
+        elif value.intent_state == "unknown":
+            reasons.append("INTENT_UNCLEAR")
+        return PrashnaRadicalityResult(
+            status="unavailable",
+            outcome_allowed=False,
+            anchor_action="require_single_question",
+            reason_codes=tuple(reasons),
+            **common,
+        )
+    if value.question_relation == "exact_duplicate":
+        return PrashnaRadicalityResult(
+            status="conflicting",
+            outcome_allowed=False,
+            anchor_action="reuse_sealed_anchor",
+            reason_codes=("QUESTION_REPEATED",),
+            **common,
+        )
+    return PrashnaRadicalityResult(
+        status="readable",
+        outcome_allowed=True,
+        anchor_action="reuse_sealed_anchor",
+        reason_codes=(),
+        **common,
+    )
