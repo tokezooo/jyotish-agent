@@ -8,6 +8,8 @@ known. Later Jaimini slices consume this same verified corpus identity.
 from __future__ import annotations
 
 import hashlib
+import datetime as dt
+import re
 from enum import StrEnum
 from typing import Literal
 
@@ -433,3 +435,286 @@ def render_jaimini_topic_report(
         lines.append("Limitations: " + ", ".join(analysis.unavailable_reasons))
     lines.append(disclaimer)
     return "\n".join(lines) + "\n"
+
+
+class JaiminiTimingFailure(RuntimeError):
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        super().__init__(message)
+
+
+class JaiminiTimingWindow(FrozenModel):
+    sign: str = Field(min_length=1)
+    start: dt.datetime
+    end: dt.datetime
+    boundary_stability: Literal["stable", "unstable"]
+    confidence: float = Field(ge=0.0, le=0.95)
+    rule_ids: tuple[str, ...] = Field(min_length=1)
+    fact_paths: tuple[str, ...] = Field(min_length=4)
+    source_commitments: tuple[Sha256, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _bounded_window(self) -> "JaiminiTimingWindow":
+        if self.start.tzinfo is None or self.end.tzinfo is None:
+            raise ValueError("timing windows must be timezone-aware")
+        if self.end <= self.start:
+            raise ValueError("timing window end must be after start")
+        return self
+
+
+class JaiminiTimingAnalysis(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    graph_sha256: Sha256
+    natal_topic: JaiminiTopic
+    available: bool
+    windows: tuple[JaiminiTimingWindow, ...]
+    limitations: tuple[str, ...]
+
+
+_CHARA_PERIOD_PATH = re.compile(
+    r"^jaimini\.chara_dasha\.(?P<index>[1-9][0-9]*)\."
+    r"(?P<field>sign|start|end|active)$"
+)
+
+
+def link_chara_dasha_timing(
+    graph: AnalysisGraph,
+    natal_analysis: JaiminiTopicAnalysis,
+    *,
+    birth_time_confidence: Literal["exact", "approximate"] = "exact",
+    max_windows: int = 12,
+) -> JaiminiTimingAnalysis:
+    """Link bounded Chara Dasha periods only to an available natal topic graph."""
+
+    if natal_analysis.graph_sha256 != graph.graph_sha256:
+        raise JaiminiTimingFailure(
+            "NATAL_GRAPH_SUBSTITUTED",
+            "Natal topic and timing graph identities do not match.",
+        )
+    if not natal_analysis.available:
+        return JaiminiTimingAnalysis(
+            graph_sha256=graph.graph_sha256,
+            natal_topic=natal_analysis.topic,
+            available=False,
+            windows=(),
+            limitations=("NATAL_TOPIC_UNAVAILABLE",),
+        )
+
+    timing_nodes = tuple(node for node in graph.topic_nodes if node.topic == "timing")
+    fact_by_id = {node.node_id: node for node in graph.fact_nodes}
+    periods: dict[int, dict[str, object]] = {}
+    rule_ids_by_period: dict[int, set[str]] = {}
+    commitments_by_period: dict[int, set[str]] = {}
+    confidence_by_period: dict[int, float] = {}
+
+    for node in timing_nodes:
+        fact_edges = tuple(
+            edge
+            for edge in graph.edges
+            if edge.source_id == node.node_id and edge.relation == "supported_by_fact"
+        )
+        period_indexes: set[int] = set()
+        for edge in fact_edges:
+            fact = fact_by_id.get(edge.target_id)
+            if fact is None:
+                continue
+            match = _CHARA_PERIOD_PATH.fullmatch(fact.path)
+            if match is None:
+                continue
+            index = int(match.group("index"))
+            field = match.group("field")
+            periods.setdefault(index, {})[field] = fact.value
+            periods[index].setdefault("fact_paths", set())
+            paths = periods[index]["fact_paths"]
+            if isinstance(paths, set):
+                paths.add(fact.path)
+            period_indexes.add(index)
+            rule_ids_by_period.setdefault(index, set()).add(node.rule_id)
+            confidence_by_period[index] = min(
+                confidence_by_period.get(index, node.confidence), node.confidence
+            )
+        source_targets = {
+            edge.target_id
+            for edge in graph.edges
+            if edge.source_id == node.node_id and edge.relation == "supported_by_source"
+        }
+        for index in period_indexes:
+            commitments_by_period.setdefault(index, set()).update(
+                hashlib.sha256(target.encode("utf-8")).hexdigest()
+                for target in source_targets
+            )
+
+    windows: list[JaiminiTimingWindow] = []
+    for index in sorted(periods):
+        period = periods[index]
+        if period.get("active") is not True:
+            continue
+        required = {"sign", "start", "end", "active", "fact_paths"}
+        if not required <= set(period):
+            raise JaiminiTimingFailure(
+                "TIMING_LINEAGE_INCOMPLETE",
+                "An active timing period lacks required fact lineage.",
+            )
+        try:
+            start = dt.datetime.fromisoformat(str(period["start"]))
+            end = dt.datetime.fromisoformat(str(period["end"]))
+            window = JaiminiTimingWindow(
+                sign=str(period["sign"]),
+                start=start,
+                end=end,
+                boundary_stability=(
+                    "stable" if birth_time_confidence == "exact" else "unstable"
+                ),
+                confidence=confidence_by_period[index],
+                rule_ids=tuple(sorted(rule_ids_by_period[index])),
+                fact_paths=tuple(sorted(period["fact_paths"])),
+                source_commitments=tuple(sorted(commitments_by_period.get(index, set()))),
+            )
+        except (TypeError, ValueError) as exc:
+            raise JaiminiTimingFailure(
+                "TIMING_WINDOW_INVALID",
+                "A timing period is not a valid bounded timezone-aware interval.",
+            ) from exc
+        windows.append(window)
+
+    if len(windows) > max_windows:
+        raise JaiminiTimingFailure(
+            "TIMING_PAYLOAD_LIMIT", "Timing window count exceeds the configured bound."
+        )
+    limitations = (
+        ("BIRTH_TIME_APPROXIMATE",)
+        if birth_time_confidence == "approximate" and windows
+        else (() if windows else ("NO_ADMITTED_TIMING_WINDOWS",))
+    )
+    return JaiminiTimingAnalysis(
+        graph_sha256=graph.graph_sha256,
+        natal_topic=natal_analysis.topic,
+        available=bool(windows),
+        windows=tuple(windows),
+        limitations=limitations,
+    )
+
+
+def render_jaimini_timing_report(
+    analysis: JaiminiTimingAnalysis,
+    *,
+    locale: Literal["ru", "en"],
+) -> str:
+    title = "Jaimini timing windows" if locale == "en" else "Окна периодов Jaimini"
+    lines = [f"## {title} — experimental_full"]
+    for window in analysis.windows:
+        lines.append(
+            f"- {window.sign}: {window.start.date().isoformat()} — "
+            f"{window.end.date().isoformat()} [{window.boundary_stability}; "
+            f"confidence <= {window.confidence:.2f}]"
+        )
+    lines.append(
+        "These are bounded possibility windows, not event promises."
+        if locale == "en"
+        else "Это ограниченные окна возможностей, а не обещания событий."
+    )
+    if analysis.limitations:
+        lines.append("Limitations: " + ", ".join(analysis.limitations))
+    return "\n".join(lines) + "\n"
+
+
+class JaiminiOverlayFailure(RuntimeError):
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        super().__init__(message)
+
+
+class JaiminiOverlayDefinition(FrozenModel):
+    overlay_id: str = Field(pattern=r"^[a-z][a-z0-9_]{2,95}$")
+    display_name: str = Field(min_length=1)
+    source_ids: tuple[SourceId, ...] = ()
+    activation_status: Literal["unavailable", "available"]
+    missing_reason: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _activation_has_sources(self) -> "JaiminiOverlayDefinition":
+        if self.activation_status == "available" and not self.source_ids:
+            raise ValueError("available overlays require verified source identities")
+        if self.activation_status == "unavailable" and self.missing_reason is None:
+            raise ValueError("unavailable overlays require a missing reason")
+        return self
+
+
+class JaiminiOverlayRegistry(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    overlays: tuple[JaiminiOverlayDefinition, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _unique_overlays(self) -> "JaiminiOverlayRegistry":
+        ids = [overlay.overlay_id for overlay in self.overlays]
+        if len(ids) != len(set(ids)):
+            raise ValueError("overlay IDs must be unique")
+        return self
+
+
+class JaiminiOverlayComparison(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    topic: JaiminiTopic
+    overlay_id: str
+    overlay_active: bool
+    baseline_graph_sha256: Sha256
+    overlay_graph_sha256: Sha256 | None
+    school_ids: tuple[str, ...]
+    baseline_signals: tuple[JaiminiTopicSignal, ...]
+    overlay_signals: tuple[JaiminiTopicSignal, ...]
+    divergences: tuple[tuple[str, str], ...]
+
+
+def compare_jaimini_overlays(
+    baseline: JaiminiTopicAnalysis,
+    overlay: JaiminiTopicAnalysis,
+    *,
+    overlay_id: str,
+    activate: bool,
+) -> JaiminiOverlayComparison:
+    """Compare isolated analyses; never merge overlay signals into baseline state."""
+
+    if baseline.topic != overlay.topic:
+        raise JaiminiOverlayFailure(
+            "OVERLAY_TOPIC_MISMATCH", "Baseline and overlay topics do not match."
+        )
+    if not activate:
+        return JaiminiOverlayComparison(
+            topic=baseline.topic,
+            overlay_id=overlay_id,
+            overlay_active=False,
+            baseline_graph_sha256=baseline.graph_sha256,
+            overlay_graph_sha256=None,
+            school_ids=baseline.school_ids,
+            baseline_signals=baseline.signals,
+            overlay_signals=(),
+            divergences=(),
+        )
+    if set(baseline.school_ids) & set(overlay.school_ids):
+        raise JaiminiOverlayFailure(
+            "OVERLAY_SCHOOL_NOT_EXPLICIT",
+            "Overlay analysis must use a school distinct from the baseline.",
+        )
+    if overlay_id not in overlay.school_ids:
+        raise JaiminiOverlayFailure(
+            "OVERLAY_ID_MISMATCH",
+            "Activated overlay identity does not match its analysis school.",
+        )
+    divergences = tuple(
+        sorted(
+            (baseline_rule, overlay_rule)
+            for baseline_rule in baseline.activated_rule_ids
+            for overlay_rule in overlay.activated_rule_ids
+        )
+    )
+    return JaiminiOverlayComparison(
+        topic=baseline.topic,
+        overlay_id=overlay_id,
+        overlay_active=True,
+        baseline_graph_sha256=baseline.graph_sha256,
+        overlay_graph_sha256=overlay.graph_sha256,
+        school_ids=tuple(sorted(set(baseline.school_ids) | set(overlay.school_ids))),
+        baseline_signals=baseline.signals,
+        overlay_signals=overlay.signals,
+        divergences=divergences,
+    )
