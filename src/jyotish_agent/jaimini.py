@@ -481,7 +481,7 @@ def _facts_for_snapshot(
 ]:
     profile = load_jaimini_rule_profile()
     lagna, planets = _position_map(snapshot.d1)  # type: ignore[union-attr]
-    _d9_lagna, _d9_planets = _position_map(snapshot.d9)  # type: ignore[union-attr]
+    d9_lagna, d9_planets = _position_map(snapshot.d9)  # type: ignore[union-attr]
     longitudes = {
         names.PLANETS[index]: sign * 30 + degrees
         for index, (sign, degrees) in planets.items()
@@ -563,6 +563,8 @@ def _facts_for_snapshot(
         for sign in range(12)
     )
     padas = arudha_padas(lagna, lord_signs)
+    d9_lord_signs = tuple(d9_planets[lord_indices[sign]][0] for sign in range(12))
+    d9_padas = arudha_padas(d9_lagna, d9_lord_signs)
     occupants: dict[int, list[str]] = {}
     for index, (sign, _degrees) in planets.items():
         occupants.setdefault(sign, []).append(names.PLANETS[index])
@@ -691,9 +693,63 @@ def _facts_for_snapshot(
                 )
             )
 
+    relationship_nodes = {
+        label: {
+            "body": seven.assignments[label],
+            "D1": planets[names.PLANETS.index(seven.assignments[label])][0],
+            "D9": d9_planets[names.PLANETS.index(seven.assignments[label])][0],
+        }
+        for label in ("AK", "AmK", "DK")
+    }
+    relationship_nodes.update(
+        {
+            "AL": {"D1": padas["AL"], "D9": d9_padas["AL"]},
+            "UL": {"D1": padas["UL"], "D9": d9_padas["UL"]},
+        }
+    )
+    relationships: list[JaiminiFact] = []
+    for label, placements in relationship_nodes.items():
+        body = placements.get("body")
+        if body is not None:
+            relationships.append(
+                JaiminiFact(
+                    fact_id=f"jaimini.relationships.node.{label}.body", value=body
+                )
+            )
+        for varga in ("D1", "D9"):
+            sign = int(placements[varga])
+            relationships.append(
+                JaiminiFact(
+                    fact_id=f"jaimini.relationships.node.{label}.{varga}.sign",
+                    value=names.SIGNS[sign],
+                )
+            )
+            trace.append(
+                JaiminiFact(
+                    fact_id=f"jaimini.trace.relationships.node.{label}.{varga}.sign_index",
+                    value=sign,
+                )
+            )
+    for varga in ("D1", "D9"):
+        for left, right in combinations(("AK", "AmK", "DK", "AL", "UL"), 2):
+            distance = (
+                int(relationship_nodes[right][varga])
+                - int(relationship_nodes[left][varga])
+            ) % 12
+            relationships.append(
+                JaiminiFact(
+                    fact_id=(
+                        f"jaimini.relationships.edge.{varga}."
+                        f"{left}_to_{right}.forward_distance"
+                    ),
+                    value=distance,
+                )
+            )
+
     sections: list[tuple[str, tuple[JaiminiFact, ...]]] = [
         ("chara_karakas", tuple(karaka_facts)),
         ("core_geometry", tuple(geometry)),
+        ("relationship_graph", tuple(sorted(relationships, key=lambda fact: fact.fact_id))),
     ]
     if request.analysis_scope == "core_with_chara_dasha":
         periods = chara_dasha(

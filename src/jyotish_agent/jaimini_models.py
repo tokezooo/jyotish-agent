@@ -188,12 +188,14 @@ class _JaiminiResultBase(_StrictModel):
 
     @model_validator(mode="after")
     def interpretation_fails_closed(self) -> "_JaiminiResultBase":
-        status = getattr(self, "status", None)
         if self.interpretation_status == "available":
-            if status != "completed":
-                raise ValueError("interpretation is available only for completed results")
-            if self.provenance.source_review_status != "approved":
-                raise ValueError("available interpretation requires approved source review")
+            # Future activation must add signed renderer ID/version fields and verify
+            # both that binding and governed source admission before relaxing this
+            # public invariant. Source-review metadata alone is never sufficient.
+            raise ValueError(
+                "available interpretation requires a verified governed renderer "
+                "ID/version; no governed renderer is admitted"
+            )
         return self
 
 

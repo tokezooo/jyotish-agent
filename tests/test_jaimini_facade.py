@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import pytest
 
 from jyotish_agent import jaimini as domain
+from jyotish_agent import interpretations, signing
 from jyotish_agent.jaimini_models import JaiminiInput
 from jyotish_agent.jaimini_models import ExactJaiminiBirthInput, JaiminiPlace
 from jyotish_agent.timezone_resolution import TimezoneResolutionError
@@ -131,6 +132,24 @@ def test_domain_facade_returns_bounded_signed_deterministic_facts(monkeypatch):
     assert "jaimini.rasi_drishti.planet.Sun.signs" in atoms
     assert "jaimini.argala.AL.2_vs_12.status" in atoms
     assert "jaimini.chara_antardasha.1.1" in atoms
+    relationship = next(
+        section for section in first.sections if section.section_id == "relationship_graph"
+    )
+    relationship_ids = [fact.fact_id for fact in relationship.facts]
+    assert relationship_ids == sorted(relationship_ids)
+    assert atoms["jaimini.relationships.node.AK.body"] == "Sun"
+    assert atoms["jaimini.relationships.node.AK.D1.sign"] == "Taurus"
+    assert atoms["jaimini.relationships.node.AK.D9.sign"] == "Gemini"
+    assert "jaimini.relationships.node.AL.D1.sign" in atoms
+    assert "jaimini.relationships.node.AL.D9.sign" in atoms
+    assert "jaimini.relationships.edge.D1.AK_to_AmK.forward_distance" in atoms
+    assert "jaimini.relationships.edge.D9.AL_to_UL.forward_distance" in atoms
+    assert len(relationship.facts) == 33
+    cached = signing.get_cached_domain_artifact(first.artifact_token)
+    assert cached is not None
+    assert signing.verify_domain_artifact(cached)
+    signed_atoms = interpretations.iter_jaimini_fact_atoms(cached["facts"])
+    assert all(fact_id in signed_atoms for fact_id in relationship_ids)
     assert first.trace is None
     assert any(item.code == "SOURCE_ADMISSION_UNVERIFIED" for item in first.limitations)
     assert len(json.dumps(first.model_dump(mode="json"), ensure_ascii=False).encode()) < 512 * 1024
@@ -149,6 +168,10 @@ def test_approximate_range_marks_changed_geometry_unstable(monkeypatch):
         fact.fact_id: fact for section in result.sections for fact in section.facts
     }
     assert facts["jaimini.lagna.sign"].stability == "unstable"
+    assert facts["jaimini.relationships.node.AL.D1.sign"].stability == "unstable"
+    assert facts[
+        "jaimini.relationships.edge.D1.AK_to_AL.forward_distance"
+    ].stability == "unstable"
     assert any(item.code == "BIRTH_TIME_SENSITIVE" for item in result.limitations)
 
 
@@ -174,6 +197,7 @@ def test_include_trace_controls_bounded_rule_inputs(monkeypatch):
     trace = {fact.fact_id: fact.value for fact in shown.trace}
     assert "jaimini.trace.arudha.A1.lord_sign" in trace
     assert "jaimini.trace.argala.AL.2_vs_12.contributors" in trace
+    assert "jaimini.trace.relationships.node.AL.D9.sign_index" in trace
     assert len(shown.trace) <= 256
 
 

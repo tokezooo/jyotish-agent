@@ -213,7 +213,7 @@ def test_non_completed_results_cannot_claim_available_interpretation(status, nex
         )
 
 
-def test_completed_result_requires_approved_sources_for_available_interpretation():
+def test_completed_result_rejects_available_interpretation_until_renderer_is_governed():
     completed = {
         "status": "completed",
         "profile_name": "synthetic-example",
@@ -222,7 +222,7 @@ def test_completed_result_requires_approved_sources_for_available_interpretation
         "truncation": {"truncated": False, "total_count": 0, "returned_count": 0},
         **_artifact_fields(),
     }
-    with pytest.raises(ValidationError, match="approved"):
+    with pytest.raises(ValidationError, match="renderer"):
         TypeAdapter(JaiminiResult).validate_python(
             {
                 **_result_common(
@@ -232,15 +232,38 @@ def test_completed_result_requires_approved_sources_for_available_interpretation
             }
         )
 
-    result = TypeAdapter(JaiminiResult).validate_python(
-        {
-            **_result_common(
-                interpretation_status="available", source_review_status="approved"
-            ),
-            **completed,
-        }
-    )
-    assert result.interpretation_status == "available"
+    with pytest.raises(ValidationError, match="renderer"):
+        TypeAdapter(JaiminiResult).validate_python(
+            {
+                **_result_common(
+                    interpretation_status="available", source_review_status="approved"
+                ),
+                **completed,
+            }
+        )
+
+
+@pytest.mark.parametrize("interpretation", [None, ["Arbitrary approved-looking prose."]])
+def test_fake_admission_hash_cannot_activate_public_interpretation(interpretation):
+    with pytest.raises(ValidationError, match="renderer"):
+        TypeAdapter(JaiminiResult).validate_python(
+            {
+                **_result_common(
+                    interpretation_status="available", source_review_status="approved"
+                ),
+                "status": "completed",
+                "profile_name": "synthetic-example",
+                "anchor_summary": "exact birth anchor",
+                "sections": [],
+                "truncation": {
+                    "truncated": False,
+                    "total_count": 0,
+                    "returned_count": 0,
+                },
+                "interpretation": interpretation,
+                **_artifact_fields(),
+            }
+        )
 
 
 def test_frozen_profile_encodes_every_doctrinal_and_time_choice():
