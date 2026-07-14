@@ -9,20 +9,37 @@ already locked D1/D9 session callback.
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
+import json
 from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_EVEN
 from itertools import combinations
 from typing import Callable, Literal, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
+from . import ENGINE_VERSION, names
 from .config import CalculationConfig
 from .jaimini_models import (
     ApproximateJaiminiBirthInput,
     ExactJaiminiBirthInput,
+    JaiminiCompletedResult,
+    JaiminiFact,
+    JaiminiInput,
+    JaiminiLimitation,
+    JaiminiProvenance,
     JaiminiRuleProfile,
+    JaiminiSection,
+    JaiminiTruncation,
 )
 from .pyjhora_facade import BirthProfile, _run_engine_session
-from .rule_profiles import load_jaimini_rule_profile
+from .rule_profiles import (
+    jaimini_rule_profile_sha256,
+    jaimini_source_admission_verified,
+    jaimini_source_map_sha256,
+    load_jaimini_rule_profile,
+    load_jaimini_source_map,
+)
+from .signing import cache_domain_artifact
 
 _SEVEN_PLANETS = ("Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn")
 _PLANET_INDICES = {name: index for index, name in enumerate((*_SEVEN_PLANETS, "Rahu", "Ketu"))}
@@ -409,3 +426,266 @@ def capture_birth_snapshots(
         )
         captured.append(result.domain)
     return tuple(captured)
+
+
+def _canonical_hash(value: object) -> str:
+    encoded = json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _position_map(chart: object) -> tuple[int, dict[int, tuple[int, float]]]:
+    lagna: int | None = None
+    planets: dict[int, tuple[int, float]] = {}
+    for position in chart:  # type: ignore[union-attr]
+        if position.planet_index is None:
+            lagna = int(position.sign_index)
+        else:
+            planets[int(position.planet_index)] = (
+                int(position.sign_index),
+                float(position.degrees),
+            )
+    if lagna is None or any(index not in planets for index in range(9)):
+        raise ValueError("Jaimini snapshot is incomplete")
+    return lagna, planets
+
+
+def _facts_for_snapshot(
+    snapshot: object,
+    request: JaiminiInput,
+    *,
+    birth_start: dt.datetime,
+) -> tuple[tuple[str, tuple[JaiminiFact, ...]], ...]:
+    profile = load_jaimini_rule_profile()
+    lagna, planets = _position_map(snapshot.d1)  # type: ignore[union-attr]
+    _d9_lagna, _d9_planets = _position_map(snapshot.d9)  # type: ignore[union-attr]
+    longitudes = {
+        names.PLANETS[index]: sign * 30 + degrees
+        for index, (sign, degrees) in planets.items()
+    }
+    seven = chara_karakas(longitudes, scheme=7)
+    eight = chara_karakas(longitudes, scheme=8)
+
+    karaka_facts = tuple(
+        JaiminiFact(fact_id=f"jaimini.karakas.7.{label}", value=planet)
+        for label, planet in seven.assignments.items()
+    ) + tuple(
+        JaiminiFact(fact_id=f"jaimini.karakas.8.{label}", value=planet)
+        for label, planet in eight.assignments.items()
+    )
+
+    lord_signs = tuple(
+        planets[names.sign_lord_index(sign)][0]  # type: ignore[index]
+        for sign in range(12)
+    )
+    padas = arudha_padas(lagna, lord_signs)
+    occupants: dict[int, list[str]] = {}
+    for index, (sign, _degrees) in planets.items():
+        occupants.setdefault(sign, []).append(names.PLANETS[index])
+    geometry = [
+        JaiminiFact(fact_id="jaimini.lagna.sign", value=names.SIGNS[lagna]),
+        JaiminiFact(
+            fact_id="jaimini.svamsa.sign",
+            value=names.SIGNS[svamsa(snapshot.d9, profile=profile)],  # type: ignore[union-attr]
+        ),
+        JaiminiFact(
+            fact_id="jaimini.karakamsa.sign",
+            value=names.SIGNS[
+                karakamsa(snapshot.d9, seven.assignments, profile=profile)  # type: ignore[union-attr]
+            ],
+        ),
+    ]
+    geometry.extend(
+        JaiminiFact(fact_id=f"jaimini.arudha.{key}", value=names.SIGNS[value])
+        for key, value in sorted(padas.items())
+    )
+    geometry.extend(
+        JaiminiFact(
+            fact_id=f"jaimini.rasi_drishti.{names.SIGNS[sign]}",
+            value=",".join(names.SIGNS[target] for target in rasi_drishti(sign, profile=profile)),
+        )
+        for sign in range(12)
+    )
+    geometry.extend(
+        JaiminiFact(
+            fact_id=f"jaimini.argala.lagna.{pair.house}_vs_{pair.obstruction_house}",
+            value=pair.status,
+        )
+        for pair in argala(lagna, occupants, profile=profile)
+    )
+
+    sections: list[tuple[str, tuple[JaiminiFact, ...]]] = [
+        ("chara_karakas", karaka_facts),
+        ("core_geometry", tuple(geometry)),
+    ]
+    if request.analysis_scope == "core_with_chara_dasha":
+        periods = chara_dasha(
+            lagna,
+            lord_signs,
+            gender=request.gender or "male",
+            start=birth_start,
+        )
+        dasha: list[JaiminiFact] = []
+        reference = dt.datetime.combine(
+            request.reference_date or request.birth.date,
+            dt.time(12),
+            dt.timezone.utc,
+        )
+        for index, period in enumerate(periods, 1):
+            prefix = f"jaimini.chara_dasha.{index}"
+            dasha.extend(
+                (
+                    JaiminiFact(fact_id=f"{prefix}.sign", value=names.SIGNS[period.sign]),
+                    JaiminiFact(fact_id=f"{prefix}.start", value=period.start.isoformat()),
+                    JaiminiFact(fact_id=f"{prefix}.end", value=period.end.isoformat()),
+                    JaiminiFact(fact_id=f"{prefix}.active", value=period.contains(reference)),
+                )
+            )
+        sections.append(("chara_dasha", tuple(dasha)))
+    return tuple(sections)
+
+
+class JaiminiFacade:
+    """Pure deterministic Jaimini Core facade over immutable engine snapshots."""
+
+    def calculate(self, request: JaiminiInput) -> JaiminiCompletedResult:
+        reference_date = request.reference_date or request.birth.date
+        snapshots = capture_birth_snapshots(
+            request.birth,
+            reference_date=(reference_date.year, reference_date.month, reference_date.day),
+        )
+        local_instants = _local_datetimes(request.birth)
+        if len(snapshots) != len(local_instants):
+            raise ValueError("Jaimini sensitivity sample count mismatch")
+        samples = tuple(
+            _facts_for_snapshot(snapshot, request, birth_start=instant.astimezone(dt.UTC))
+            for snapshot, instant in zip(snapshots, local_instants, strict=True)
+        )
+        sample_maps = tuple(
+            {
+                fact.fact_id: fact.value
+                for _section_id, facts in sample
+                for fact in facts
+            }
+            for sample in samples
+        )
+        stability = {
+            path: "stable"
+            if all(sample.get(path) == sample_maps[0].get(path) for sample in sample_maps)
+            else "unstable"
+            for path in sample_maps[0]
+        }
+        sections = tuple(
+            JaiminiSection(
+                section_id=section_id,
+                facts=tuple(
+                    fact.model_copy(update={"stability": stability[fact.fact_id]})
+                    for fact in facts
+                ),
+            )
+            for section_id, facts in samples[0]
+        )
+        all_facts = [
+            fact.model_dump(mode="json")
+            for section in sections
+            for fact in section.facts
+        ]
+
+        source_map = load_jaimini_source_map()
+        source_available = jaimini_source_admission_verified()
+        normalized_anchor = {
+            "confidence": request.birth.confidence,
+            "timezone": request.birth.place.timezone,
+            "utc_instants": [instant.astimezone(dt.UTC).isoformat() for instant in local_instants],
+        }
+        profile_payload = {
+            "profile": request.profile,
+            "birth": request.birth.model_dump(mode="json"),
+        }
+        effective_config = {
+            "rule_profile": request.rule_profile,
+            "analysis_scope": request.analysis_scope,
+            "gender": request.gender,
+            "reference_date": reference_date.isoformat(),
+            "include_trace": request.include_trace,
+            "engine_config": snapshots[0].config.__dict__,
+        }
+        provenance = JaiminiProvenance(
+            rule_profile_version=source_map.rule_profile_version,
+            rule_profile_sha256=jaimini_rule_profile_sha256(),
+            source_map_sha256=jaimini_source_map_sha256(),
+            source_review_status=source_map.review.status,
+            source_reviewer=source_map.review.reviewer,
+            source_reviewer_role=source_map.review.reviewer_role,
+            engine_version=ENGINE_VERSION,
+            ephemeris="moshier-or-installed-swiss",
+            tzdb_version="system-zoneinfo",
+        )
+        artifact = cache_domain_artifact(
+            {
+                "mode": "jaimini",
+                "normalized_anchor_sha256": _canonical_hash(normalized_anchor),
+                "profile_sha256": _canonical_hash(profile_payload),
+                "config_sha256": _canonical_hash(effective_config),
+                "rule_profile_sha256": provenance.rule_profile_sha256,
+                "source_map_sha256": provenance.source_map_sha256,
+                "facts": all_facts,
+                "provenance": provenance.model_dump(mode="json"),
+            }
+        )
+        unstable_count = sum(value == "unstable" for value in stability.values())
+        limitations = [
+            JaiminiLimitation(
+                code="SPECIAL_LAGNAS_NOT_COMPUTED",
+                message="Special lagnas require a separately verified sunrise primitive.",
+            )
+        ]
+        if not source_available:
+            limitations.append(
+                JaiminiLimitation(
+                    code="SOURCE_ADMISSION_UNVERIFIED",
+                    message="Interpretation is unavailable until every rule/source mapping is admitted.",
+                )
+            )
+        if unstable_count:
+            limitations.append(
+                JaiminiLimitation(
+                    code="BIRTH_TIME_SENSITIVE",
+                    message=f"{unstable_count} facts change across the declared birth-time range.",
+                )
+            )
+        sample_count = len(local_instants)
+        anchor_summary = (
+            "exact birth anchor; 1 sample"
+            if request.birth.confidence == "exact"
+            else f"approximate birth anchor; {sample_count} samples at 5-minute steps"
+        )
+        request_hash = _canonical_hash(
+            {
+                "anchor": artifact["normalized_anchor_sha256"],
+                "config": artifact["config_sha256"],
+            }
+        )
+        return JaiminiCompletedResult(
+            status="completed",
+            request_id=f"req_{request_hash[:24]}",
+            profile_name=request.profile,
+            anchor_summary=anchor_summary,
+            sections=sections,
+            truncation=JaiminiTruncation(
+                truncated=False,
+                total_count=len(all_facts),
+                returned_count=len(all_facts),
+            ),
+            warnings=(),
+            limitations=tuple(limitations),
+            interpretation_status="available" if source_available else "unavailable",
+            interpretation=("Admitted source mappings support the computed facts.",)
+            if source_available
+            else None,
+            provenance=provenance,
+            artifact_id=artifact["artifact_id"],
+            artifact_sha256=artifact["artifact_sha256"],
+            artifact_token=artifact["artifact_token"],
+        )

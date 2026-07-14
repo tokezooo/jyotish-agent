@@ -18,6 +18,7 @@ import re
 from enum import Enum
 
 from .names import PLANETS, SIGNS
+from .signing import get_cached_domain_artifact, verify_domain_artifact
 
 _DIVISIONAL_KEY = re.compile(r"^d\d+$")
 
@@ -218,6 +219,51 @@ def iter_fact_atoms(facts: dict) -> dict[str, str]:
                 atoms[f"vimshottari.{level}.{field}"] = str(period[field])
 
     return atoms
+
+
+def iter_jaimini_fact_atoms(facts: list[dict]) -> dict[str, str]:
+    """Project a bounded Jaimini artifact fact list into citable atoms."""
+    atoms: dict[str, str] = {}
+    for fact in facts:
+        if not isinstance(fact, dict):
+            continue
+        path = fact.get("fact_id")
+        value = fact.get("value")
+        if (
+            isinstance(path, str)
+            and path.startswith("jaimini.")
+            and isinstance(value, (str, int, float, bool))
+        ):
+            atoms[path] = "true" if value is True else "false" if value is False else str(value)
+    return atoms
+
+
+def validate_jaimini_answer(
+    facts_used: list[dict],
+    artifact_token: str,
+    *,
+    interpretation_requested: bool = False,
+) -> list[str]:
+    """Check citations against a server-held artifact and enforce its source gate."""
+    artifact = get_cached_domain_artifact(artifact_token)
+    if artifact is None:
+        return ["ARTIFACT_NOT_FOUND"]
+    if not verify_domain_artifact(artifact):
+        return ["ARTIFACT_INVALID"]
+    if interpretation_requested and (
+        artifact.get("provenance", {}).get("source_review_status") != "approved"
+    ):
+        return ["INTERPRETATION_SOURCE_UNAVAILABLE"]
+    atoms = iter_jaimini_fact_atoms(artifact.get("facts", []))
+    violations: list[str] = []
+    for ref in facts_used:
+        path = str(ref.get("path", "")).strip()
+        value = str(ref.get("value", "")).strip()
+        if path not in atoms:
+            violations.append(f"FACT_NOT_IN_ARTIFACT:{path}")
+        elif not _values_match(value, atoms[path]):
+            violations.append(f"FACT_VALUE_MISMATCH:{path}")
+    return violations
 
 
 def _values_match(cited: str, computed: str) -> bool:

@@ -166,6 +166,8 @@ class JaiminiProvenance(_FrozenStrictModel):
     rule_profile_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     source_map_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     source_review_status: ReviewStatus
+    source_reviewer: str | None = None
+    source_reviewer_role: str | None = None
     engine_version: str | None = None
     ephemeris: str | None = None
     tzdb_version: str | None = None
@@ -197,6 +199,16 @@ class JaiminiCompletedResult(_JaiminiResultBase):
     anchor_summary: str = Field(min_length=1, max_length=200)
     sections: tuple[JaiminiSection, ...] = Field(max_length=12)
     truncation: JaiminiTruncation
+    interpretation: tuple[str, ...] | None = None
+    artifact_id: str | None = Field(default=None, pattern=r"^jya_[0-9a-f]{24}$")
+    artifact_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    artifact_token: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def interpretation_matches_status(self) -> "JaiminiCompletedResult":
+        if self.interpretation_status == "unavailable" and self.interpretation is not None:
+            raise ValueError("unavailable interpretation cannot contain rendering")
+        return self
 
 
 class JaiminiNeedsInputResult(_JaiminiResultBase):

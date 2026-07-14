@@ -8,6 +8,7 @@ from importlib import resources
 
 from pydantic import TypeAdapter
 
+from .corpus import load_builtin_manifest
 from .jaimini_models import JaiminiFixture, JaiminiRuleProfile, JaiminiSourceMap
 
 _DATA = resources.files("jyotish_agent").joinpath("data/jaimini")
@@ -23,6 +24,44 @@ def _json(name: str):
 
 def _sha256(name: str) -> str:
     return hashlib.sha256(_bytes(name)).hexdigest()
+
+
+def jaimini_rule_profile_sha256() -> str:
+    return _sha256("jaimini_core_v1.json")
+
+
+def jaimini_source_map_sha256() -> str:
+    return _sha256("jaimini_core_v1_sources.json")
+
+
+def jaimini_source_admission_verified() -> bool:
+    """Return true only when every approved mapping resolves in governed corpus data."""
+    source_map = load_jaimini_source_map()
+    if (
+        source_map.interpretation_status != "available"
+        or source_map.review.status != "approved"
+        or not source_map.review.reviewer
+        or not source_map.review.reviewer_role
+    ):
+        return False
+    admitted: dict[str, str] = {}
+    for source in load_builtin_manifest()["sources"]:
+        if source.get("review", {}).get("status") != "approved":
+            continue
+        if not source.get("rights_note") or not source.get("provenance_url"):
+            continue
+        admitted.update(
+            {
+                fragment["fragment_id"]: fragment["checksum"]
+                for fragment in source.get("fragments", [])
+            }
+        )
+    return bool(source_map.rules) and all(
+        rule.source_status == "approved"
+        and rule.fragment_id in admitted
+        and admitted[rule.fragment_id] == rule.fragment_sha256
+        for rule in source_map.rules
+    )
 
 
 def load_jaimini_rule_profile() -> JaiminiRuleProfile:

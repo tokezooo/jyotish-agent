@@ -6,12 +6,14 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from .mcp_facade import JyotishMcpFacade, facade_from_environment
+from .jaimini_models import JaiminiCompletedResult
 from .mcp_models import (
     CalculateInput,
     CalculateResult,
     FinalizedResearch,
     FinalizeResearchInput,
     InspectResearchInput,
+    JaiminiMcpInput,
     ProfileInput,
     ProfileResult,
     ResearchBundle,
@@ -27,6 +29,8 @@ SERVER_INSTRUCTIONS = """Normal conversation is the default. Use quick, stateles
 Routing:
 - Conceptual Jyotish questions may be answered without tools.
 - calculate and search_sources are stateless and do not create ResearchRuns.
+- jaimini is stateless and returns signed computed facts; do not invent interpretation
+  when interpretation_status is unavailable, and never infer an approximate range.
 - research creates exactly one authoritative run and returns evidence for synthesis.
 - finalize_research validates and saves a deep memo; inspect_research retrieves it.
 - Do not infer missing birth data for another person and do not overwrite the default profile.
@@ -78,6 +82,19 @@ def build_server(facade: JyotishMcpFacade | None = None) -> FastMCP:
     )
     def calculate(request: CalculateInput) -> CalculateResult:
         return runtime.calculate(request)
+
+    @server.tool(
+        name="jaimini",
+        description=(
+            "Compute bounded signed Jaimini Core facts for an exact birth time or an "
+            "explicit 5-minute-step approximate range. Interpretation remains unavailable "
+            "unless the governed Jaimini source map is fully admitted."
+        ),
+        annotations=READ_ONLY,
+        structured_output=True,
+    )
+    def jaimini(request: JaiminiMcpInput) -> JaiminiCompletedResult:
+        return runtime.jaimini(request)
 
     @server.tool(
         name="search_sources",

@@ -46,9 +46,11 @@ def test_server_metadata_and_tool_contract(tmp_path: Path):
     assert "Normal conversation is the default" in SERVER_INSTRUCTIONS[:512]
     assert "ResearchRun" in SERVER_INSTRUCTIONS[:512]
     assert "must equal finalize_research.markdown exactly" in SERVER_INSTRUCTIONS[:512]
+    assert "jaimini is stateless" in SERVER_INSTRUCTIONS
     assert {tool.name for tool in tools} == {
         "get_profile",
         "calculate",
+        "jaimini",
         "search_sources",
         "research",
         "finalize_research",
@@ -58,6 +60,9 @@ def test_server_metadata_and_tool_contract(tmp_path: Path):
     assert by_name["calculate"].outputSchema is not None
     assert by_name["calculate"].annotations.readOnlyHint is True
     assert by_name["calculate"].annotations.idempotentHint is True
+    assert by_name["jaimini"].annotations.readOnlyHint is True
+    assert by_name["jaimini"].annotations.idempotentHint is True
+    assert by_name["jaimini"].outputSchema is not None
     assert by_name["research"].annotations.readOnlyHint is False
     assert by_name["research"].annotations.idempotentHint is False
     assert by_name["finalize_research"].annotations.destructiveHint is False

@@ -20,6 +20,7 @@ import hmac
 import json
 import os
 import secrets
+from copy import deepcopy
 from collections import OrderedDict
 
 _env_key = os.environ.get("JYOTISH_SIGNING_KEY", "")
@@ -70,3 +71,62 @@ def get_cached_facts(token: str) -> dict | None:
     if facts is not None:
         _FACTS_CACHE.move_to_end(token)
     return facts
+
+
+# Domain artifacts bind more than a facts dictionary: replay must preserve the
+# normalized anchor, effective profile/configuration, governed rule/source packs,
+# and engine provenance.  Keep this cache separate from the legacy natal facts
+# cache so the existing ``facts_token`` behavior and eviction budget do not change.
+_DOMAIN_ARTIFACT_CACHE: "OrderedDict[str, dict]" = OrderedDict()
+_DOMAIN_ARTIFACT_CACHE_MAX = 256
+
+
+def _domain_unsigned(payload: dict) -> dict:
+    return {
+        key: value
+        for key, value in payload.items()
+        if key not in {"artifact_id", "artifact_sha256", "artifact_token"}
+    }
+
+
+def cache_domain_artifact(payload: dict) -> dict:
+    """Seal and defensively cache a deterministic signed domain artifact."""
+    unsigned = deepcopy(_domain_unsigned(payload))
+    digest = hashlib.sha256(_canonical(unsigned)).hexdigest()
+    token = hmac.new(_SIGNING_KEY, _canonical(unsigned), hashlib.sha256).hexdigest()
+    artifact = {
+        **unsigned,
+        "artifact_id": f"jya_{digest[:24]}",
+        "artifact_sha256": digest,
+        "artifact_token": token,
+    }
+    _DOMAIN_ARTIFACT_CACHE[token] = deepcopy(artifact)
+    _DOMAIN_ARTIFACT_CACHE.move_to_end(token)
+    while len(_DOMAIN_ARTIFACT_CACHE) > _DOMAIN_ARTIFACT_CACHE_MAX:
+        _DOMAIN_ARTIFACT_CACHE.popitem(last=False)
+    return deepcopy(artifact)
+
+
+def verify_domain_artifact(artifact: dict) -> bool:
+    """Verify the artifact identity, digest, and HMAC in constant time."""
+    try:
+        unsigned = _domain_unsigned(artifact)
+        digest = hashlib.sha256(_canonical(unsigned)).hexdigest()
+        token = hmac.new(_SIGNING_KEY, _canonical(unsigned), hashlib.sha256).hexdigest()
+        expected_id = f"jya_{digest[:24]}"
+        return (
+            hmac.compare_digest(str(artifact["artifact_sha256"]), digest)
+            and hmac.compare_digest(str(artifact["artifact_token"]), token)
+            and hmac.compare_digest(str(artifact["artifact_id"]), expected_id)
+        )
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def get_cached_domain_artifact(token: str) -> dict | None:
+    """Return a defensive copy of a server-held signed domain artifact."""
+    artifact = _DOMAIN_ARTIFACT_CACHE.get(token)
+    if artifact is None:
+        return None
+    _DOMAIN_ARTIFACT_CACHE.move_to_end(token)
+    return deepcopy(artifact)

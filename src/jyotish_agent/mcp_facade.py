@@ -9,12 +9,21 @@ from pathlib import Path
 from typing import Callable
 
 from .hardening import reject_symlink_ancestors
+from .jaimini import JaiminiFacade
+from .jaimini_models import (
+    ApproximateJaiminiBirthInput,
+    ExactJaiminiBirthInput,
+    JaiminiCompletedResult,
+    JaiminiInput,
+    JaiminiPlace,
+)
 from .mcp_models import (
     CalculateInput,
     CalculateResult,
     FinalizedResearch,
     FinalizeResearchInput,
     InspectResearchInput,
+    JaiminiMcpInput,
     ProfileInput,
     ProfileResult,
     ResearchBundle,
@@ -230,6 +239,46 @@ class JyotishMcpFacade:
             warnings=profile_warnings(calculation_profile),
             provenance=calculated["provenance"],
         )
+
+    def jaimini(self, value: JaiminiMcpInput) -> JaiminiCompletedResult:
+        """Compute stateless Jaimini facts from a selected private/inline profile."""
+        profile = self._select_profile(value)
+        timezone = profile.place.timezone
+        if not isinstance(timezone, (IanaTimezone, IanaWithAssertedOffset)):
+            raise McpFacadeError("JAIMINI_IANA_TIMEZONE_REQUIRED")
+        place = JaiminiPlace(
+            name=profile.place.name,
+            latitude=profile.place.latitude,
+            longitude=profile.place.longitude,
+            timezone=timezone.zone_id,
+        )
+        if value.birth.confidence == "exact":
+            if str(profile.birth_time_confidence.value) != "exact":
+                raise McpFacadeError("JAIMINI_EXACT_BIRTH_TIME_REQUIRED")
+            birth = ExactJaiminiBirthInput(
+                confidence="exact",
+                date=profile.date,
+                time=profile.time,
+                place=place,
+            )
+        else:
+            birth = ApproximateJaiminiBirthInput(
+                confidence="approximate",
+                date=profile.date,
+                earliest_time=value.birth.earliest_time,
+                latest_time=value.birth.latest_time,
+                place=place,
+            )
+        request = JaiminiInput(
+            profile=profile.name,
+            birth=birth,
+            rule_profile=value.rule_profile,
+            analysis_scope=value.analysis_scope,
+            gender=value.gender,
+            reference_date=value.reference_date,
+            include_trace=value.include_trace,
+        )
+        return JaiminiFacade().calculate(request)
 
     def search_sources(self, value: SourceSearchInput) -> SourceSearchResult:
         results = []
