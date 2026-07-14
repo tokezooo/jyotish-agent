@@ -70,7 +70,9 @@ explicit user constraints are available and signed. Governed Jaimini doctrine, P
 judgement, Muhurta eligibility/ranking/personalization, qualified human review, and real
 concierge validation are not shipped. See [domain contracts](docs/domains/), the
 [tool drift snapshot](docs/domain-tool-snapshot-v1.json), [local benchmark](docs/release-benchmark-v1.json),
-and [requirement audit](docs/prashna-muhurta-jaimini-requirement-audit-v1.json).
+[real Codex conversational smokes](docs/release-codex-conversational-smokes-v1.json),
+[held-out calculation/trust eval](docs/release-domain-adversarial-eval-v1.json), and
+[requirement audit](docs/prashna-muhurta-jaimini-requirement-audit-v1.json).
 
 ## Golden path: governed ResearchRun v2
 

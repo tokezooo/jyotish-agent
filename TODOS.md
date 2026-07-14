@@ -12,7 +12,7 @@
 - Qualified source admission and human adjudication for Jaimini, Prashna, and Muhurta.
 - Governed Jaimini doctrine, Prashna judgement, and Muhurta ranking/personalization.
 - 10–20 real/concierge sessions and reviewer material-error/value measurements.
-- Real Codex conversational quick/inspection smokes for RU and EN (local stdio is covered).
+- Doctrinal-quality held-out evals after governed sources and qualified reviewers exist.
 
 ## Additive domain release status (2026-07-14)
 
@@ -21,7 +21,9 @@
 - [x] Muhūrta general/focused-work boundaries, hard constraints, and near misses.
 - [x] Read-only MCP tools, snapshots, privacy projection, RU/EN docs, benchmark, audit.
 - [ ] Admit governed sources/reviewers before enabling prose or ranking.
-- [ ] Run adjudicated real sessions and real Codex conversational smokes.
+- [x] Run real Codex conversational RU/EN quick and inspection smokes for all three domains.
+- [x] Run held-out calculation/trust adversarial domain evals (15 independently authored cases).
+- [ ] Run adjudicated real/concierge sessions and doctrinal-quality held-out evals.
 
 ## Next Implementation Tasks
 

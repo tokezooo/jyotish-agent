@@ -44,6 +44,7 @@
     "test_strategy_release_and_value_gates": [
       "benchmark.all_modes_warm_p50_p95", "release.real_stdio_matrix",
       "release.unsupported_claim_rejection", "release.held_out_adversarial_evals",
+      "release.doctrinal_quality_held_out_evals",
       "release.wheel_package_data", "release.real_codex_conversational_smokes",
       "value.real_concierge_sessions"
     ],

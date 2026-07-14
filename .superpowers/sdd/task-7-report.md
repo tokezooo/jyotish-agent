@@ -5,7 +5,7 @@
 Integrated natural RU/EN routing for the three additive MCP tools, published strict
 tool-schema drift snapshots and per-domain operational docs, added a pure privacy-safe
 operation-metric projection, and produced reproducible benchmark, stdio-matrix, and
-61-requirement audit artifacts. Existing natal/API/Pi/ResearchRun surfaces were not
+90-requirement audit artifacts. Existing natal/API/Pi/ResearchRun surfaces were not
 expanded. All new tools remain stateless, read-only/idempotent, and fail closed.
 
 The release is intentionally calculation-only. Jaimini governed doctrine, Prashna
@@ -104,12 +104,12 @@ the public transport. Focused signing/checker tests assert artifact substitution
 unsupported prose fail closed. Data-root snapshots/counts prove no ResearchRun or
 domain persistence.
 
-The requirement audit has 61 stable IDs: 44 `met`, 11
-`intentionally_unavailable`, 5 `not_in_scope`, and 1 `gap`. The remaining gap is a
-real Codex conversational quick/inspection smoke (the local MCP stdio transport is
-covered). External source admission, qualified human review, adjudicated real sessions,
-governed interpretation/ranking, and Muhurta natal personalization are explicitly
-unavailable rather than silently marked complete.
+The final requirement audit has 90 stable IDs: 62 `met`, 19
+`intentionally_unavailable`, 9 `not_in_scope`, and zero `gap` rows. A separately named
+doctrinal-quality held-out evaluation remains intentionally unavailable until governed
+sources and qualified review exist. External source admission, qualified human
+review, adjudicated real sessions, governed interpretation/ranking, and Muhurta natal
+personalization are explicitly unavailable rather than silently marked complete.
 
 ## Other release gates
 
@@ -136,5 +136,54 @@ and Muhurta. `git diff --check` is clean.
    regenerating expectations from production code.
 3. Run 10–20 real/concierge sessions and record usefulness, follow-up/return behavior,
    reviewer material-error rate, latency versus manual work, and preference.
-4. Run real Codex conversational RU/EN quick and inspection smokes. Do not infer that
-   passing stdio transport tests proves the final conversational rendering quality.
+4. Run doctrinal-quality held-out evaluation only after sources/reviewers are admitted.
+
+## Independent review-fix addendum
+
+The first Task 7 review requested changes. The following fixes landed test-first:
+
+1. The transport artifact no longer calls facade/core evidence stdio. Every one of its
+   17 cases now declares `process_stdio`, `facade`, or `pure_core` and maps each claimed
+   assertion to exact evidence. There are no blanket common assertions.
+2. The audit expanded from 61 to 90 plan requirements and is checked for exact equality
+   against `tests/fixtures/task7_requirement_manifest_v1.json`, grouped by authoritative
+   plan sections. It explicitly includes held-out adversarial evals, independent versus
+   adjudicated goldens, applying/separating geometry, soft ranking, requested planetary
+   changes, optional surfaces, release criteria, and not-in-scope boundaries.
+3. Operation metrics now accept only codes present in `ERROR_REGISTRY`, require a strict
+   boolean truncation flag and strict numeric/count/mode/status types, and reject private
+   uppercase strings and arbitrary objects.
+4. Six real Codex CLI smokes passed: RU quick plus RU inspection Jaimini, RU quick plus
+   EN inspection Muhurta, and RU quick plus EN inspection Prashna. All used the correct
+   dedicated MCP tool, produced natural answers, kept source gates honest, and exposed no
+   private material or internal ledgers. A pre-fix normal Prashna answer inferred a
+   communication/ownership theme from literal factors while source review was pending.
+   It is retained as an excluded failed attempt. Commit `75e16b0` added explicit skill
+   and server guards; the original normal prompt then passed without practical inference.
+5. A genuinely held-out static calculation/trust fixture now drives 15 adversarial cases:
+   Jaimini tie/approximate/source-prose/substitution, Prashna anchor/retry/privacy/safety/
+   source state, and Muhurta skipped-date/stale-window/cancel/deadline/payload/source state.
+   Expected outcomes are independently authored package-external fixture data; production
+   never reads them. The reproducible runner passed 15/15 and emitted a checksum-bound artifact.
+
+Review-fix RED evidence:
+
+```text
+Task 7 focused tests:
+- private uppercase error codes were accepted by the metric projector
+- the matrix falsely declared mixed facade/core cases as stdio
+- the pending-source practical-inference guard was absent from skill/server instructions
+```
+
+Review-fix GREEN evidence:
+
+```text
+tests/test_task7_release.py: 12 passed
+Held-out calculation/trust eval: 15 passed, 0 failed
+Task 7 release + MCP focused suite: 23 passed in 21.07s
+Full Python suite: 577 passed, 2 Swiss-only skipped in 160.17s
+Ruff: All checks passed
+git diff --check: clean
+Wheel: built successfully; all nine domain governance assets present
+Bun: typecheck plus 52 tests passed
+```

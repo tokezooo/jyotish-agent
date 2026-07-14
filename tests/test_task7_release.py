@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
+import subprocess
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -123,10 +125,15 @@ def test_requirement_audit_is_complete_and_honest() -> None:
         "jaimini.adjudicated_golden_fixtures",
         "muhurta.requested_planetary_change_boundaries",
         "muhurta.adjudicated_golden_searches",
+        "release.doctrinal_quality_held_out_evals",
     } <= unavailable
     gaps = {item["id"] for item in requirements if item["status"] == "gap"}
-    assert {"release.held_out_adversarial_evals", "release.real_codex_conversational_smokes"} <= gaps
-    assert audit["summary"] == dict(Counter(item["status"] for item in requirements))
+    assert gaps == set()
+    counts = Counter(item["status"] for item in requirements)
+    assert audit["summary"] == {
+        status: counts[status]
+        for status in ("met", "intentionally_unavailable", "not_in_scope", "gap")
+    }
 
 
 def test_stdio_release_matrix_is_privacy_safe_and_covers_brief() -> None:
@@ -188,6 +195,39 @@ def test_codex_smoke_artifact_schema_requires_real_routing_and_leak_checks() -> 
         "no_private_material", "expected_route",
     } == set(case["properties"]["checks"]["required"])
     assert schema["properties"]["summary"]["properties"]["release_gate"]["enum"] == ["passed", "failed"]
+    excluded = schema["properties"]["excluded_failed_attempts"]["items"]
+    assert excluded["additionalProperties"] is False
+    assert {"failure", "counted", "corrective_commit"} <= set(excluded["required"])
+    assert excluded["properties"]["counted"]["const"] is False
+
+
+def test_real_codex_smokes_cover_quick_and_inspection_for_every_domain() -> None:
+    artifact = json.loads((ROOT / "docs" / "release-codex-conversational-smokes-v1.json").read_text())
+    assert artifact["runner"] == "real_codex_cli_against_current_worktree"
+    assert artifact["summary"] == {"passed": 6, "failed": 0, "release_gate": "passed"}
+    by_route: dict[str, set[str]] = {}
+    for case in artifact["cases"]:
+        assert case["passed"] is True and case["failure"] is None
+        assert all(case["checks"].values())
+        assert len(case["tool_routing"]) == 1
+        assert len(case["evidence_sha256"]) == 64
+        by_route.setdefault(case["tool_routing"][0], set()).add(case["flow"])
+    assert by_route == {
+        "jaimini": {"quick", "inspection"},
+        "prashna": {"quick", "inspection"},
+        "muhurta": {"quick", "inspection"},
+    }
+    assert artifact["excluded_failed_attempts"] == [{
+        "id": "cs_failed_prashna_pre_guard_inference",
+        "prompt": "RU quick obstacle question produced unsupported practical inference",
+        "output_redacted": "The pre-fix answer hid internals but inferred a practical communication or ownership theme from computed factors while source review was pending.",
+        "failure": "Source-gate honesty failed: practical meaning was inferred from literal chart facts.",
+        "evidence_sha256": "544a6265959aa52e0cd75dac5b06b1a298531b8e9dd9f187c86869eba419dd94",
+        "counted": False,
+        "corrective_commit": "75e16b0",
+    }]
+    serialized = json.dumps(artifact, sort_keys=True).lower()
+    assert not any(marker in serialized for marker in ("artifact_token", "question_fingerprint", "jya_", "sha256:"))
 
 
 def test_consultant_skill_forbids_practical_inference_while_domain_source_gate_is_pending() -> None:
@@ -196,3 +236,24 @@ def test_consultant_skill_forbids_practical_inference_while_domain_source_gate_i
     assert "do not infer practical meaning, advice, significance, or an area to watch" in normalized
     assert "Mercury, a house lord, a pada, a boundary, or another computed factor" in normalized
     assert "do not infer a practical obstacle, theme, advice, or area to watch" in " ".join(SERVER_INSTRUCTIONS.split())
+
+
+def test_heldout_adversarial_runner_matches_independently_authored_fixture() -> None:
+    fixture_path = ROOT / "eval" / "heldout_domain_adversarial_v1.json"
+    fixture = json.loads(fixture_path.read_text())
+    assert fixture["authorship"] == "independently authored release expectations; never generated from production output"
+    assert len(fixture["cases"]) == 15
+    assert {case["domain"] for case in fixture["cases"]} == {"jaimini", "prashna", "muhurta"}
+    assert len({case["id"] for case in fixture["cases"]}) == 15
+    assert not any("heldout_domain_adversarial" in path.read_text(errors="ignore") for path in (ROOT / "src").rglob("*.py"))
+    completed = subprocess.run(
+        [sys.executable, "scripts/run_domain_adversarial_eval.py"],
+        cwd=ROOT, check=True, capture_output=True, text=True,
+    )
+    result = json.loads(completed.stdout.strip().splitlines()[-1])
+    assert result["fixture_sha256"] == hashlib.sha256(fixture_path.read_bytes()).hexdigest()
+    assert result["total"] == result["passed"] == 15
+    assert result["failed"] == 0
+    assert all(item["actual"] == item["expected"] and item["passed"] for item in result["results"])
+    saved = json.loads((ROOT / "docs" / "release-domain-adversarial-eval-v1.json").read_text())
+    assert saved == result

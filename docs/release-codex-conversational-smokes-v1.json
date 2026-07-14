@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "runner": "real_codex_cli_against_current_worktree",
+  "environment": {
+    "client": "Codex CLI with isolated minimal home",
+    "transport": "local_mcp",
+    "profile_kind": "default_private_redacted"
+  },
+  "cases": [
+    {
+      "id": "cs_jaimini_ru_quick", "language": "ru", "flow": "quick",
+      "prompt": "RU quick: what computed Jaimini factors are available and what can be said without unverified doctrine?",
+      "output_redacted": "Natural Russian answer listed the available computed Jaimini groups and stated that mission, career promises, marriage, and prediction cannot be inferred without the verified source pack.",
+      "tool_routing": ["jaimini"], "result_status": "completed",
+      "evidence_sha256": "4e7e6de19dd3e3474ebf8075944bc1d7d06c090d038c7e54629b7283f26b4c35",
+      "checks": {"natural_answer":true,"source_gate_honest":true,"no_internal_ledger":true,"no_private_material":true,"expected_route":true},
+      "passed": true, "failure": null
+    },
+    {
+      "id": "cs_jaimini_ru_inspection", "language": "ru", "flow": "inspection",
+      "prompt": "RU inspection: groups, time sensitivity, active Chara Dasha, human-readable provenance, why interpretation closed",
+      "output_redacted": "Natural headed inspection covered five computed groups, exact-anchor stability, active timing, human-readable engine/profile provenance, pending source review, and unavailable interpretation without exposing raw trace material.",
+      "tool_routing": ["jaimini"], "result_status": "completed",
+      "evidence_sha256": "7c5c410f6d2170978d923b41cdc8c307aa7351c91cea2a45fcf4640c29268119",
+      "checks": {"natural_answer":true,"source_gate_honest":true,"no_internal_ledger":true,"no_private_material":true,"expected_route":true},
+      "passed": true, "failure": null
+    },
+    {
+      "id": "cs_muhurta_ru_quick", "language": "ru", "flow": "quick",
+      "prompt": "RU quick: 90-minute Moscow daylight focused-work candidates on 2026-07-15, no favorable label",
+      "output_redacted": "Natural Russian answer returned a small set of calendar-ready calculation candidates, refused a favorable or doctrinal ranking label, and stated that it made no booking.",
+      "tool_routing": ["muhurta"], "result_status": "completed",
+      "evidence_sha256": "b5c7787a63917db2de32637aa10292edd1e17d4bb6ba52c8a406add94a977720",
+      "checks": {"natural_answer":true,"source_gate_honest":true,"no_internal_ledger":true,"no_private_material":true,"expected_route":true},
+      "passed": true, "failure": null
+    },
+    {
+      "id": "cs_muhurta_en_inspection", "language": "en", "flow": "inspection",
+      "prompt": "EN inspection: 60-minute Kolkata 3-day boundary search, groups/counts/truncation/provenance/source status",
+      "output_redacted": "Natural technical answer summarized boundary families and counts, returned-window and near-miss limits, truncation, human-readable provenance, and pending doctrine; it distinguished chronology from ranking and made no booking or persistence claim.",
+      "tool_routing": ["muhurta"], "result_status": "completed",
+      "evidence_sha256": "b557063dccc3e4f4d1dafc9693e103be02722ab1a965c7666ed53c2d66044212",
+      "checks": {"natural_answer":true,"source_gate_honest":true,"no_internal_ledger":true,"no_private_material":true,"expected_route":true},
+      "passed": true, "failure": null
+    },
+    {
+      "id": "cs_prashna_ru_quick", "language": "ru", "flow": "quick",
+      "prompt": "RU quick: what can be seen about the work-project Alpha obstacle at the sealed Moscow moment?",
+      "output_redacted": "After the guard fix, the natural answer reported only literal computed placements and statuses and said the concrete obstacle cannot honestly be named while the interpretive source contour is pending.",
+      "tool_routing": ["prashna"], "result_status": "completed",
+      "evidence_sha256": "da133771fa2f56592d9e6d4a126108b676cccc00b1ba809ca26a6ed27be0eecf",
+      "checks": {"natural_answer":true,"source_gate_honest":true,"no_internal_ledger":true,"no_private_material":true,"expected_route":true},
+      "passed": true, "failure": null
+    },
+    {
+      "id": "cs_prashna_en_inspection", "language": "en", "flow": "inspection",
+      "prompt": "EN inspection: chart/panchanga/topic/readability/aspect/limitations and anchor/source status; no inference or prediction",
+      "output_redacted": "Natural inspection covered time-chart and panchanga groups, topic/readability statuses, aspect groups, unsupported applying/separating geometry, limitations, sealed-anchor status, human-readable versions, no truncation, and pending source review without making an obstacle inference.",
+      "tool_routing": ["prashna"], "result_status": "completed",
+      "evidence_sha256": "fddd8669a341f46e3683bcfb19f218ea69cc5ac5c6deebb0101c22912c183cff",
+      "checks": {"natural_answer":true,"source_gate_honest":true,"no_internal_ledger":true,"no_private_material":true,"expected_route":true},
+      "passed": true, "failure": null
+    }
+  ],
+  "excluded_failed_attempts": [
+    {
+      "id": "cs_failed_prashna_pre_guard_inference",
+      "prompt": "RU quick obstacle question produced unsupported practical inference",
+      "output_redacted": "The pre-fix answer hid internals but inferred a practical communication or ownership theme from computed factors while source review was pending.",
+      "failure": "Source-gate honesty failed: practical meaning was inferred from literal chart facts.",
+      "evidence_sha256": "544a6265959aa52e0cd75dac5b06b1a298531b8e9dd9f187c86869eba419dd94",
+      "counted": false,
+      "corrective_commit": "75e16b0"
+    }
+  ],
+  "summary": {"passed": 6, "failed": 0, "release_gate": "passed"}
+}

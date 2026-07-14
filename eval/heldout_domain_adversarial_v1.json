@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "authorship": "independently authored release expectations; never generated from production output",
+  "public_safe": true,
+  "cases": [
+    {"id":"j_exact_tie","domain":"jaimini","kind":"exact_tie","expected":"EXACT_TIE_REQUIRES_ADJUDICATION","basis":"two hand-authored equal one-arcsecond scores must trigger the frozen tie policy"},
+    {"id":"j_approximate","domain":"jaimini","kind":"approximate_sweep","expected":"COMPLETED_3_SAMPLES_SOURCE_PENDING","basis":"inclusive 10-minute range at five-minute steps is exactly three samples"},
+    {"id":"j_source_prose","domain":"jaimini","kind":"source_prose","expected":"INTERPRETATION_SOURCE_UNAVAILABLE","basis":"pending source admission cannot authorize caller prose"},
+    {"id":"j_fact_substitution","domain":"jaimini","kind":"fact_substitution","expected":"FACT_VALUE_MISMATCH","basis":"a signed fact path cannot accept a forged scalar"},
+    {"id":"p_anchor_substitution","domain":"prashna","kind":"anchor_substitution","expected":"ANCHOR_MISMATCH","basis":"a materially different topic cannot reuse a sealed work-question anchor"},
+    {"id":"p_retry_drift","domain":"prashna","kind":"retry_drift","expected":"IDEMPOTENCY_CONFLICT","basis":"changing an output selector under the same capture identity is not an exact retry"},
+    {"id":"p_secret_wire","domain":"prashna","kind":"secret_wire","expected":"INPUT_INVALID_PRIVATE_ABSENT","basis":"malformed private material must map to a controlled envelope without reflection"},
+    {"id":"p_high_stakes","domain":"prashna","kind":"high_stakes","expected":"HIGH_STAKES_TOPIC","basis":"medical judgement is outside the admitted low-risk family"},
+    {"id":"p_source_status","domain":"prashna","kind":"source_status","expected":"COMPLETED_INTERPRETATION_UNAVAILABLE","basis":"time-chart facts remain usable while doctrine is pending"},
+    {"id":"m_skipped_date","domain":"muhurta","kind":"skipped_date","expected":"COMPLETED_PHYSICAL_RANGE","basis":"the 2011 Apia skipped civil date contains no instant but the physical UTC range stays contiguous"},
+    {"id":"m_stale_window","domain":"muhurta","kind":"stale_window","expected":"WINDOW_IDS_MISMATCH","basis":"caller window IDs must exactly match the signed artifact"},
+    {"id":"m_cancel","domain":"muhurta","kind":"cancel","expected":"SEARCH_CANCELLED","basis":"cooperative cancellation returns typed incomplete without ranking"},
+    {"id":"m_deadline","domain":"muhurta","kind":"deadline","expected":"SEARCH_DEADLINE_EXCEEDED","basis":"an elapsed explicit UTC deadline returns typed incomplete"},
+    {"id":"m_payload","domain":"muhurta","kind":"payload","expected":"PAYLOAD_UNDER_512_KIB","basis":"normal result ceiling is 524288 serialized bytes"},
+    {"id":"m_source_status","domain":"muhurta","kind":"source_status","expected":"COMPLETED_RANKING_UNAVAILABLE_SOURCE_PENDING","basis":"boundary chronology remains usable while doctrinal ranking is pending"}
+  ]
+}
