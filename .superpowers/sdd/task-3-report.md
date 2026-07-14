@@ -130,3 +130,90 @@ frozen source-review gate; this task does not falsely claim qualified human/sour
 3. Static fixture expectations are implementation-independent and hand-auditable, but are not
    claimed as qualified human/source-adjudicated. The packaged source map and adjudication fixtures
    intentionally remain `pending`; interpretation must continue to fail closed.
+
+## Review-fix addendum
+
+Commit `10cb855` was reviewed and the requested findings were corrected with another strict TDD
+cycle. This addendum supersedes concerns 1 and 2 above; concern 3 remains an intentional fail-closed
+source-admission state.
+
+### Review RED evidence
+
+The new profile-mapping tests were run before production changes:
+
+```text
+uv run pytest -q tests/test_jaimini_core.py tests/test_task1_jaimini_contracts.py -x
+E   TypeError: rasi_drishti() got an unexpected keyword argument 'profile'
+1 failed, 2 passed in 0.22s
+```
+
+That RED proved runtime doctrine was not yet profile-bound. The same test-first patch added checks
+for missing Dasha gender, forbidden geometry-only gender, non-five-minute range width, and argala
+empty/equal/unequal count outcomes before implementing those behaviors.
+
+### Frozen doctrine migration
+
+`JaiminiRuleProfile` and `jaimini_core_v1.json` now explicitly and immutably freeze:
+
+- modal rasi drishti branches;
+- argala houses, all four virodhargala pairs, count comparison, and the four result statuses;
+- svamsa as D9 lagna and karakamsa as D9 Atmakaraka;
+- BL/HL/GL inclusion, sunrise-solar anchor, elapsed-minute input, 120/60/24-minute-per-sign rates,
+  and modulo-360 wrapping.
+
+The affected runtime functions accept a validated `JaiminiRuleProfile`; omitting it loads the
+packaged profile. They read their houses, pairs, statuses, included lagnas, and rates from that
+profile and fail on unsupported variants rather than executing untracked doctrine.
+
+Checksum migration was performed in dependency order:
+
+```text
+jaimini_core_v1.json         8a97c43e8438351ae73a59fed731cf5e48ef3c25c347ddf3570dea5818696b58
+jaimini_core_v1_sources.json 5e494796568722aff34fdc6a9fc43634809928d5afb6c1771574119c04ea3095
+```
+
+The source map was bound to the new profile hash and gained pending mappings for rasi drishti,
+argala geometry/count obstruction, svamsa, karakamsa, and selected special-lagna rates. All five
+package adjudication fixtures were then migrated to both new hashes. Their expected scenarios and
+manual fixture arithmetic were not regenerated or changed. Source review remains `pending`, every
+new mapping remains `pending`, and `interpretation_status` remains `unavailable`.
+
+### Input and sampling corrections
+
+The additive `JaiminiInput` now has a strict optional binary `gender` field with cross-field rules:
+
+- `core_with_chara_dasha` requires `female` or `male`;
+- geometry-only `core` forbids gender because it is unused.
+
+No existing `BirthProfile` or Research model changed. Approximate inputs now reject widths not
+divisible by five minutes. Both `sensitivity_sweep` and locked-session `capture_birth_snapshots`
+call the same `_sample_instants` generator, so `10:00..10:10` is exactly three inclusive samples
+and `10:00..10:12` is rejected consistently.
+
+Argala results now expose an explicit status determined by frozen count comparison:
+
+- no contributors: `absent`;
+- contributors and no obstructors: `unobstructed`;
+- fewer obstructors than contributors: `partial`;
+- equal or more obstructors: `obstructed`.
+
+### Review GREEN evidence
+
+```text
+uv run pytest -q tests/test_jaimini_core.py tests/test_task1_jaimini_contracts.py
+42 passed in 1.61s
+
+uv run pytest -q tests/test_jaimini_core.py tests/test_task1_jaimini_contracts.py tests/test_locked_engine_session.py tests/test_pyjhora_facade_golden.py
+67 passed, 2 skipped in 26.06s
+
+uv run pytest -q
+444 passed, 2 skipped in 106.09s
+```
+
+The two skips remain the pre-existing Swiss-ephemeris-only goldens. `git diff --check` is clean.
+
+### Remaining concern
+
+Qualified human/source adjudication is still pending by design. Calculation choices are now fully
+tracked and executable, but interpretive Jaimini output must remain unavailable until that separate
+Phase-0 gate is honestly approved.

@@ -25,8 +25,10 @@ from jyotish_agent.jaimini import (
 from jyotish_agent.jaimini_models import (
     ApproximateJaiminiBirthInput,
     ExactJaiminiBirthInput,
+    JaiminiInput,
     JaiminiPlace,
 )
+from jyotish_agent.rule_profiles import load_jaimini_rule_profile
 
 FIXTURE = json.loads(
     (Path(__file__).parent / "fixtures/jaimini_core_hand_checked_v1.json").read_text()
@@ -67,8 +69,9 @@ def test_chara_karakas_exact_tie_errors_and_near_tie_only_flags():
     ],
 )
 def test_rasi_drishti_modal_geometry(source, expected):
-    assert rasi_drishti(source) == expected
-    assert all(source in rasi_drishti(target) for target in expected)
+    profile = load_jaimini_rule_profile()
+    assert rasi_drishti(source, profile=profile) == expected
+    assert all(source in rasi_drishti(target, profile=profile) for target in expected)
 
 
 def test_arudha_all_twelve_and_same_or_seventh_exception_are_hand_counted():
@@ -91,10 +94,22 @@ def test_co_lord_resolution_uses_duration_then_degree_then_frozen_order():
 def test_argala_and_virodhargala_pair_each_counted_house():
     # From Aries: primary argala houses 2/4/11, obstructed by 12/10/3; secondary 5 by 9.
     occupants = {1: ("Moon",), 3: ("Mars",), 10: ("Jupiter",), 11: ("Saturn",), 9: ("Venus",), 2: ("Sun",), 4: ("Mercury",), 8: ("Rahu",)}
-    result = argala(0, occupants)
+    result = argala(0, occupants, profile=load_jaimini_rule_profile())
     assert [(item.house, item.obstruction_house) for item in result] == [(2, 12), (4, 10), (11, 3), (5, 9)]
     assert result[0].contributors == ("Moon",) and result[0].obstructors == ("Saturn",)
     assert result[3].contributors == ("Mercury",) and result[3].obstructors == ("Rahu",)
+    assert result[0].status == "obstructed"  # equal counts
+
+
+def test_argala_obstruction_status_empty_equal_and_unequal_counts():
+    profile = load_jaimini_rule_profile()
+    empty = argala(0, {}, profile=profile)[0]
+    unobstructed = argala(0, {1: ("Moon",)}, profile=profile)[0]
+    partial = argala(0, {1: ("Moon", "Mars"), 11: ("Saturn",)}, profile=profile)[0]
+    overwhelmed = argala(0, {1: ("Moon",), 11: ("Saturn", "Rahu")}, profile=profile)[0]
+    assert (empty.status, unobstructed.status, partial.status, overwhelmed.status) == (
+        "absent", "unobstructed", "partial", "obstructed"
+    )
 
 
 def test_svamsa_is_d9_lagna_and_karakamsa_is_d9_ak_sign():
@@ -118,7 +133,7 @@ def test_svamsa_and_karakamsa_accept_locked_snapshot_positions():
 
 def test_selected_special_lagnas_use_elapsed_sunrise_rates_and_wrap():
     # At 120 minutes after sunrise: BL advances 1, HL 2, GL 5 signs from Sun.
-    assert special_lagnas(sun_longitude=350.0, minutes_since_sunrise=120) == {
+    assert special_lagnas(sun_longitude=350.0, minutes_since_sunrise=120, profile=load_jaimini_rule_profile()) == {
         "bhava_lagna": pytest.approx(20.0),
         "hora_lagna": pytest.approx(50.0),
         "ghati_lagna": pytest.approx(140.0),
@@ -184,6 +199,28 @@ def test_exact_and_approximate_sensitivity_are_bounded_inclusive_five_minutes():
         sensitivity_sweep(confidence="approximate", start=start, end=start + dt.timedelta(minutes=125), calculate=lambda _: {})
     with pytest.raises(ValueError, match="unknown"):
         sensitivity_sweep(confidence="unknown", start=start, end=None, calculate=lambda _: {})
+    with pytest.raises(ValueError, match="five minutes"):
+        sensitivity_sweep(confidence="approximate", start=start, end=start + dt.timedelta(minutes=12), calculate=lambda _: {})
+
+
+def test_approximate_model_rejects_non_five_minute_width_and_gender_matches_scope():
+    place = {"name": "UTC", "latitude": 0, "longitude": 0, "timezone": "Etc/UTC"}
+    with pytest.raises(ValueError, match="divisible by 5"):
+        ApproximateJaiminiBirthInput.model_validate({
+            "confidence": "approximate", "date": "2000-01-01",
+            "earliest_time": "10:00:00", "latest_time": "10:12:00", "place": place,
+        })
+    common = {
+        "profile": "synthetic", "birth": {
+            "confidence": "exact", "date": "2000-01-01", "time": "10:00:00", "place": place,
+        }
+    }
+    with pytest.raises(ValueError, match="gender.*required"):
+        JaiminiInput.model_validate({**common, "analysis_scope": "core_with_chara_dasha"})
+    with pytest.raises(ValueError, match="gender.*not accepted"):
+        JaiminiInput.model_validate({**common, "analysis_scope": "core", "gender": "male"})
+    assert JaiminiInput.model_validate({**common, "analysis_scope": "core"}).gender is None
+    assert JaiminiInput.model_validate({**common, "analysis_scope": "core_with_chara_dasha", "gender": "female"}).gender == "female"
 
 
 def test_capture_birth_snapshots_uses_locked_session_callback_for_every_sample(monkeypatch):

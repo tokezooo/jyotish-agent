@@ -74,6 +74,7 @@ def test_exact_and_approximate_birth_inputs_are_discriminated_and_strict():
             },
             "rule_profile": "jaimini_core_v1",
             "analysis_scope": "core_with_chara_dasha",
+            "gender": "female",
             "reference_date": "2026-07-13",
         }
     )
@@ -229,6 +230,16 @@ def test_frozen_profile_encodes_every_doctrinal_and_time_choice():
     assert profile.karakas.exact_tie_policy == "error_requires_adjudication"
     assert profile.karakas.near_tie_threshold_arcseconds == 60
     assert profile.arudha.exception == "same_or_seventh_moves_to_tenth"
+    assert profile.rasi_drishti.variant == "modal_sign_aspects"
+    assert profile.argala.obstruction_rule == "count_comparison"
+    assert profile.argala.obstruction_pairs == ((2, 12), (4, 10), (11, 3), (5, 9))
+    assert profile.svamsa.svamsa == "d9_lagna_sign"
+    assert profile.svamsa.karakamsa == "d9_atmakaraka_sign"
+    assert profile.special_lagnas.rates_minutes_per_sign.model_dump() == {
+        "bhava_lagna": 120,
+        "hora_lagna": 60,
+        "ghati_lagna": 24,
+    }
     assert profile.co_lords.scorpio == ("Mars", "Ketu")
     assert profile.co_lords.aquarius == ("Saturn", "Rahu")
     assert profile.co_lords.resolution == "greater_rashi_duration_then_degree_then_fixed_order"

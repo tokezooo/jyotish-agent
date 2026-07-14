@@ -94,6 +94,8 @@ class ApproximateJaiminiBirthInput(_StrictModel):
             raise ValueError("latest_time must be after earliest_time on the same date")
         if minutes > _MAX_APPROXIMATE_MINUTES:
             raise ValueError("birth time range must not exceed 120 minutes")
+        if (end - start).total_seconds() % (self.sensitivity_step_minutes * 60):
+            raise ValueError("birth time range must be divisible by 5 minutes")
         return self
 
     @computed_field(return_type=int)
@@ -116,8 +118,17 @@ class JaiminiInput(_StrictModel):
     birth: JaiminiBirthInput
     rule_profile: JaiminiRuleProfileId = "jaimini_core_v1"
     analysis_scope: AnalysisScope = "core_with_chara_dasha"
+    gender: Literal["female", "male"] | None = None
     reference_date: dt.date | None = None
     include_trace: bool = False
+
+    @model_validator(mode="after")
+    def gender_matches_analysis_scope(self) -> "JaiminiInput":
+        if self.analysis_scope == "core_with_chara_dasha" and self.gender is None:
+            raise ValueError("gender is required for core_with_chara_dasha")
+        if self.analysis_scope == "core" and self.gender is not None:
+            raise ValueError("gender is not accepted for core geometry")
+        return self
 
 
 class JaiminiFact(_FrozenStrictModel):
@@ -228,6 +239,49 @@ class ArudhaRules(_FrozenStrictModel):
     exception: Literal["same_or_seventh_moves_to_tenth"]
 
 
+class RasiDrishtiRules(_FrozenStrictModel):
+    variant: Literal["modal_sign_aspects"]
+    movable: Literal["non_adjacent_fixed"]
+    fixed: Literal["non_adjacent_movable"]
+    dual: Literal["other_dual"]
+
+
+class ArgalaRules(_FrozenStrictModel):
+    contributing_houses: tuple[Literal[2], Literal[4], Literal[11], Literal[5]]
+    obstruction_pairs: tuple[
+        tuple[Literal[2], Literal[12]],
+        tuple[Literal[4], Literal[10]],
+        tuple[Literal[11], Literal[3]],
+        tuple[Literal[5], Literal[9]],
+    ]
+    obstruction_rule: Literal["count_comparison"]
+    empty_status: Literal["absent"]
+    zero_obstructors_status: Literal["unobstructed"]
+    fewer_obstructors_status: Literal["partial"]
+    equal_or_more_obstructors_status: Literal["obstructed"]
+
+
+class SvamsaRules(_FrozenStrictModel):
+    svamsa: Literal["d9_lagna_sign"]
+    karakamsa: Literal["d9_atmakaraka_sign"]
+
+
+class SpecialLagnaRates(_FrozenStrictModel):
+    bhava_lagna: Literal[120]
+    hora_lagna: Literal[60]
+    ghati_lagna: Literal[24]
+
+
+class SpecialLagnaRules(_FrozenStrictModel):
+    included: tuple[
+        Literal["bhava_lagna"], Literal["hora_lagna"], Literal["ghati_lagna"]
+    ]
+    anchor: Literal["sun_longitude_at_sunrise"]
+    elapsed: Literal["minutes_since_sunrise"]
+    rates_minutes_per_sign: SpecialLagnaRates
+    wrap: Literal["modulo_360"]
+
+
 class CoLordRules(_FrozenStrictModel):
     scorpio: tuple[Literal["Mars", "Ketu"], ...]
     aquarius: tuple[Literal["Saturn", "Rahu"], ...]
@@ -256,6 +310,10 @@ class JaiminiRuleProfile(_FrozenStrictModel):
     school: str
     karakas: KarakaRules
     arudha: ArudhaRules
+    rasi_drishti: RasiDrishtiRules
+    argala: ArgalaRules
+    svamsa: SvamsaRules
+    special_lagnas: SpecialLagnaRules
     co_lords: CoLordRules
     chara_dasha: CharaDashaRules
     time: TimeRules

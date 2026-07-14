@@ -17,6 +17,36 @@
     "counting": "inclusive_sign_count",
     "exception": "same_or_seventh_moves_to_tenth"
   },
+  "rasi_drishti": {
+    "variant": "modal_sign_aspects",
+    "movable": "non_adjacent_fixed",
+    "fixed": "non_adjacent_movable",
+    "dual": "other_dual"
+  },
+  "argala": {
+    "contributing_houses": [2, 4, 11, 5],
+    "obstruction_pairs": [[2, 12], [4, 10], [11, 3], [5, 9]],
+    "obstruction_rule": "count_comparison",
+    "empty_status": "absent",
+    "zero_obstructors_status": "unobstructed",
+    "fewer_obstructors_status": "partial",
+    "equal_or_more_obstructors_status": "obstructed"
+  },
+  "svamsa": {
+    "svamsa": "d9_lagna_sign",
+    "karakamsa": "d9_atmakaraka_sign"
+  },
+  "special_lagnas": {
+    "included": ["bhava_lagna", "hora_lagna", "ghati_lagna"],
+    "anchor": "sun_longitude_at_sunrise",
+    "elapsed": "minutes_since_sunrise",
+    "rates_minutes_per_sign": {
+      "bhava_lagna": 120,
+      "hora_lagna": 60,
+      "ghati_lagna": 24
+    },
+    "wrap": "modulo_360"
+  },
   "co_lords": {
     "scorpio": ["Mars", "Ketu"],
     "aquarius": ["Saturn", "Rahu"],
