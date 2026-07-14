@@ -1,0 +1,77 @@
+{
+  "schema_version": "1.0",
+  "required_worked_chart_count": 20,
+  "required_topics": [
+    "karaka",
+    "karakamsa",
+    "svamsa",
+    "arudha",
+    "argala",
+    "rasi_drishti",
+    "chara_dasha",
+    "relationships"
+  ],
+  "requirements": [
+    {
+      "requirement": "sanskrit_upadesa_sutras",
+      "source_ids": [
+        "jaimini_sutras_b_suryanarain_rao_1949",
+        "jaimini_sutras_vimala_achyutananda_jha_1943"
+      ],
+      "topics": [
+        "karaka",
+        "karakamsa",
+        "svamsa",
+        "arudha",
+        "argala",
+        "rasi_drishti",
+        "chara_dasha",
+        "relationships"
+      ],
+      "worked_chart_count": 0,
+      "acquisition_blocker": null
+    },
+    {
+      "requirement": "nilakantha_subodhini_translation",
+      "source_ids": [],
+      "topics": [],
+      "worked_chart_count": 0,
+      "acquisition_blocker": "The specified 2025 K. Guru Rajesh English translation must be lawfully purchased or supplied as local bytes."
+    },
+    {
+      "requirement": "independent_translation",
+      "source_ids": ["jaimini_sutras_b_suryanarain_rao_1949"],
+      "topics": [],
+      "worked_chart_count": 0,
+      "acquisition_blocker": null
+    },
+    {
+      "requirement": "practical_chara_dasha",
+      "source_ids": [],
+      "topics": [],
+      "worked_chart_count": 0,
+      "acquisition_blocker": "A licensed practical Chara Dasha work has not been supplied."
+    },
+    {
+      "requirement": "published_worked_charts",
+      "source_ids": [],
+      "topics": [],
+      "worked_chart_count": 0,
+      "acquisition_blocker": "Twenty traceable published worked charts with exact page anchors are still required."
+    },
+    {
+      "requirement": "sanjay_rath_overlay",
+      "source_ids": [],
+      "topics": [],
+      "worked_chart_count": 0,
+      "acquisition_blocker": "Sanjay Rath's licensed Upadesa Sutra or course-book bytes have not been supplied."
+    },
+    {
+      "requirement": "kn_rao_overlay",
+      "source_ids": [],
+      "topics": [],
+      "worked_chart_count": 0,
+      "acquisition_blocker": "A selected licensed K. N. Rao practical Jaimini source has not been supplied."
+    }
+  ]
+}
