@@ -17,8 +17,10 @@ from jyotish_agent.muhurta_models import MuhurtaSearchRequest
 from jyotish_agent.interpretations import iter_muhurta_fact_atoms, validate_muhurta_answer
 from jyotish_agent.pyjhora_facade import (
     BirthProfile,
+    CivilDateUnavailableError,
     _MuhurtaBoundaryEstimate,
     _canonicalize_muhurta_estimates,
+    _civil_day_utc_bounds,
     _run_muhurta_boundary_day,
 )
 from jyotish_agent.muhurta_profiles import (
@@ -243,6 +245,88 @@ def test_boundary_probes_use_pre_and_post_dst_offsets() -> None:
     for result in (fallback, spring):
         assert all(item.start_utc.tzinfo is UTC for item in result.day.values)
         assert all(item.start_utc.astimezone(zone).utcoffset() is not None for item in result.day.values)
+
+
+@pytest.mark.parametrize(("zone_id", "civil_date", "expected_start", "expected_end"), (
+    ("America/Santiago", dt.date(2026, 9, 6), "2026-09-06T04:00:00+00:00", "2026-09-07T03:00:00+00:00"),
+    ("America/Havana", dt.date(2026, 3, 8), "2026-03-08T05:00:00+00:00", "2026-03-09T04:00:00+00:00"),
+    ("America/Havana", dt.date(2026, 11, 1), "2026-11-01T04:00:00+00:00", "2026-11-02T05:00:00+00:00"),
+    ("Asia/Beirut", dt.date(2026, 3, 29), "2026-03-28T22:00:00+00:00", "2026-03-29T21:00:00+00:00"),
+))
+def test_civil_day_bounds_cover_midnight_transitions_without_gaps(
+    zone_id: str, civil_date: dt.date, expected_start: str, expected_end: str,
+) -> None:
+    start, end = _civil_day_utc_bounds(civil_date, ZoneInfo(zone_id))
+    next_start, _ = _civil_day_utc_bounds(civil_date + dt.timedelta(days=1), ZoneInfo(zone_id))
+    assert start == dt.datetime.fromisoformat(expected_start)
+    assert end == dt.datetime.fromisoformat(expected_end)
+    assert end == next_start
+
+
+def test_skipped_civil_date_is_typed_but_physical_search_remains_contiguous() -> None:
+    with pytest.raises(CivilDateUnavailableError):
+        _civil_day_utc_bounds(dt.date(2011, 12, 30), ZoneInfo("Pacific/Apia"))
+    place = EventPlace(name="private", latitude=-13.8333, longitude=-171.75, zone_id="Pacific/Apia")
+    result = MuhurtaFacade().search(_request(
+        place=place, start="2011-12-29T00:00:00-10:00", end="2011-12-31T00:00:00+14:00",
+        duration_minutes=30, hard_constraints={},
+    ))
+    assert result.status == "completed"
+
+
+@pytest.mark.parametrize(("zone_id", "civil_date", "latitude", "longitude"), (
+    ("America/Santiago", dt.date(2026, 9, 6), -33.4489, -70.6693),
+    ("America/Havana", dt.date(2026, 3, 8), 23.1136, -82.3666),
+    ("America/Havana", dt.date(2026, 11, 1), 23.1136, -82.3666),
+    ("Asia/Beirut", dt.date(2026, 3, 29), 33.8938, 35.5018),
+))
+def test_boundary_day_handles_nonexistent_or_ambiguous_midnight(
+    zone_id: str, civil_date: dt.date, latitude: float, longitude: float,
+) -> None:
+    result = _run_muhurta_boundary_day(
+        BirthProfile("event", (civil_date.year, civil_date.month, civil_date.day), (0, 0, 0), latitude, longitude, 0),
+        civil_date, zone_id,
+    )
+    assert result.day_start_utc < result.day_end_utc
+    assert result.probe_offsets
+    assert all(
+        result.day_start_utc <= item.start_utc < result.day_end_utc
+        or item.end_utc is not None
+        and item.start_utc < result.day_end_utc
+        and item.end_utc > result.day_start_utc
+        for item in result.day.values
+    )
+    assert all(item.start_utc.tzinfo is UTC for item in result.day.values)
+    assert all(
+        item.end_utc is not None
+        or item.start_utc.astimezone(ZoneInfo(zone_id)).date() == civil_date
+        for item in result.day.values
+    )
+    if zone_id == "America/Havana" and civil_date == dt.date(2026, 11, 1):
+        assert (0, -240) in result.probe_offsets
+        assert (0, -300) in result.probe_offsets
+    elif civil_date in {dt.date(2026, 9, 6), dt.date(2026, 3, 8), dt.date(2026, 3, 29)}:
+        assert result.probe_offsets[0][0] == 60
+
+
+@pytest.mark.parametrize(("place", "start", "end", "start_fold"), (
+    (EventPlace(name="private", latitude=-33.4489, longitude=-70.6693, zone_id="America/Santiago"),
+     "2026-09-06T01:00:00-03:00", "2026-09-07T00:00:00-03:00", None),
+    (EventPlace(name="private", latitude=23.1136, longitude=-82.3666, zone_id="America/Havana"),
+     "2026-03-08T01:00:00-04:00", "2026-03-09T00:00:00-04:00", None),
+    (EventPlace(name="private", latitude=23.1136, longitude=-82.3666, zone_id="America/Havana"),
+     "2026-11-01T00:00:00-04:00", "2026-11-02T00:00:00-05:00", 0),
+    (EventPlace(name="private", latitude=33.8938, longitude=35.5018, zone_id="Asia/Beirut"),
+     "2026-03-29T01:00:00+03:00", "2026-03-30T00:00:00+03:00", None),
+))
+def test_public_search_completes_across_midnight_transition_days(
+    place: EventPlace, start: str, end: str, start_fold: int | None,
+) -> None:
+    result = MuhurtaFacade().search(_request(
+        place=place, start=start, end=end, start_fold=start_fold,
+        duration_minutes=30, hard_constraints={}, max_candidate_intervals=5000,
+    ))
+    assert result.status == "completed"
 
 
 def test_concurrent_mixed_zones_are_config_isolated() -> None:

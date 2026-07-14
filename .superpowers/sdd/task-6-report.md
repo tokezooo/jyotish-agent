@@ -63,6 +63,22 @@ and physical UTC proximity. The governed profile freezes this behavior as versio
 with a 900-second tolerance. It also made the default end executable as seven local civil
 days and added explicit trace-cap metadata.
 
+Observed third review-fix RED:
+
+```text
+PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest -q \
+  tests/test_muhurta_core.py -k 'civil_day_bounds or midnight_transition'
+
+ImportError: cannot import name '_civil_day_utc_bounds'
+```
+
+The third review-fix cycle derives each local civil date as an exact physical UTC
+half-open interval. Nominal probes are resolved to valid physical instants, nonexistent
+midnight advances to the date's first real instant, ambiguous midnight retains both
+folds deterministically, and every actual offset-segment start is probed. Regression
+cases cover Santiago, Havana, and Beirut midnight transitions plus a fully skipped Apia
+date, while preserving London and Moscow behavior.
+
 Focused GREEN:
 
 ```text
@@ -71,7 +87,7 @@ PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest -q \
   tests/test_muhurta_package.py tests/test_muhurta_benchmark.py \
   tests/test_mcp_server.py tests/test_mcp_stdio.py
 
-37 passed in 18.20s
+50 passed in 19.18s
 ```
 
 This covers half-open/DST/property behavior, transition boundaries, hard monotonicity,
@@ -85,7 +101,7 @@ Full GREEN:
 ```text
 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest -q
 
-552 passed, 2 skipped in 151.85s
+565 passed, 2 skipped in 152.37s
 ```
 
 The two skips are the existing Swiss-ephemeris-only goldens; Moshier completed.
@@ -108,7 +124,7 @@ uv build --wheel --out-dir <temporary directory>
 Ten warm one-day Moscow focused-work searches, 90-minute duration:
 
 ```json
-{"candidate_intervals":36,"case":"one_day_moscow_focused_work_90m","config_sha256":"821df6ee9b5cd8bc89f5fba821edbd4b438021912a40a765c986563f5b856f84","ephemeris_mode":"moshier","max_ms":478.144,"min_ms":467.698,"p50_ms":469.564,"p95_ms":478.144,"python":"3.12.2","result_bytes":9820,"rule_profile_sha256":"aaa494c6f0bb6f6ffe7d244c51024ed4f5a69e4da700eb347639c3e007afddab","runner":"scripts/benchmark_muhurta.py","source_gate":"pending","source_map_sha256":"1943f1617abb4c8bcf8aef2bff9c93257b73a27c275df5433d711a780c70a947","transition_canonicalization_version":"1.0.0","transition_cluster_tolerance_seconds":900,"warm_runs":10}
+{"candidate_intervals":36,"case":"one_day_moscow_focused_work_90m","config_sha256":"821df6ee9b5cd8bc89f5fba821edbd4b438021912a40a765c986563f5b856f84","ephemeris_mode":"moshier","max_ms":486.34,"min_ms":468.504,"p50_ms":470.264,"p95_ms":486.34,"python":"3.12.2","result_bytes":9820,"rule_profile_sha256":"aaa494c6f0bb6f6ffe7d244c51024ed4f5a69e4da700eb347639c3e007afddab","runner":"scripts/benchmark_muhurta.py","source_gate":"pending","source_map_sha256":"1943f1617abb4c8bcf8aef2bff9c93257b73a27c275df5433d711a780c70a947","transition_canonicalization_version":"1.0.0","transition_cluster_tolerance_seconds":900,"warm_runs":10}
 ```
 
 The reproducible runner is `scripts/benchmark_muhurta.py`; its captured artifact is

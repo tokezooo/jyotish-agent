@@ -83,6 +83,13 @@ ERROR_REGISTRY: dict[str, dict[str, Any]] = {
         "fix": "Select one of the explicitly supported low-risk activities.",
         "next_action": "select_supported_activity",
     },
+    "CIVIL_DATE_UNAVAILABLE": {
+        "retryable": False,
+        "problem": "The requested IANA zone has no physical instants on one local civil date.",
+        "cause": "A historical calendar transition skipped that local date entirely.",
+        "fix": "Narrow the range to local dates that exist in the requested IANA zone.",
+        "next_action": "narrow_search_range",
+    },
     "HIGH_STAKES_ACTIVITY": {
         "retryable": False,
         "problem": "The requested activity is outside the low-risk Muhurta boundary.",

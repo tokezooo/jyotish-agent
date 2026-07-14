@@ -34,7 +34,13 @@ from .muhurta_profiles import (
     muhurta_source_admission_evidence,
     muhurta_source_map_sha256,
 )
-from .pyjhora_facade import BirthProfile, EngineOutputError, _EngineConfigSnapshot, _run_muhurta_boundary_day
+from .pyjhora_facade import (
+    BirthProfile,
+    CivilDateUnavailableError,
+    EngineOutputError,
+    _EngineConfigSnapshot,
+    _run_muhurta_boundary_day,
+)
 from .signing import cache_domain_artifact
 
 _SUPPORTED = {"general", "focused_work_session_v1"}
@@ -173,6 +179,11 @@ class MuhurtaFacade:
                 result = _run_muhurta_boundary_day(
                     engine_profile, civil_day, request.place.zone_id, engine_config,
                     rule_profile.transition_canonicalization.tolerance_seconds,
+                )
+            except CivilDateUnavailableError:
+                return MuhurtaNeedsInputResult(
+                    status="needs_input",
+                    **_error_fields("CIVIL_DATE_UNAVAILABLE", request_id, "boundary_collection"),
                 )
             except (ConfigError, EngineOutputError, ArithmeticError, ValueError):
                 return incomplete("ENGINE_CROSSCHECK_FAILED", "boundary_collection", days=len(primitives), boundaries=boundary_progress)

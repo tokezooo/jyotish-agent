@@ -258,7 +258,10 @@ class _Rescue(_BaseResult):
 
 class MuhurtaNeedsInputResult(_Rescue):
     status: Literal["needs_input"]
-    error_code: Literal["ACTIVITY_UNSUPPORTED", "SEARCH_RANGE_TOO_LARGE", "RULE_PROFILE_UNSUPPORTED", "INPUT_INVALID"]
+    error_code: Literal[
+        "ACTIVITY_UNSUPPORTED", "SEARCH_RANGE_TOO_LARGE", "RULE_PROFILE_UNSUPPORTED",
+        "INPUT_INVALID", "CIVIL_DATE_UNAVAILABLE",
+    ]
     next_action: Literal["select_supported_activity", "narrow_search_range", "select_supported_rule_profile", "correct_request"]
     supported_values: tuple[str, ...] = ("general", "focused_work_session_v1")
 

@@ -27,6 +27,10 @@ from .yogas import detect_yogas
 class EngineOutputError(ValueError):
     """PyJHora returned a shape the facade did not expect (degenerate/changed output)."""
 
+
+class CivilDateUnavailableError(EngineOutputError):
+    """The IANA zone skips the requested local calendar date entirely."""
+
 # Degrees are rounded to this many places everywhere, so float noise across
 # libm/BLAS builds can't break byte-stability or the golden fixture.
 _DEG_PRECISION = 6
@@ -124,6 +128,8 @@ class _MuhurtaBoundaryDayResult:
     ephemeris_mode: str
     probe_offsets: tuple[tuple[int, int], ...]
     canonicalization_tolerance_seconds: int
+    day_start_utc: datetime
+    day_end_utc: datetime
 
 
 _ENGINE_SESSION_LOCAL = threading.local()
@@ -136,6 +142,96 @@ def _clock_hour(value: object) -> float:
     clock = text.split()[0]
     hour, minute, second = (int(part) for part in clock.split(":"))
     return day_offset + hour + minute / 60 + second / 3600
+
+
+def _first_utc_with_local_date_at_least(target: date, zone) -> datetime:
+    """Return the first whole UTC second whose local date is at least ``target``."""
+    nominal = datetime(target.year, target.month, target.day, tzinfo=UTC)
+    low = round((nominal - timedelta(days=2)).timestamp())
+    high = round((nominal + timedelta(days=2)).timestamp())
+    if datetime.fromtimestamp(low, tz=UTC).astimezone(zone).date() >= target:
+        raise EngineOutputError("IANA civil-date lower search bound is invalid")
+    if datetime.fromtimestamp(high, tz=UTC).astimezone(zone).date() < target:
+        raise EngineOutputError("IANA civil-date upper search bound is invalid")
+    while low + 1 < high:
+        middle = (low + high) // 2
+        if datetime.fromtimestamp(middle, tz=UTC).astimezone(zone).date() < target:
+            low = middle
+        else:
+            high = middle
+    return datetime.fromtimestamp(high, tz=UTC)
+
+
+def _civil_day_utc_bounds(civil_date: date, zone) -> tuple[datetime, datetime]:
+    """Resolve the exact physical half-open interval occupied by a local date."""
+    start = _first_utc_with_local_date_at_least(civil_date, zone)
+    end = _first_utc_with_local_date_at_least(civil_date + timedelta(days=1), zone)
+    if start.astimezone(zone).date() != civil_date or start >= end:
+        raise CivilDateUnavailableError("local civil date contains no physical instants")
+    return start, end
+
+
+def _offset_segment_starts(start: datetime, end: datetime, zone) -> tuple[datetime, ...]:
+    """Find each UTC offset segment start within one physical civil-day span."""
+    starts = [start]
+    cursor = start
+    current_offset = cursor.astimezone(zone).utcoffset()
+    while cursor < end:
+        following = min(cursor + timedelta(minutes=1), end)
+        if following == end:
+            break
+        following_offset = following.astimezone(zone).utcoffset()
+        if following_offset != current_offset:
+            low = round(cursor.timestamp())
+            high = round(following.timestamp())
+            while low + 1 < high:
+                middle = (low + high) // 2
+                if datetime.fromtimestamp(middle, tz=UTC).astimezone(zone).utcoffset() == current_offset:
+                    low = middle
+                else:
+                    high = middle
+            transition = datetime.fromtimestamp(high, tz=UTC)
+            starts.append(transition)
+            current_offset = transition.astimezone(zone).utcoffset()
+            cursor = transition
+        else:
+            cursor = following
+    return tuple(starts)
+
+
+def _valid_local_candidates(naive: datetime, zone) -> tuple[datetime, ...]:
+    by_utc = {
+        value.astimezone(UTC): value.astimezone(UTC)
+        for value in (naive.replace(tzinfo=zone, fold=0), naive.replace(tzinfo=zone, fold=1))
+        if value.astimezone(UTC).astimezone(zone).replace(tzinfo=None) == naive
+    }
+    return tuple(sorted(by_utc))
+
+
+def _physical_probe_instants(
+    civil_date: date,
+    zone,
+    day_start: datetime,
+    day_end: datetime,
+) -> tuple[datetime, ...]:
+    """Resolve nominal local probes and all offset-segment starts to valid UTC instants."""
+    instants = set(_offset_segment_starts(day_start, day_end, zone))
+    for hour, minute in ((0, 0), (6, 0), (12, 0), (18, 0), (23, 59)):
+        naive = datetime.combine(civil_date, datetime.min.time()).replace(hour=hour, minute=minute)
+        candidates = tuple(
+            instant for instant in _valid_local_candidates(naive, zone)
+            if day_start <= instant < day_end
+        )
+        if not candidates:
+            # A nominal wall time can be skipped. Advance along the physical day
+            # until the first valid local instant at or after the requested clock.
+            instant = day_start
+            while instant < day_end and instant.astimezone(zone).replace(tzinfo=None) < naive:
+                instant += timedelta(minutes=1)
+            if instant < day_end:
+                candidates = (instant,)
+        instants.update(candidates)
+    return tuple(sorted(instant for instant in instants if day_start <= instant < day_end))
 
 
 def _canonicalize_muhurta_estimates(
@@ -205,27 +301,22 @@ def _run_muhurta_boundary_day(
             applied = apply_config(config)
             zone = ZoneInfo(zone_id)
             estimates: list[_MuhurtaBoundaryEstimate] = []
+            day_start, day_end = _civil_day_utc_bounds(civil_date, zone)
+            probe_instants = _physical_probe_instants(civil_date, zone, day_start, day_end)
 
             def jd_at(hour: int, minute: int = 0, second: int = 0):
                 return utils.julian_day_number(
                     (civil_date.year, civil_date.month, civil_date.day), (hour, minute, second)
                 )
 
-            def probe_offset(hour: int, minute: int = 0) -> float:
-                naive = datetime.combine(civil_date, datetime.min.time()).replace(hour=hour, minute=minute)
-                candidates = {
-                    value.astimezone(UTC): value
-                    for value in (naive.replace(tzinfo=zone, fold=0), naive.replace(tzinfo=zone, fold=1))
-                    if value.astimezone(UTC).astimezone(zone).replace(tzinfo=None) == naive
-                }
-                if len(candidates) != 1:
-                    raise EngineOutputError("Muhurta probe local time is ambiguous or nonexistent")
-                offset = next(iter(candidates.values())).utcoffset()
-                assert offset is not None
-                return offset.total_seconds() / 3600
-
-            probe_specs = ((0, 0), (6, 0), (12, 0), (18, 0), (23, 59))
-            offsets = tuple((hour * 60 + minute, round(probe_offset(hour, minute) * 60)) for hour, minute in probe_specs)
+            probe_records = tuple((instant, instant.astimezone(zone)) for instant in probe_instants)
+            offsets = tuple(
+                (
+                    local.hour * 60 + local.minute,
+                    round(local.utcoffset().total_seconds() / 60),  # type: ignore[union-attr]
+                )
+                for _, local in probe_records
+            )
 
             def to_utc(hour_value: float, engine_offset: float) -> datetime:
                 if not math.isfinite(hour_value):
@@ -260,10 +351,12 @@ def _run_muhurta_boundary_day(
             # panchanga period here is longer than the probe step; aggregating its
             # current start/end catches every same-day transition, including the
             # second karana, while independently validating output variants.
-            for hour, minute in probe_specs:
-                engine_offset = probe_offset(hour, minute)
+            for _, local_probe in probe_records:
+                offset = local_probe.utcoffset()
+                assert offset is not None
+                engine_offset = offset.total_seconds() / 3600
                 place = drik.Place(profile.name, profile.latitude, profile.longitude, engine_offset)
-                probe = jd_at(hour, minute)
+                probe = jd_at(local_probe.hour, local_probe.minute, local_probe.second)
                 add_current_period("tithi_transition", drik.tithi(probe, place), 1, 2, 30, engine_offset)
                 add_current_period("nakshatra_transition", drik.nakshatra(probe, place), 2, 3, 27, engine_offset)
                 add_current_period("yoga_transition", drik.yogam(probe, place), 1, 2, 27, engine_offset)
@@ -285,15 +378,16 @@ def _run_muhurta_boundary_day(
             # on the civil day. Estimates of the same physical event are then
             # canonicalized by semantic identity and UTC proximity.
             distinct_offsets = sorted({minutes / 60 for _, minutes in offsets})
+            daily_anchor = day_start.astimezone(zone)
             for engine_offset in distinct_offsets:
                 place = drik.Place(profile.name, profile.latitude, profile.longitude, engine_offset)
-                midnight_jd = jd_at(0)
-                sunrise, sunset = drik.sunrise(midnight_jd, place), drik.sunset(midnight_jd, place)
+                daily_jd = jd_at(daily_anchor.hour, daily_anchor.minute, daily_anchor.second)
+                sunrise, sunset = drik.sunrise(daily_jd, place), drik.sunset(daily_jd, place)
                 estimates.extend((
                     _MuhurtaBoundaryEstimate("sunrise", "sunrise", to_utc(float(sunrise[0]), engine_offset)),
                     _MuhurtaBoundaryEstimate("sunset", "sunset", to_utc(float(sunset[0]), engine_offset)),
                 ))
-                for sign, start_hour, end_hour in drik.udhaya_lagna_muhurtha(midnight_jd, place):
+                for sign, start_hour, end_hour in drik.udhaya_lagna_muhurtha(daily_jd, place):
                     estimates.append(_MuhurtaBoundaryEstimate(
                         f"lagna_{int(sign)}", f"lagna:{int(sign)}", to_utc(float(start_hour), engine_offset),
                         to_utc(float(end_hour) + (24 if float(end_hour) <= float(start_hour) else 0), engine_offset),
@@ -302,14 +396,14 @@ def _run_muhurta_boundary_day(
                     ("rahu_kala", drik.raahu_kaalam), ("yamaganda", drik.yamaganda_kaalam),
                     ("gulika", drik.gulikai_kaalam), ("abhijit", drik.abhijit_muhurta),
                 ):
-                    period = function(midnight_jd, place)
+                    period = function(daily_jd, place)
                     if not period or len(period) < 2:
                         raise EngineOutputError(f"{kind} returned an unsupported period shape")
                     estimates.append(_MuhurtaBoundaryEstimate(
                         kind, kind, to_utc(_clock_hour(period[0]), engine_offset),
                         to_utc(_clock_hour(period[1]), engine_offset),
                     ))
-                dur = drik.durmuhurtam(midnight_jd, place)
+                dur = drik.durmuhurtam(daily_jd, place)
                 if len(dur) % 2:
                     raise EngineOutputError("durmuhurta returned an unsupported period shape")
                 for index in range(0, len(dur), 2):
@@ -318,7 +412,7 @@ def _run_muhurta_boundary_day(
                         to_utc(_clock_hour(dur[index]), engine_offset),
                         to_utc(_clock_hour(dur[index + 1]), engine_offset),
                     ))
-                for index, period in enumerate(drik.amrit_kaalam(midnight_jd, place) or ()):
+                for index, period in enumerate(drik.amrit_kaalam(daily_jd, place) or ()):
                     if not period or len(period) < 2:
                         raise EngineOutputError("amrita returned an unsupported period shape")
                     estimates.append(_MuhurtaBoundaryEstimate(
@@ -326,9 +420,6 @@ def _run_muhurta_boundary_day(
                         to_utc(_clock_hour(period[1]), engine_offset),
                     ))
 
-            day_start = datetime(civil_date.year, civil_date.month, civil_date.day, tzinfo=zone).astimezone(UTC)
-            next_date = civil_date + timedelta(days=1)
-            day_end = datetime(next_date.year, next_date.month, next_date.day, tzinfo=zone).astimezone(UTC)
             relevant = tuple(
                 item for item in estimates
                 if (
@@ -366,6 +457,8 @@ def _run_muhurta_boundary_day(
                 config=snapshot, ephemeris_mode=runtime_config.ephemeris_mode(),
                 probe_offsets=offsets,
                 canonicalization_tolerance_seconds=canonicalization_tolerance_seconds,
+                day_start_utc=day_start,
+                day_end_utc=day_end,
             )
     finally:
         _ENGINE_SESSION_LOCAL.active = False
