@@ -8,6 +8,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .jaimini_models import AnalysisScope, JaiminiRuleProfileId
+from .prashna_models import PrashnaRequest
 from .research_models import ResearchBirthProfileRequest
 
 
@@ -99,6 +100,10 @@ class JaiminiMcpInput(ProfileSelection):
         if self.analysis_scope == "core" and self.gender is not None:
             raise ValueError("gender is not accepted for core geometry")
         return self
+
+
+class PrashnaMcpInput(PrashnaRequest):
+    """Additive MCP input; intentionally independent from natal profiles."""
 
 
 class SourceSearchInput(BaseModel):

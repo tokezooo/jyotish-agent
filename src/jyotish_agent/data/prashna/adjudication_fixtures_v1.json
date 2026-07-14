@@ -1,0 +1,13 @@
+{
+  "gate_status": "pending",
+  "reviewer": null,
+  "reviewer_role": null,
+  "reason": "Synthetic calculation scenarios are present, but no qualified doctrinal review has occurred.",
+  "cases": [
+    {"case_id": "work_obstacle_moscow_explicit", "family": "work_project_status_and_obstacles", "zone_id": "Europe/Moscow", "anchor_kind": "explicit", "review_status": "pending"},
+    {"case_id": "project_delay_london_fold", "family": "work_project_status_and_obstacles", "zone_id": "Europe/London", "anchor_kind": "explicit_fold", "review_status": "pending"},
+    {"case_id": "startup_blocker_new_york_now", "family": "work_project_status_and_obstacles", "zone_id": "America/New_York", "anchor_kind": "captured_now", "review_status": "pending"},
+    {"case_id": "composite_topic_rescue", "family": "unsupported_composite", "zone_id": "Asia/Kolkata", "anchor_kind": "explicit", "review_status": "pending"},
+    {"case_id": "high_stakes_rescue", "family": "unsupported_high_stakes", "zone_id": "Europe/Berlin", "anchor_kind": "explicit", "review_status": "pending"}
+  ]
+}

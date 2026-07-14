@@ -17,6 +17,8 @@ from .jaimini_models import (
     JaiminiPlace,
     JaiminiResult,
 )
+from .prashna import PrashnaFacade
+from .prashna_models import PrashnaResult
 from .mcp_models import (
     CalculateInput,
     CalculateResult,
@@ -24,6 +26,7 @@ from .mcp_models import (
     FinalizeResearchInput,
     InspectResearchInput,
     JaiminiMcpInput,
+    PrashnaMcpInput,
     ProfileInput,
     ProfileResult,
     ResearchBundle,
@@ -138,6 +141,7 @@ class JyotishMcpFacade:
             Path(default_profile_path) if default_profile_path is not None else None
         )
         self.store = ResearchStore(self.data_root)
+        self.clock = clock or (lambda: dt.datetime.now(dt.UTC))
         service_kwargs = {"clock": clock} if clock is not None else {}
         self.service = ResearchService(self.store, **service_kwargs)
 
@@ -285,6 +289,10 @@ class JyotishMcpFacade:
             include_trace=value.include_trace,
         )
         return JaiminiFacade().calculate(request)
+
+    def prashna(self, value: PrashnaMcpInput) -> PrashnaResult:
+        """Compute one stateless, sealed question-time Praśna result."""
+        return PrashnaFacade(clock=self.clock).calculate(value)
 
     def search_sources(self, value: SourceSearchInput) -> SourceSearchResult:
         results = []

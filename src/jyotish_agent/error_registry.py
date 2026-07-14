@@ -27,6 +27,27 @@ ERROR_REGISTRY: dict[str, dict[str, Any]] = {
         "fix": "Create a new anchor for this question.",
         "next_action": "create_new_anchor",
     },
+    "TOPIC_UNSUPPORTED": {
+        "retryable": False,
+        "problem": "The question is outside the admitted Praśna family.",
+        "cause": "Only one concrete work or project status question is supported.",
+        "fix": "Provide one primary work or project status question.",
+        "next_action": "provide_primary_question",
+    },
+    "TOPIC_COMPOSITE": {
+        "retryable": False,
+        "problem": "The Praśna question combines multiple topics.",
+        "cause": "A single primary house cannot be selected deterministically.",
+        "fix": "Choose one primary work or project status question.",
+        "next_action": "provide_primary_question",
+    },
+    "HIGH_STAKES_TOPIC": {
+        "retryable": False,
+        "problem": "The request is outside the low-risk Praśna boundary.",
+        "cause": "Medical, legal, financial, pregnancy, death, or harm judgement is not supported.",
+        "fix": "Use an appropriate qualified professional instead of a deterministic prediction.",
+        "next_action": "consult_qualified_professional",
+    },
     "SEARCH_RANGE_TOO_LARGE": {
         "retryable": False,
         "problem": "The requested search range exceeds the supported maximum.",

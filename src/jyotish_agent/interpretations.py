@@ -241,6 +241,58 @@ def iter_jaimini_fact_atoms(facts: list[dict]) -> dict[str, str]:
     return atoms
 
 
+def iter_prashna_fact_atoms(facts: list[dict]) -> dict[str, str]:
+    """Project signed deterministic Praśna facts; reject duplicate identities."""
+    atoms: dict[str, str] = {}
+    for fact in facts:
+        if not isinstance(fact, dict):
+            continue
+        path, value = fact.get("fact_id"), fact.get("value")
+        if isinstance(path, str) and path.startswith("prashna.") and isinstance(value, (str, int, float, bool)):
+            if path in atoms:
+                raise ValueError(f"DUPLICATE_PRASHNA_FACT_ID:{path}")
+            atoms[path] = "true" if value is True else "false" if value is False else str(value)
+    return atoms
+
+
+def validate_prashna_answer(
+    facts_used: list[dict],
+    artifact_token: str,
+    *,
+    interpretation_requested: bool = False,
+    normalized_anchor_sha256: str | None = None,
+    question_fingerprint: str | None = None,
+) -> list[str]:
+    """Validate citations and keep Praśna doctrine fail-closed."""
+    from .prashna_profiles import prashna_source_admission_evidence
+
+    artifact = get_cached_domain_artifact(artifact_token)
+    if artifact is None:
+        return ["ARTIFACT_NOT_FOUND"]
+    if not verify_domain_artifact(artifact) or artifact.get("mode") != "prashna":
+        return ["ARTIFACT_INVALID"]
+    if normalized_anchor_sha256 is not None and artifact.get("normalized_anchor_sha256") != normalized_anchor_sha256:
+        return ["ANCHOR_MISMATCH"]
+    if question_fingerprint is not None and artifact.get("question_fingerprint") != question_fingerprint:
+        return ["QUESTION_FINGERPRINT_MISMATCH"]
+    if interpretation_requested:
+        admission = prashna_source_admission_evidence()
+        if not admission["verified"]:
+            return ["INTERPRETATION_SOURCE_UNAVAILABLE"]
+        if artifact.get("source_admission_sha256") != admission["sha256"]:
+            return ["SOURCE_ADMISSION_MISMATCH"]
+        return ["INTERPRETATION_RENDERER_UNAVAILABLE"]
+    atoms = iter_prashna_fact_atoms(artifact.get("facts", []))
+    violations: list[str] = []
+    for ref in facts_used:
+        path, value = str(ref.get("path", "")).strip(), str(ref.get("value", "")).strip()
+        if path not in atoms:
+            violations.append(f"FACT_NOT_IN_ARTIFACT:{path}")
+        elif not _values_match(value, atoms[path]):
+            violations.append(f"FACT_VALUE_MISMATCH:{path}")
+    return violations
+
+
 def validate_jaimini_answer(
     facts_used: list[dict],
     artifact_token: str,

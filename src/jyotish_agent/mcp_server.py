@@ -7,6 +7,7 @@ from mcp.types import ToolAnnotations
 
 from .mcp_facade import JyotishMcpFacade, facade_from_environment
 from .jaimini_models import JaiminiResultModel
+from .prashna_models import PrashnaResultModel
 from .mcp_models import (
     CalculateInput,
     CalculateResult,
@@ -14,6 +15,7 @@ from .mcp_models import (
     FinalizeResearchInput,
     InspectResearchInput,
     JaiminiMcpInput,
+    PrashnaMcpInput,
     ProfileInput,
     ProfileResult,
     ResearchBundle,
@@ -31,6 +33,8 @@ Routing:
 - calculate and search_sources are stateless and do not create ResearchRuns.
 - jaimini is stateless and returns signed computed facts; do not invent interpretation
   when interpretation_status is unavailable, and never infer an approximate range.
+- prashna seals one explicit/captured question moment and supports only bounded work/project
+  facts; reuse its opaque anchor token for clarification and never invent doctrine.
 - research creates exactly one authoritative run and returns evidence for synthesis.
 - finalize_research validates and saves a deep memo; inspect_research retrieves it.
 - Do not infer missing birth data for another person and do not overwrite the default profile.
@@ -95,6 +99,19 @@ def build_server(facade: JyotishMcpFacade | None = None) -> FastMCP:
     )
     def jaimini(request: JaiminiMcpInput) -> JaiminiResultModel:
         return JaiminiResultModel(root=runtime.jaimini(request))
+
+    @server.tool(
+        name="prashna",
+        description=(
+            "Compute signed time-chart facts for one low-risk work/project status question. "
+            "Use an explicit event anchor or capture_now with place; reuse the opaque anchor "
+            "token only for clarification. Governed interpretation is unavailable."
+        ),
+        annotations=READ_ONLY,
+        structured_output=True,
+    )
+    def prashna(request: PrashnaMcpInput) -> PrashnaResultModel:
+        return PrashnaResultModel(root=runtime.prashna(request))
 
     @server.tool(
         name="search_sources",

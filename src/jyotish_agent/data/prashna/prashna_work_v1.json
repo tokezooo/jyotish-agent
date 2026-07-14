@@ -1,0 +1,17 @@
+{
+  "profile_id": "prashna_work_v1",
+  "version": "1.0.0",
+  "school": "bounded-time-chart-calculation-only",
+  "lagna_method": "time_chart",
+  "question_family": "work_project_status_and_obstacles",
+  "primary_house": 10,
+  "secondary_houses": [6, 11],
+  "unsupported_lagna_methods": ["kp_249", "kp_108", "nadi"],
+  "rule_result_limit": 100,
+  "rules": [
+    {"rule_id": "prashna.readability.anchor_complete", "version": "1.0.0", "source_status": "not_required"},
+    {"rule_id": "prashna.readability.single_topic", "version": "1.0.0", "source_status": "not_required"},
+    {"rule_id": "prashna.radicality.source_gate", "version": "1.0.0", "source_status": "pending"},
+    {"rule_id": "prashna.geometry.applying_separating", "version": "1.0.0", "source_status": "pending"}
+  ]
+}
