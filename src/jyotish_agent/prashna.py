@@ -70,6 +70,22 @@ def question_fingerprint(question: str) -> str:
     return hashlib.sha256(_normalized_question(question).encode("utf-8")).hexdigest()
 
 
+def _capture_request_material(request: PrashnaRequest, fingerprint: str) -> dict:
+    """Bind every public capture field except identity and inactive anchor alternatives."""
+    material = request.model_dump(
+        mode="json",
+        exclude={
+            "question",
+            "anchor",
+            "anchor_token",
+            "clarification_of_fingerprint",
+            "idempotency_key",
+        },
+    )
+    material["question_fingerprint"] = fingerprint
+    return material
+
+
 @dataclass(frozen=True)
 class TopicRoute:
     status: Literal["supported", "unsupported", "composite", "high_stakes"]
@@ -243,11 +259,7 @@ class PrashnaFacade:
             "mode": "prashna_capture_identity",
             "idempotency_key": request.idempotency_key,
         })
-        material_sha256 = _sha({
-            "question_fingerprint": fingerprint,
-            "place": request.place.model_dump(mode="json"),
-            "rule_profile": request.rule_profile,
-        })
+        material_sha256 = _sha(_capture_request_material(request, fingerprint))
         with _CAPTURE_CONDITION:
             cached = _CAPTURE_CACHE.get(identity)
             if cached is not None:
