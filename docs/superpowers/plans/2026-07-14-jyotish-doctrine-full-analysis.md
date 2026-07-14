@@ -293,4 +293,3 @@
 - Spec coverage: every Linear issue `LEA-516` through `LEA-544` maps to one task and each acceptance family has a named test/gate.
 - Placeholder scan: no deferred code placeholders or fabricated evidence are permitted; real source/reviewer/concierge inputs remain explicit evidence gates.
 - Type consistency: the dependency chain is `SourceRecord -> IngestionArtifact -> SourceFragment -> CompiledProfile -> AnalysisGraph -> StructuredClaim -> AdmissionReport`; all domain packs consume this chain and existing signed fact projections.
-

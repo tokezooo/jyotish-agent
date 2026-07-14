@@ -236,4 +236,3 @@ This design covers all project and issue requirements from `LEA-516` through
 qualified specialist review are evidence inputs, not code. They must remain
 explicitly incomplete until real evidence exists and may not be fabricated by the
 implementation or release audit.
-
