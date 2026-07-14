@@ -497,3 +497,88 @@ def evaluate_muhurta_eligibility(
         soft_signals=tuple(sorted(set(soft_signals))),
         rule_traces=tuple(traces),
     )
+
+
+class MuhurtaNatalFactorsInput(FrozenModel):
+    personalization_requested: bool
+    consent_confirmed: bool
+    source_admitted: bool
+    birth_time_accuracy: Literal["exact", "approximate"]
+    birth_nakshatra_stable: bool
+    birth_moon_sign_stable: bool
+    birth_nakshatra_index: int = Field(ge=0, le=26)
+    candidate_nakshatra_index: int = Field(ge=0, le=26)
+    birth_moon_sign_index: int = Field(ge=0, le=11)
+    candidate_moon_sign_index: int = Field(ge=0, le=11)
+
+
+class MuhurtaNatalFactorsResult(FrozenModel):
+    status: Literal["available", "omitted", "unavailable"]
+    tara_bala: Literal["favorable", "unfavorable"] | None = None
+    candra_bala: Literal["favorable", "unfavorable"] | None = None
+    soft_adjustment: int = Field(ge=-2, le=2)
+    confidence: Literal["exact", "stable_approximate", "unstable", "not_applicable"]
+    source_locators: tuple[str, ...] = ()
+    reason_code: str | None = None
+    can_override_hard_exclusion: Literal[False] = False
+
+
+def evaluate_muhurta_natal_factors(
+    value: MuhurtaNatalFactorsInput,
+) -> MuhurtaNatalFactorsResult:
+    """Calculate opt-in Tara/Candra bala without returning natal coordinates."""
+
+    if not value.personalization_requested:
+        return MuhurtaNatalFactorsResult(
+            status="omitted",
+            soft_adjustment=0,
+            confidence="not_applicable",
+        )
+    if not value.consent_confirmed:
+        return MuhurtaNatalFactorsResult(
+            status="unavailable",
+            soft_adjustment=0,
+            confidence="not_applicable",
+            reason_code="NATAL_CONSENT_REQUIRED",
+        )
+    if not value.source_admitted:
+        return MuhurtaNatalFactorsResult(
+            status="unavailable",
+            soft_adjustment=0,
+            confidence="not_applicable",
+            reason_code="NATAL_RULES_NOT_ADMITTED",
+        )
+    if value.birth_time_accuracy == "approximate" and not (
+        value.birth_nakshatra_stable and value.birth_moon_sign_stable
+    ):
+        return MuhurtaNatalFactorsResult(
+            status="unavailable",
+            soft_adjustment=0,
+            confidence="unstable",
+            reason_code="NATAL_FACTORS_UNSTABLE",
+        )
+
+    tara_position = (
+        (value.candidate_nakshatra_index - value.birth_nakshatra_index) % 9
+    ) + 1
+    candra_position = (
+        (value.candidate_moon_sign_index - value.birth_moon_sign_index) % 12
+    ) + 1
+    tara = "favorable" if tara_position in {2, 4, 6, 8, 9} else "unfavorable"
+    candra = "favorable" if candra_position in {1, 3, 6, 7, 10, 11} else "unfavorable"
+    adjustment = (1 if tara == "favorable" else -1) + (
+        1 if candra == "favorable" else -1
+    )
+    return MuhurtaNatalFactorsResult(
+        status="available",
+        tara_bala=tara,
+        candra_bala=candra,
+        soft_adjustment=adjustment,
+        confidence=(
+            "exact" if value.birth_time_accuracy == "exact" else "stable_approximate"
+        ),
+        source_locators=(
+            "Kalaprakasika, printed pp. 166-168",
+            "Kalaprakasika, printed pp. 207-208",
+        ),
+    )
