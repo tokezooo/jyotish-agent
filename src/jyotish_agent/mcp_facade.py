@@ -544,6 +544,46 @@ class JyotishMcpFacade:
             return PrashnaNeedsInputResult(status="needs_input", **fields)
         return self.prashna(parsed)
 
+    def prashna_full_render_payload(self, value: object) -> dict[str, object]:
+        """Total privacy-safe adapter for the experimental Full Prashna renderer."""
+        try:
+            if not isinstance(value, dict):
+                raise ValueError("invalid payload")
+            from .doctrine.prashna_pack import (
+                PrashnaOutcomeGraph,
+                render_prashna_outcome,
+            )
+
+            language = value.get("language", "en")
+            depth = value.get("depth", "full")
+            include_evidence = value.get("include_evidence", False)
+            if (
+                language not in {"ru", "en"}
+                or depth
+                not in {
+                    "quick",
+                    "full",
+                    "deep",
+                }
+                or not isinstance(include_evidence, bool)
+            ):
+                raise ValueError("invalid render options")
+            graph = PrashnaOutcomeGraph.model_validate(value.get("graph"))
+            report = render_prashna_outcome(
+                graph,
+                language=language,
+                depth=depth,
+                include_evidence=include_evidence,
+            )
+            return report.model_dump(mode="json")
+        except (TypeError, ValueError, ValidationError):
+            return {
+                "status": "unavailable",
+                "error_code": "INPUT_INVALID",
+                "problem": "The Full Prashna render request is invalid.",
+                "next_action": "Submit a validated graph and supported render options.",
+            }
+
     def search_sources(self, value: SourceSearchInput) -> SourceSearchResult:
         results = []
         for item in self.service.search_corpus(value.query, limit=value.limit):

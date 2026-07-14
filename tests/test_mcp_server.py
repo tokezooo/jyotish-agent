@@ -49,9 +49,10 @@ def test_server_metadata_and_tool_contract(tmp_path: Path):
     assert "jaimini is stateless" in SERVER_INSTRUCTIONS
     assert {tool.name for tool in tools} == {
         "get_profile",
-        "calculate",
-        "jaimini",
-        "prashna",
+            "calculate",
+            "jaimini",
+            "jaimini_full",
+            "prashna",
         "muhurta",
         "search_sources",
         "research",

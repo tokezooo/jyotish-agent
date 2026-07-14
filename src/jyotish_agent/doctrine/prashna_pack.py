@@ -934,3 +934,210 @@ def verify_published_case_judgment(
         observed_outcome_matches=case.outcome_traceable,
         product_admissible=case.admissibility == "admitted_safe",
     )
+
+
+class PrashnaRenderedReport(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    status: Literal["completed", "unavailable"]
+    language: Literal["ru", "en"]
+    depth: Literal["quick", "full", "deep"]
+    graph_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    conclusion: str
+    reasoning: tuple[str, ...]
+    uncertainty: str
+    timing: str | None
+    next_clarification: str | None
+    disclosure: Literal["experimental_full"] = "experimental_full"
+    evidence_appendix: tuple[str, ...] | None
+    reason_code: str | None
+
+    @model_validator(mode="after")
+    def _complete_or_empty(self) -> "PrashnaRenderedReport":
+        if self.status == "completed" and (
+            not self.reasoning or self.reason_code is not None
+        ):
+            raise ValueError("completed report requires reasoning and no error")
+        if self.status == "unavailable" and (
+            self.reasoning or self.reason_code is None
+        ):
+            raise ValueError("unavailable report cannot contain reasoning")
+        return self
+
+
+def _prashna_graph_identity_valid(graph: PrashnaOutcomeGraph) -> bool:
+    payload = graph.model_dump(mode="json", exclude={"graph_sha256"})
+    expected = hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
+    return expected == graph.graph_sha256
+
+
+def _safe_evidence_ref(reference: str) -> bool:
+    lowered = reference.casefold()
+    return not (
+        any(marker in lowered for marker in ("private", ".pdf", "token", "secret"))
+        or "/" in reference
+        or "\\" in reference
+        or re.search(r"[<>\r\n]", reference) is not None
+    )
+
+
+def _unavailable_prashna_report(
+    graph: PrashnaOutcomeGraph,
+    *,
+    language: Literal["ru", "en"],
+    depth: Literal["quick", "full", "deep"],
+    reason_code: str,
+) -> PrashnaRenderedReport:
+    return PrashnaRenderedReport(
+        status="unavailable",
+        language=language,
+        depth=depth,
+        graph_sha256=graph.graph_sha256,
+        conclusion=(
+            "Проверяемый вывод сейчас недоступен."
+            if language == "ru"
+            else "A validated conclusion is currently unavailable."
+        ),
+        reasoning=(),
+        uncertainty=(
+            "Исходный граф не прошёл обязательную проверку."
+            if language == "ru"
+            else "The source graph did not pass a required validation gate."
+        ),
+        timing=None,
+        next_clarification=None,
+        evidence_appendix=None,
+        reason_code=reason_code,
+    )
+
+
+def render_prashna_outcome(
+    graph: PrashnaOutcomeGraph,
+    *,
+    language: Literal["ru", "en"],
+    depth: Literal["quick", "full", "deep"],
+    include_evidence: bool,
+) -> PrashnaRenderedReport:
+    """Render only an identity-valid bounded graph; never accept free-form claims."""
+
+    if not _prashna_graph_identity_valid(graph):
+        return _unavailable_prashna_report(
+            graph,
+            language=language,
+            depth=depth,
+            reason_code="GRAPH_IDENTITY_INVALID",
+        )
+    if not graph.outcome_allowed:
+        return _unavailable_prashna_report(
+            graph,
+            language=language,
+            depth=depth,
+            reason_code=graph.reason_codes[0] if graph.reason_codes else "NO_ANSWER",
+        )
+    if any(not _safe_evidence_ref(reference) for reference in graph.source_refs):
+        return _unavailable_prashna_report(
+            graph,
+            language=language,
+            depth=depth,
+            reason_code="EVIDENCE_REFERENCE_UNSAFE",
+        )
+
+    conclusions = {
+        "ru": {
+            "favorable": "Граф указывает на ограниченно благоприятную тенденцию.",
+            "unfavorable": "Граф указывает на ограниченно неблагоприятную тенденцию.",
+            "mixed": "Граф показывает смешанные и противоречивые свидетельства.",
+        },
+        "en": {
+            "favorable": "The graph indicates a bounded favorable tendency.",
+            "unfavorable": "The graph indicates a bounded unfavorable tendency.",
+            "mixed": "The graph contains mixed and conflicting testimony.",
+        },
+    }
+    assistance = sum(item.polarity == "assistance" for item in graph.testimonies)
+    obstacles = sum(item.polarity == "obstacle" for item in graph.testimonies)
+    if language == "ru":
+        reasoning = [
+            f"Пройдено обязательных шлюзов: {len(graph.gates)}.",
+            f"Поддерживающих факторов: {assistance}; препятствий: {obstacles}.",
+        ]
+        if depth == "deep" and graph.conflicts:
+            reasoning.append(f"Явных конфликтов в графе: {len(graph.conflicts)}.")
+        uncertainty = (
+            f"Уверенность ограничена значением {graph.confidence:.2f}; "
+            f"школа: {graph.school}."
+        )
+        next_clarification = "Можно уточнить один уже заданный аспект вопроса."
+    else:
+        reasoning = [
+            f"Required gates passed: {len(graph.gates)}.",
+            f"Assistance factors: {assistance}; obstacle factors: {obstacles}.",
+        ]
+        if depth == "deep" and graph.conflicts:
+            reasoning.append(f"Explicit graph conflicts: {len(graph.conflicts)}.")
+        uncertainty = (
+            f"Confidence is capped at {graph.confidence:.2f}; school: {graph.school}."
+        )
+        next_clarification = "You may clarify one bounded aspect of the same question."
+    if depth == "quick":
+        reasoning = reasoning[:1]
+
+    timing = None
+    if graph.timing_window is not None:
+        window = graph.timing_window
+        timing = (
+            f"Ограниченное окно: {window.minimum}–{window.maximum} {window.unit}."
+            if language == "ru"
+            else f"Bounded window: {window.minimum}–{window.maximum} {window.unit}."
+        )
+    return PrashnaRenderedReport(
+        status="completed",
+        language=language,
+        depth=depth,
+        graph_sha256=graph.graph_sha256,
+        conclusion=conclusions[language][graph.judgment],
+        reasoning=tuple(reasoning),
+        uncertainty=uncertainty,
+        timing=timing,
+        next_clarification=next_clarification,
+        evidence_appendix=graph.source_refs if include_evidence else None,
+        reason_code=None,
+    )
+
+
+class PrashnaClarificationDecision(FrozenModel):
+    action: Literal["reuse_sealed_anchor", "create_new_anchor"]
+    anchor_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    reason_code: Literal["BOUNDED_CLARIFICATION", "MATERIAL_MISMATCH"]
+
+    @model_validator(mode="after")
+    def _anchor_matches_action(self) -> "PrashnaClarificationDecision":
+        if (self.action == "reuse_sealed_anchor") != (self.anchor_sha256 is not None):
+            raise ValueError("only bounded clarification may preserve the anchor")
+        return self
+
+
+def decide_prashna_clarification(
+    *,
+    anchor_sha256: str,
+    original_fingerprint: str,
+    current_fingerprint: str,
+    relation: Literal["bounded_clarification", "material_mismatch"],
+) -> PrashnaClarificationDecision:
+    """Preserve the sealed moment only for an already-proven bounded clarification."""
+
+    if not all(
+        re.fullmatch(r"[0-9a-f]{64}", value)
+        for value in (anchor_sha256, original_fingerprint, current_fingerprint)
+    ):
+        raise ValueError("invalid replay identity")
+    if relation == "bounded_clarification":
+        return PrashnaClarificationDecision(
+            action="reuse_sealed_anchor",
+            anchor_sha256=anchor_sha256,
+            reason_code="BOUNDED_CLARIFICATION",
+        )
+    return PrashnaClarificationDecision(
+        action="create_new_anchor",
+        anchor_sha256=None,
+        reason_code="MATERIAL_MISMATCH",
+    )
