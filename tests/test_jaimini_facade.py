@@ -3,11 +3,12 @@ from __future__ import annotations
 import json
 import datetime as dt
 from dataclasses import dataclass
+from itertools import combinations
 
 import pytest
 
+from jyotish_agent import interpretations, names, signing
 from jyotish_agent import jaimini as domain
-from jyotish_agent import interpretations, signing
 from jyotish_agent.jaimini_models import JaiminiInput
 from jyotish_agent.jaimini_models import ExactJaiminiBirthInput, JaiminiPlace
 from jyotish_agent.timezone_resolution import TimezoneResolutionError
@@ -41,7 +42,7 @@ class Snapshot:
 
 def _snapshot(
     *, lagna: int = 0, d9_lagna: int = 8, tie: bool = False,
-    sunrise_available: bool = True,
+    sunrise_available: bool = True, rahu_degrees: float | None = None,
 ) -> Snapshot:
     d1 = (Position(None, lagna, 10.0),) + tuple(
         Position(index, (index * 2 + 1) % 12, 29.0 - index)
@@ -55,6 +56,13 @@ def _snapshot(
         d1 = tuple(
             Position(item.planet_index, item.sign_index, 29.0)
             if item.planet_index in {0, 1}
+            else item
+            for item in d1
+        )
+    if rahu_degrees is not None:
+        d1 = tuple(
+            Position(item.planet_index, item.sign_index, rahu_degrees)
+            if item.planet_index == 7
             else item
             for item in d1
         )
@@ -137,14 +145,14 @@ def test_domain_facade_returns_bounded_signed_deterministic_facts(monkeypatch):
     )
     relationship_ids = [fact.fact_id for fact in relationship.facts]
     assert relationship_ids == sorted(relationship_ids)
-    assert atoms["jaimini.relationships.node.AK.body"] == "Sun"
-    assert atoms["jaimini.relationships.node.AK.D1.sign"] == "Taurus"
-    assert atoms["jaimini.relationships.node.AK.D9.sign"] == "Gemini"
-    assert "jaimini.relationships.node.AL.D1.sign" in atoms
-    assert "jaimini.relationships.node.AL.D9.sign" in atoms
-    assert "jaimini.relationships.edge.D1.AK_to_AmK.forward_distance" in atoms
-    assert "jaimini.relationships.edge.D9.AL_to_UL.forward_distance" in atoms
-    assert len(relationship.facts) == 33
+    assert atoms["jaimini.relationships.7.node.AK.body"] == "Sun"
+    assert atoms["jaimini.relationships.7.node.AK.D1.sign"] == "Taurus"
+    assert atoms["jaimini.relationships.7.node.AK.D9.sign"] == "Gemini"
+    assert "jaimini.relationships.8.node.AL.D1.sign" in atoms
+    assert "jaimini.relationships.8.node.AL.D9.sign" in atoms
+    assert "jaimini.relationships.7.edge.D1.AK_to_AmK.forward_distance" in atoms
+    assert "jaimini.relationships.8.edge.D9.AL_to_UL.forward_distance" in atoms
+    assert len(relationship.facts) == 66
     cached = signing.get_cached_domain_artifact(first.artifact_token)
     assert cached is not None
     assert signing.verify_domain_artifact(cached)
@@ -160,18 +168,38 @@ def test_approximate_range_marks_changed_geometry_unstable(monkeypatch):
     monkeypatch.setattr(
         domain,
         "capture_birth_snapshots",
-        lambda *_a, **_k: (_snapshot(lagna=0), _snapshot(lagna=0), _snapshot(lagna=1)),
+        lambda *_a, **_k: (
+            _snapshot(lagna=0, rahu_degrees=0.5),
+            _snapshot(lagna=0, rahu_degrees=0.5),
+            _snapshot(lagna=1, rahu_degrees=0.5),
+        ),
     )
     result = domain.JaiminiFacade().calculate(_request(approximate=True))
+    repeated = domain.JaiminiFacade().calculate(_request(approximate=True))
+    assert result == repeated
     assert result.anchor_summary == "approximate birth anchor; 3 samples at 5-minute steps"
     facts = {
         fact.fact_id: fact for section in result.sections for fact in section.facts
     }
     assert facts["jaimini.lagna.sign"].stability == "unstable"
-    assert facts["jaimini.relationships.node.AL.D1.sign"].stability == "unstable"
-    assert facts[
-        "jaimini.relationships.edge.D1.AK_to_AL.forward_distance"
-    ].stability == "unstable"
+    for scheme in (7, 8):
+        assert facts[
+            f"jaimini.relationships.{scheme}.node.AL.D1.sign"
+        ].stability == "unstable"
+        assert facts[
+            f"jaimini.relationships.{scheme}.edge.D1.AK_to_AL.forward_distance"
+        ].stability == "unstable"
+        assert facts[
+            f"jaimini.relationships.{scheme}.node.AK.body"
+        ].stability == "stable"
+    cached = signing.get_cached_domain_artifact(result.artifact_token)
+    assert cached is not None and signing.verify_domain_artifact(cached)
+    signed_atoms = interpretations.iter_jaimini_fact_atoms(cached["facts"])
+    relationship_ids = {
+        fact_id for fact_id in facts if fact_id.startswith("jaimini.relationships.")
+    }
+    assert relationship_ids <= signed_atoms.keys()
+    assert len(json.dumps(result.model_dump(mode="json")).encode()) < 512 * 1024
     assert any(item.code == "BIRTH_TIME_SENSITIVE" for item in result.limitations)
 
 
@@ -197,8 +225,71 @@ def test_include_trace_controls_bounded_rule_inputs(monkeypatch):
     trace = {fact.fact_id: fact.value for fact in shown.trace}
     assert "jaimini.trace.arudha.A1.lord_sign" in trace
     assert "jaimini.trace.argala.AL.2_vs_12.contributors" in trace
-    assert "jaimini.trace.relationships.node.AL.D9.sign_index" in trace
+    assert "jaimini.trace.relationships.7.node.AL.D9.sign_index" in trace
+    assert "jaimini.trace.relationships.8.node.AL.D9.sign_index" in trace
     assert len(shown.trace) <= 256
+
+
+@pytest.fixture
+def divergent_rahu_snapshot() -> Snapshot:
+    return _snapshot(rahu_degrees=0.5)
+
+
+def test_relationship_graph_is_qualified_by_karaka_scheme(
+    monkeypatch, divergent_rahu_snapshot
+):
+    monkeypatch.setattr(
+        domain,
+        "capture_birth_snapshots",
+        lambda *_a, **_k: (divergent_rahu_snapshot,),
+    )
+    first = domain.JaiminiFacade().calculate(_request())
+    second = domain.JaiminiFacade().calculate(_request())
+    assert first == second
+    facts = {
+        fact.fact_id: fact.value for section in first.sections for fact in section.facts
+    }
+    assert facts["jaimini.karakas.7.AK"] == "Sun"
+    assert facts["jaimini.karakas.8.AK"] == "Rahu"
+    assert facts["jaimini.karakas.8.PiK"] == "Mercury"
+    assert facts["jaimini.karakas.7.DK"] == facts["jaimini.karakas.8.DK"] == "Saturn"
+    assert facts["jaimini.relationships.7.node.AK.body"] == "Sun"
+    assert facts["jaimini.relationships.8.node.AK.body"] == "Rahu"
+    assert facts["jaimini.relationships.7.node.AK.D1.sign"] == "Taurus"
+    assert facts["jaimini.relationships.8.node.AK.D1.sign"] == "Cancer"
+    assert facts["jaimini.relationships.7.node.AK.D9.sign"] == "Gemini"
+    assert facts["jaimini.relationships.8.node.AK.D9.sign"] == "Pisces"
+    assert facts[
+        "jaimini.relationships.7.edge.D1.AK_to_AmK.forward_distance"
+    ] == 2
+    assert facts[
+        "jaimini.relationships.8.edge.D1.AK_to_AmK.forward_distance"
+    ] == 10
+    for scheme in (7, 8):
+        for role in ("AK", "AmK", "DK"):
+            assert facts[f"jaimini.relationships.{scheme}.node.{role}.body"] == facts[
+                f"jaimini.karakas.{scheme}.{role}"
+            ]
+        for varga in ("D1", "D9"):
+            for left, right in combinations(("AK", "AmK", "DK", "AL", "UL"), 2):
+                left_sign = names.SIGNS.index(
+                    facts[f"jaimini.relationships.{scheme}.node.{left}.{varga}.sign"]
+                )
+                right_sign = names.SIGNS.index(
+                    facts[f"jaimini.relationships.{scheme}.node.{right}.{varga}.sign"]
+                )
+                assert facts[
+                    f"jaimini.relationships.{scheme}.edge.{varga}."
+                    f"{left}_to_{right}.forward_distance"
+                ] == (right_sign - left_sign) % 12
+    relationship_ids = sorted(
+        fact_id for fact_id in facts if fact_id.startswith("jaimini.relationships.")
+    )
+    cached = signing.get_cached_domain_artifact(first.artifact_token)
+    assert cached is not None and signing.verify_domain_artifact(cached)
+    signed_atoms = interpretations.iter_jaimini_fact_atoms(cached["facts"])
+    assert all(fact_id in signed_atoms for fact_id in relationship_ids)
+    assert len(json.dumps(first.model_dump(mode="json")).encode()) < 512 * 1024
 
 
 def test_missing_sunrise_primitive_and_exact_karaka_tie_are_typed(monkeypatch):

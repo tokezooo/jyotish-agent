@@ -693,58 +693,68 @@ def _facts_for_snapshot(
                 )
             )
 
-    relationship_nodes = {
-        label: {
-            "body": seven.assignments[label],
-            "D1": planets[names.PLANETS.index(seven.assignments[label])][0],
-            "D9": d9_planets[names.PLANETS.index(seven.assignments[label])][0],
-        }
-        for label in ("AK", "AmK", "DK")
-    }
-    relationship_nodes.update(
-        {
-            "AL": {"D1": padas["AL"], "D9": d9_padas["AL"]},
-            "UL": {"D1": padas["UL"], "D9": d9_padas["UL"]},
-        }
-    )
     relationships: list[JaiminiFact] = []
-    for label, placements in relationship_nodes.items():
-        body = placements.get("body")
-        if body is not None:
-            relationships.append(
-                JaiminiFact(
-                    fact_id=f"jaimini.relationships.node.{label}.body", value=body
+    for scheme, assignments in ((7, seven.assignments), (8, eight.assignments)):
+        relationship_nodes = {
+            label: {
+                "body": assignments[label],
+                "D1": planets[names.PLANETS.index(assignments[label])][0],
+                "D9": d9_planets[names.PLANETS.index(assignments[label])][0],
+            }
+            for label in ("AK", "AmK", "DK")
+        }
+        relationship_nodes.update(
+            {
+                "AL": {"D1": padas["AL"], "D9": d9_padas["AL"]},
+                "UL": {"D1": padas["UL"], "D9": d9_padas["UL"]},
+            }
+        )
+        for label, placements in relationship_nodes.items():
+            body = placements.get("body")
+            if body is not None:
+                relationships.append(
+                    JaiminiFact(
+                        fact_id=(
+                            f"jaimini.relationships.{scheme}.node.{label}.body"
+                        ),
+                        value=body,
+                    )
                 )
-            )
+            for varga in ("D1", "D9"):
+                sign = int(placements[varga])
+                relationships.append(
+                    JaiminiFact(
+                        fact_id=(
+                            f"jaimini.relationships.{scheme}.node."
+                            f"{label}.{varga}.sign"
+                        ),
+                        value=names.SIGNS[sign],
+                    )
+                )
+                trace.append(
+                    JaiminiFact(
+                        fact_id=(
+                            f"jaimini.trace.relationships.{scheme}.node."
+                            f"{label}.{varga}.sign_index"
+                        ),
+                        value=sign,
+                    )
+                )
         for varga in ("D1", "D9"):
-            sign = int(placements[varga])
-            relationships.append(
-                JaiminiFact(
-                    fact_id=f"jaimini.relationships.node.{label}.{varga}.sign",
-                    value=names.SIGNS[sign],
+            for left, right in combinations(("AK", "AmK", "DK", "AL", "UL"), 2):
+                distance = (
+                    int(relationship_nodes[right][varga])
+                    - int(relationship_nodes[left][varga])
+                ) % 12
+                relationships.append(
+                    JaiminiFact(
+                        fact_id=(
+                            f"jaimini.relationships.{scheme}.edge.{varga}."
+                            f"{left}_to_{right}.forward_distance"
+                        ),
+                        value=distance,
+                    )
                 )
-            )
-            trace.append(
-                JaiminiFact(
-                    fact_id=f"jaimini.trace.relationships.node.{label}.{varga}.sign_index",
-                    value=sign,
-                )
-            )
-    for varga in ("D1", "D9"):
-        for left, right in combinations(("AK", "AmK", "DK", "AL", "UL"), 2):
-            distance = (
-                int(relationship_nodes[right][varga])
-                - int(relationship_nodes[left][varga])
-            ) % 12
-            relationships.append(
-                JaiminiFact(
-                    fact_id=(
-                        f"jaimini.relationships.edge.{varga}."
-                        f"{left}_to_{right}.forward_distance"
-                    ),
-                    value=distance,
-                )
-            )
 
     sections: list[tuple[str, tuple[JaiminiFact, ...]]] = [
         ("chara_karakas", tuple(karaka_facts)),
