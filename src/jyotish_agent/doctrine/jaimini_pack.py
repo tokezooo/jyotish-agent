@@ -13,8 +13,9 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
-from .models import FrozenModel, ScanQuality
 from ..research_store import canonical_json
+from .graph import AnalysisGraph
+from .models import FrozenModel, ScanQuality
 from .sources import Sha256, SourceId, SourceManifest, SourceVerificationReport
 
 
@@ -225,3 +226,210 @@ class JaiminiRuleInventory(FrozenModel):
             payload["candidates"], key=lambda candidate: candidate["rule_id"]
         )
         return hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
+
+
+class JaiminiTopic(StrEnum):
+    SELF = "self"
+    CAREER = "career"
+    RELATIONSHIPS = "relationships"
+    TIMING = "timing"
+
+
+class JaiminiTopicSignalClass(StrEnum):
+    SUPPORTING = "supporting"
+    CONFLICTING = "conflicting"
+
+
+class JaiminiTopicSignal(FrozenModel):
+    path: str
+    value: str | int | float | bool | None
+    topic: str
+    rule_id: str
+    school: str
+    signal_class: JaiminiTopicSignalClass
+    confidence: float = Field(ge=0.0, le=0.95)
+    time_scope: str
+
+
+class JaiminiTopicAnalysis(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    topic: JaiminiTopic
+    graph_sha256: Sha256
+    available: bool
+    school_ids: tuple[str, ...]
+    activated_rule_ids: tuple[str, ...]
+    signals: tuple[JaiminiTopicSignal, ...]
+    conflicts: tuple[tuple[str, str], ...]
+    suppressed_fact_paths: tuple[str, ...]
+    prohibited_topics: tuple[str, ...]
+    unavailable_reasons: tuple[str, ...]
+
+
+_TOPIC_LABELS: dict[JaiminiTopic, frozenset[str]] = {
+    JaiminiTopic.SELF: frozenset({"self", "dharma", "education", "capability"}),
+    JaiminiTopic.CAREER: frozenset({"career", "status", "activity"}),
+    JaiminiTopic.RELATIONSHIPS: frozenset(
+        {"relationships", "family", "legacy"}
+    ),
+    JaiminiTopic.TIMING: frozenset({"timing"}),
+}
+
+_TIME_SENSITIVE_PREFIXES: dict[JaiminiTopic, tuple[str, ...]] = {
+    JaiminiTopic.SELF: (
+        "jaimini.karakamsa.",
+        "jaimini.svamsa.",
+        "jaimini.arudha.",
+        "jaimini.special_lagnas.",
+    ),
+    JaiminiTopic.CAREER: (
+        "jaimini.arudha.",
+        "jaimini.argala.",
+        "jaimini.rasi_drishti.",
+    ),
+    JaiminiTopic.RELATIONSHIPS: (
+        "jaimini.relationships.",
+        "jaimini.arudha.",
+        "jaimini.argala.",
+        "jaimini.rasi_drishti.",
+    ),
+    JaiminiTopic.TIMING: (
+        "jaimini.chara_dasha.",
+        "jaimini.chara_antardasha.",
+    ),
+}
+
+
+def analyze_jaimini_topic(
+    graph: AnalysisGraph,
+    topic: JaiminiTopic,
+    *,
+    birth_time_confidence: Literal["exact", "approximate"] = "exact",
+) -> JaiminiTopicAnalysis:
+    """Project a source-bound graph into a bounded Jaimini topic result."""
+
+    labels = _TOPIC_LABELS[topic]
+    topic_nodes = tuple(node for node in graph.topic_nodes if node.topic in labels)
+    active_rules = {node.rule_id for node in topic_nodes}
+    conflict_pairs = {
+        tuple(sorted((node.left_rule_id, node.right_rule_id)))
+        for node in graph.conflict_nodes
+        if node.left_rule_id in active_rules and node.right_rule_id in active_rules
+    }
+    conflicting_rules = {rule_id for pair in conflict_pairs for rule_id in pair}
+    fact_by_id = {node.node_id: node for node in graph.fact_nodes}
+    signals: list[JaiminiTopicSignal] = []
+    suppressed: set[str] = set()
+    time_sensitive = _TIME_SENSITIVE_PREFIXES[topic]
+
+    for node in sorted(topic_nodes, key=lambda item: item.rule_id):
+        fact_ids = sorted(
+            edge.target_id
+            for edge in graph.edges
+            if edge.source_id == node.node_id and edge.relation == "supported_by_fact"
+        )
+        for fact_id in fact_ids:
+            fact = fact_by_id.get(fact_id)
+            if fact is None:
+                continue
+            if birth_time_confidence == "approximate" and fact.path.startswith(
+                time_sensitive
+            ):
+                suppressed.add(fact.path)
+                continue
+            signals.append(
+                JaiminiTopicSignal(
+                    path=fact.path,
+                    value=fact.value,
+                    topic=node.topic,
+                    rule_id=node.rule_id,
+                    school=node.school,
+                    signal_class=(
+                        JaiminiTopicSignalClass.CONFLICTING
+                        if node.rule_id in conflicting_rules
+                        else JaiminiTopicSignalClass.SUPPORTING
+                    ),
+                    confidence=node.confidence,
+                    time_scope=node.time_scope,
+                )
+            )
+
+    reasons: list[str] = []
+    if not topic_nodes:
+        reasons.append("NO_ADMITTED_TOPIC_RULES")
+    if birth_time_confidence == "approximate" and suppressed:
+        reasons.append("BIRTH_TIME_APPROXIMATE")
+    if topic_nodes and not signals:
+        reasons.append("NO_STABLE_TOPIC_SIGNALS")
+
+    return JaiminiTopicAnalysis(
+        topic=topic,
+        graph_sha256=graph.graph_sha256,
+        available=bool(topic_nodes and signals),
+        school_ids=tuple(sorted({node.school for node in topic_nodes})),
+        activated_rule_ids=tuple(sorted(active_rules)),
+        signals=tuple(
+            sorted(signals, key=lambda item: (item.topic, item.rule_id, item.path))
+        ),
+        conflicts=tuple(sorted(conflict_pairs)),
+        suppressed_fact_paths=tuple(sorted(suppressed)),
+        prohibited_topics=tuple(
+            sorted(node.topic for node in graph.prohibition_nodes)
+        ),
+        unavailable_reasons=tuple(reasons),
+    )
+
+
+def render_jaimini_topic_report(
+    analysis: JaiminiTopicAnalysis,
+    *,
+    locale: Literal["ru", "en"],
+) -> str:
+    """Render only bounded graph-derived topic signals in Russian or English."""
+
+    titles = {
+        "en": {
+            JaiminiTopic.SELF: "Jaimini: self and capabilities",
+            JaiminiTopic.CAREER: "Jaimini career",
+            JaiminiTopic.RELATIONSHIPS: "Jaimini relationships",
+            JaiminiTopic.TIMING: "Jaimini timing",
+        },
+        "ru": {
+            JaiminiTopic.SELF: "Jaimini: личность и способности",
+            JaiminiTopic.CAREER: "Jaimini: карьера",
+            JaiminiTopic.RELATIONSHIPS: "Jaimini: отношения",
+            JaiminiTopic.TIMING: "Jaimini: периоды",
+        },
+    }
+    lines = [f"## {titles[locale][analysis.topic]} — experimental_full"]
+    if locale == "en":
+        lines.append(f"Status: {'available' if analysis.available else 'unavailable'}")
+        signal_phrase = "Source-bound symbolic signal"
+        conflict_label = "Conflicting admitted rules"
+        disclaimer = (
+            "This is a symbolic, source-bound interpretation, not a guaranteed event forecast."
+        )
+    else:
+        lines.append(f"Статус: {'доступно' if analysis.available else 'недоступно'}")
+        signal_phrase = "Подтверждённый источником символический сигнал"
+        conflict_label = "Конфликтующие допущенные правила"
+        disclaimer = (
+            "Это символическая интерпретация с опорой на источники, а не гарантированный прогноз события."
+        )
+
+    if analysis.school_ids:
+        lines.append("School: " + ", ".join(analysis.school_ids))
+    for signal in analysis.signals:
+        lines.append(
+            f"- {signal.topic}: {signal_phrase} "
+            f"[{signal.school}; {signal.time_scope}; {signal.signal_class.value}; "
+            f"confidence <= {signal.confidence:.2f}]"
+        )
+    if analysis.conflicts:
+        lines.append(
+            f"{conflict_label}: "
+            + "; ".join(f"{left} <> {right}" for left, right in analysis.conflicts)
+        )
+    if analysis.unavailable_reasons:
+        lines.append("Limitations: " + ", ".join(analysis.unavailable_reasons))
+    lines.append(disclaimer)
+    return "\n".join(lines) + "\n"
