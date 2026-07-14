@@ -129,8 +129,10 @@ def test_complete_answer_submission_requires_every_binding_and_all_visible_text(
     omitted.pop("anchor_token")
     assert interpretations.validate_prashna_answer(omitted) == ["INVALID_ANSWER_SUBMISSION"]
 
-    predictive_empty = _submission(first, [], "Project Alpha will definitely succeed.")
-    assert interpretations.validate_prashna_answer(predictive_empty) == ["UNSUPPORTED_VISIBLE_TEXT"]
+    predictive_empty = valid.model_dump(mode="json")
+    predictive_empty["claims"] = []
+    predictive_empty["visible_text"] = "Project Alpha will definitely succeed."
+    assert interpretations.validate_prashna_answer(predictive_empty) == ["INVALID_ANSWER_SUBMISSION"]
 
     duplicate = _submission(first, [claim, claim], claim["text"] + "\n" + claim["text"])
     assert interpretations.validate_prashna_answer(duplicate) == ["DUPLICATE_CLAIM:prashna.topic.primary_house"]

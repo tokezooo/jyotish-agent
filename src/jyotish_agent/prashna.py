@@ -152,19 +152,29 @@ def _prashna_config_sha256() -> str:
     })
 
 
-@dataclass(frozen=True)
+@dataclass
 class _CaptureRecord:
     material_sha256: str
     anchor_data: dict
     anchor_token: str
+    rule_profile_sha256: str
+    config_sha256: str
+    normalized_anchor_sha256: str
+    result: PrashnaCompletedResult | None = None
+    in_flight: bool = True
 
 
 _CAPTURE_CACHE: "OrderedDict[str, _CaptureRecord]" = OrderedDict()
 _CAPTURE_CACHE_MAX = 256
 _CAPTURE_LOCK = threading.Lock()
+_CAPTURE_CONDITION = threading.Condition(_CAPTURE_LOCK)
 
 
 class _IdempotencyConflict(ValueError):
+    pass
+
+
+class _CaptureAnchorStale(ValueError):
     pass
 
 
@@ -227,7 +237,7 @@ class PrashnaFacade:
         *,
         fingerprint: str,
         route: TopicRoute,
-    ) -> tuple[EventAnchor, str]:
+    ) -> tuple[EventAnchor, str, str, PrashnaCompletedResult | None]:
         assert request.place is not None and request.idempotency_key is not None
         identity = sign_facts({
             "mode": "prashna_capture_identity",
@@ -238,26 +248,38 @@ class PrashnaFacade:
             "place": request.place.model_dump(mode="json"),
             "rule_profile": request.rule_profile,
         })
-        with _CAPTURE_LOCK:
+        with _CAPTURE_CONDITION:
             cached = _CAPTURE_CACHE.get(identity)
             if cached is not None:
                 if cached.material_sha256 != material_sha256:
                     raise _IdempotencyConflict
                 _CAPTURE_CACHE.move_to_end(identity)
-                resealed = self._seal_anchor(
-                    cached.anchor_data,
-                    fingerprint=fingerprint,
-                    normalized_question=_normalized_question(request.question),
-                    route=route,
-                    rule_profile=request.rule_profile,
-                )
+                self._verify_cached_capture(cached)
+                while cached.in_flight:
+                    _CAPTURE_CONDITION.wait()
+                    self._verify_cached_capture(cached)
+                if cached.result is not None:
+                    anchor = EventAnchor(
+                        asked_at=cached.anchor_data["asked_at"],
+                        place=cached.anchor_data["place"],
+                        time_confidence=cached.anchor_data["time_confidence"],
+                    )
+                    return (
+                        anchor,
+                        cached.anchor_token,
+                        identity,
+                        cached.result.model_copy(deep=True),
+                    )
+                cached.in_flight = True
                 return (
                     EventAnchor(
                         asked_at=cached.anchor_data["asked_at"],
                         place=cached.anchor_data["place"],
                         time_confidence=cached.anchor_data["time_confidence"],
                     ),
-                    resealed["artifact_token"],
+                    cached.anchor_token,
+                    identity,
+                    None,
                 )
             anchor = self._capture(request.place)
             anchor_data = _anchor_payload(anchor)
@@ -268,12 +290,66 @@ class PrashnaFacade:
                 route=route,
                 rule_profile=request.rule_profile,
             )
-            record = _CaptureRecord(material_sha256, anchor_data, sealed["artifact_token"])
+            record = _CaptureRecord(
+                material_sha256=material_sha256,
+                anchor_data=anchor_data,
+                anchor_token=sealed["artifact_token"],
+                rule_profile_sha256=sealed["rule_profile_sha256"],
+                config_sha256=sealed["config_sha256"],
+                normalized_anchor_sha256=sealed["normalized_anchor_sha256"],
+            )
             _CAPTURE_CACHE[identity] = record
             _CAPTURE_CACHE.move_to_end(identity)
             while len(_CAPTURE_CACHE) > _CAPTURE_CACHE_MAX:
-                _CAPTURE_CACHE.popitem(last=False)
-            return anchor, record.anchor_token
+                removable = next(
+                    (key for key, item in _CAPTURE_CACHE.items() if not item.in_flight),
+                    None,
+                )
+                if removable is None:
+                    break
+                del _CAPTURE_CACHE[removable]
+            return anchor, record.anchor_token, identity, None
+
+    @staticmethod
+    def _verify_cached_capture(cached: _CaptureRecord) -> None:
+        try:
+            anchor = EventAnchor(
+                asked_at=cached.anchor_data["asked_at"],
+                place=cached.anchor_data["place"],
+                time_confidence=cached.anchor_data["time_confidence"],
+            )
+            replayed = _anchor_payload(anchor)
+        except ValidationError as exc:
+            raise _CaptureAnchorStale from exc
+        artifact = get_cached_domain_artifact(cached.anchor_token)
+        if (
+            cached.rule_profile_sha256 != prashna_rule_profile_sha256()
+            or cached.config_sha256 != _prashna_config_sha256()
+            or cached.normalized_anchor_sha256 != _sha(replayed)
+            or cached.anchor_data != replayed
+            or artifact is None
+            or not verify_domain_artifact(artifact)
+            or artifact.get("mode") != "prashna_anchor"
+            or artifact.get("artifact_token") != cached.anchor_token
+            or artifact.get("rule_profile_sha256") != cached.rule_profile_sha256
+            or artifact.get("config_sha256") != cached.config_sha256
+            or artifact.get("normalized_anchor_sha256") != cached.normalized_anchor_sha256
+        ):
+            raise _CaptureAnchorStale
+
+    @staticmethod
+    def _finish_capture(
+        identity: str | None,
+        result: PrashnaCompletedResult | None,
+    ) -> None:
+        if identity is None:
+            return
+        with _CAPTURE_CONDITION:
+            cached = _CAPTURE_CACHE.get(identity)
+            if cached is not None:
+                cached.result = result.model_copy(deep=True) if result is not None else None
+                cached.in_flight = False
+            _CAPTURE_CONDITION.notify_all()
 
     @staticmethod
     def _seal_anchor(
@@ -335,6 +411,8 @@ class PrashnaFacade:
 
     def calculate(self, request: PrashnaRequest) -> PrashnaResult:
         current_fingerprint = question_fingerprint(request.question)
+        capture_identity: str | None = None
+        cached_result: PrashnaCompletedResult | None = None
         try:
             profile = load_prashna_rule_profile()
             route = route_prashna_topic(request.question, profile)
@@ -408,9 +486,11 @@ class PrashnaFacade:
                     )
                     anchor_token = sealed["artifact_token"]
                 else:
-                    anchor, anchor_token = self._capture_idempotently(
+                    anchor, anchor_token, capture_identity, cached_result = self._capture_idempotently(
                         request, fingerprint=current_fingerprint, route=route
                     )
+                    if cached_result is not None:
+                        return cached_result
             except _IdempotencyConflict:
                 return PrashnaNeedsInputResult(
                     status="needs_input",
@@ -420,6 +500,8 @@ class PrashnaFacade:
                         stage="anchor_capture",
                     ),
                 )
+            except _CaptureAnchorStale:
+                return self._stale(current_fingerprint)
             anchor_data = _anchor_payload(anchor)
             fingerprint = current_fingerprint
             relation = "new_anchor"
@@ -429,8 +511,9 @@ class PrashnaFacade:
         request_id = _request_id(fingerprint, anchor_hash)
         if route.status != "supported":
             return self._rescue(route, request_id)
+        completed: PrashnaCompletedResult | None = None
         try:
-            return self._calculate_supported(
+            completed = self._calculate_supported(
                 request=request,
                 anchor=anchor,
                 anchor_data=anchor_data,
@@ -461,6 +544,9 @@ class PrashnaFacade:
                     stage="governance",
                 ),
             )
+        finally:
+            self._finish_capture(capture_identity, completed)
+        return completed
 
     def _calculate_supported(
         self,

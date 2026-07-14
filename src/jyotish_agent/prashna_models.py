@@ -181,5 +181,5 @@ class PrashnaAnswerSubmission(_Strict):
     question_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
     current_question_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
     question_relation: Literal["new_anchor", "exact_duplicate", "bounded_clarification"]
-    claims: tuple[PrashnaAnswerClaim, ...] = Field(max_length=100)
+    claims: tuple[PrashnaAnswerClaim, ...] = Field(min_length=1, max_length=100)
     visible_text: str = Field(max_length=100_000)

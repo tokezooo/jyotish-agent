@@ -60,7 +60,14 @@ def test_checker_rejects_mixed_anchor_fingerprint_and_duplicate_atoms():
         normalized_anchor_sha256=result.normalized_anchor_sha256,
         question_fingerprint=result.question_fingerprint,
         current_question_fingerprint=result.current_question_fingerprint,
-        question_relation=result.question_relation, claims=(), visible_text="",
+        question_relation=result.question_relation,
+        claims=({
+            "claim_type": "computed_fact",
+            "path": "prashna.topic.primary_house",
+            "value": "10",
+            "text": "prashna.topic.primary_house = 10",
+        },),
+        visible_text="prashna.topic.primary_house = 10",
     )
     assert interpretations.validate_prashna_answer(
         submission.model_copy(update={"normalized_anchor_sha256": "0" * 64})
