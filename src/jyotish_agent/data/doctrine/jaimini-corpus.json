@@ -36,7 +36,7 @@
       "source_ids": [],
       "topics": [],
       "worked_chart_count": 0,
-      "acquisition_blocker": "The specified 2025 K. Guru Rajesh English translation must be lawfully purchased or supplied as local bytes."
+      "acquisition_blocker": "The supplied similarly named file is byte-identical to the existing 1943 Vimala commentary, not the specified 2025 K. Guru Rajesh English translation; an official procurement reference is recorded but licensed translation bytes are still required."
     },
     {
       "requirement": "independent_translation",
@@ -50,28 +50,28 @@
       "source_ids": [],
       "topics": [],
       "worked_chart_count": 0,
-      "acquisition_blocker": "A licensed practical Chara Dasha work has not been supplied."
+      "acquisition_blocker": "Official procurement references for practical Chara Dasha works were supplied, but no licensed book bytes were included."
     },
     {
       "requirement": "published_worked_charts",
       "source_ids": [],
       "topics": [],
       "worked_chart_count": 0,
-      "acquisition_blocker": "Twenty traceable published worked charts with exact page anchors are still required."
+      "acquisition_blocker": "Twenty traceable natal chart candidates were supplied, but they contain no published Jaimini worked interpretations, exact book-page anchors, or independent expected outcomes."
     },
     {
       "requirement": "sanjay_rath_overlay",
       "source_ids": [],
       "topics": [],
       "worked_chart_count": 0,
-      "acquisition_blocker": "Sanjay Rath's licensed Upadesa Sutra or course-book bytes have not been supplied."
+      "acquisition_blocker": "Official Sanjay Rath and bookseller references were supplied, but licensed Upadesa Sutra or Narayana Dasa bytes were not included."
     },
     {
       "requirement": "kn_rao_overlay",
       "source_ids": [],
       "topics": [],
       "worked_chart_count": 0,
-      "acquisition_blocker": "A selected licensed K. N. Rao practical Jaimini source has not been supplied."
+      "acquisition_blocker": "An official bookseller reference for K. N. Rao's practical Chara Dasha work was supplied, but licensed source bytes were not included."
     }
   ]
 }

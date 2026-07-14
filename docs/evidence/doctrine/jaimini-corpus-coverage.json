@@ -1,7 +1,10 @@
 {
   "schema_version": "1.0",
-  "manifest_sha256": "f7da1f4badda556e5cd772f0687a05936d1d522eb779dcf88f16a07ef4c9603e",
+  "manifest_sha256": "56c46d90e671cb6db8652a182b977eb36b7514f26f543c79254c256e129c44aa",
   "verified_source_ids": [
+    "jaimini_astro_databank_20_chart_candidates_2026",
+    "jaimini_jyotish_pradipika_chapter1_medavarapu_2016",
+    "jaimini_jyotish_pradipika_corrections_medavarapu_2016",
     "jaimini_sutras_b_suryanarain_rao_1949",
     "jaimini_sutras_vimala_achyutananda_jha_1943"
   ],
@@ -34,11 +37,11 @@
   "verified_worked_chart_count": 0,
   "missing_worked_chart_count": 20,
   "acquisition_blockers": [
-    "kn_rao_overlay: A selected licensed K. N. Rao practical Jaimini source has not been supplied.",
-    "nilakantha_subodhini_translation: The specified 2025 K. Guru Rajesh English translation must be lawfully purchased or supplied as local bytes.",
-    "practical_chara_dasha: A licensed practical Chara Dasha work has not been supplied.",
-    "published_worked_charts: Twenty traceable published worked charts with exact page anchors are still required.",
-    "sanjay_rath_overlay: Sanjay Rath's licensed Upadesa Sutra or course-book bytes have not been supplied."
+    "kn_rao_overlay: An official bookseller reference for K. N. Rao's practical Chara Dasha work was supplied, but licensed source bytes were not included.",
+    "nilakantha_subodhini_translation: The supplied similarly named file is byte-identical to the existing 1943 Vimala commentary, not the specified 2025 K. Guru Rajesh English translation; an official procurement reference is recorded but licensed translation bytes are still required.",
+    "practical_chara_dasha: Official procurement references for practical Chara Dasha works were supplied, but no licensed book bytes were included.",
+    "published_worked_charts: Twenty traceable natal chart candidates were supplied, but they contain no published Jaimini worked interpretations, exact book-page anchors, or independent expected outcomes.",
+    "sanjay_rath_overlay: Official Sanjay Rath and bookseller references were supplied, but licensed Upadesa Sutra or Narayana Dasa bytes were not included."
   ],
   "ready": false
 }

@@ -5,17 +5,28 @@
     {
       "domain": "jaimini",
       "release_id": "full_jaimini_v1",
-      "evidence_sha256": "095617c625fa92e4fcaaf0ee6a049d7597b7685093b7ec82f668f23b8991c330",
+      "evidence_sha256": "24d98e40aa2bd35460684723e236d3d9748e44b44000c2c4dc4b1468bdd31188",
       "admission_state": "blocked_sources",
       "available": false,
-      "gate_statuses": {"rule_fixtures": "passed", "hand_worked_cases": "missing", "school_conflict_cases": "passed", "metamorphic_tests": "passed", "held_out_cases": "missing", "conversational_e2e_ru": "passed", "conversational_e2e_en": "passed", "privacy_adversarial": "passed", "payload_performance": "passed", "deep_conversational_e2e": "missing"},
+      "gate_statuses": {
+        "rule_fixtures": "passed",
+        "hand_worked_cases": "missing",
+        "school_conflict_cases": "passed",
+        "metamorphic_tests": "passed",
+        "held_out_cases": "missing",
+        "conversational_e2e_ru": "passed",
+        "conversational_e2e_en": "passed",
+        "privacy_adversarial": "passed",
+        "payload_performance": "passed",
+        "deep_conversational_e2e": "missing"
+      },
       "blockers": [
         "compiled_profile: no source-admitted production profile exists",
-        "nilakantha_subodhini_translation: licensed local bytes missing",
-        "practical_chara_dasha: licensed local source missing",
-        "published_worked_charts: 20 traceable cases missing",
-        "sanjay_rath_overlay: licensed local bytes missing",
-        "kn_rao_overlay: selected licensed local source missing",
+        "nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
+        "practical_chara_dasha: procurement references captured, but licensed source bytes remain missing",
+        "published_worked_charts: 20 traceable natal candidates imported, but zero published worked interpretations or independent expected outcomes",
+        "sanjay_rath_overlay: official procurement references captured, but licensed source bytes remain missing",
+        "kn_rao_overlay: official procurement reference captured, but licensed source bytes remain missing",
         "specialist_review: no production rule/profile review"
       ]
     },
@@ -25,7 +36,18 @@
       "evidence_sha256": "4650bb728752375cb7171d64f3c559286495c07ac1d95d4db5f70fece531a117",
       "admission_state": "blocked_sources",
       "available": false,
-      "gate_statuses": {"source_manifest": "passed", "radicality_and_anchor_suite": "passed", "taxonomy_ru_en": "passed", "geometry_property_suite": "passed", "outcome_graph_and_privacy": "passed", "tajika_source_admission": "failed", "published_outcome_cases": "missing", "held_out_questions": "missing", "concierge_future_outcomes": "missing", "specialist_review": "missing"},
+      "gate_statuses": {
+        "source_manifest": "passed",
+        "radicality_and_anchor_suite": "passed",
+        "taxonomy_ru_en": "passed",
+        "geometry_property_suite": "passed",
+        "outcome_graph_and_privacy": "passed",
+        "tajika_source_admission": "failed",
+        "published_outcome_cases": "missing",
+        "held_out_questions": "missing",
+        "concierge_future_outcomes": "missing",
+        "specialist_review": "missing"
+      },
       "blockers": [
         "published_outcome_cases: one additional complete traceable case is required",
         "tajika_source_admission: OCR, translation, and specialist review are incomplete",
@@ -39,7 +61,18 @@
       "evidence_sha256": "460f521312e83a5b19e1e277fb010bdff5be8cd525579b1c372d9956c9ed275d",
       "admission_state": "blocked_evaluation",
       "available": false,
-      "gate_statuses": {"source_manifest": "passed", "profile_identity": "passed", "private_baseline_profile": "passed", "profile_rule_fixture_suite": "passed", "private_runtime_e2e": "passed", "independent_held_out_evaluation": "missing", "modern_overlay": "optional_missing", "specialist_review": "missing", "cross_domain_concierge_sessions": "missing", "whole_project_independent_review": "passed"},
+      "gate_statuses": {
+        "source_manifest": "passed",
+        "profile_identity": "passed",
+        "private_baseline_profile": "passed",
+        "profile_rule_fixture_suite": "passed",
+        "private_runtime_e2e": "passed",
+        "independent_held_out_evaluation": "missing",
+        "modern_overlay": "optional_missing",
+        "specialist_review": "missing",
+        "cross_domain_concierge_sessions": "missing",
+        "whole_project_independent_review": "passed"
+      },
       "blockers": [
         "independent_held_out_evaluation: no independently designed outcome corpus and evaluator result exists",
         "specialist_review: external rule-pack review is missing",
@@ -49,22 +82,47 @@
     }
   ],
   "verification": {
-    "review_remediation_suite": {"command": "uv run pytest -q tests/doctrine/test_lea_526_jaimini_career.py tests/doctrine/test_lea_527_jaimini_relationships.py tests/doctrine/test_lea_536_prashna_renderer.py tests/doctrine/test_lea_530_jaimini_release.py tests/doctrine/test_lea_537_prashna_release.py tests/doctrine/test_lea_544_muhurta_release.py", "status": "passed", "passed": 40, "failed": 0},
-    "full_python_suite": {"command": "uv run pytest -q", "status": "passed", "passed": 791, "failed": 0, "skipped": 2},
-    "ruff": {"command": "uv run ruff check src tests", "status": "passed"},
-    "typescript": {"command": "bun run typecheck", "status": "passed"},
-    "bun_tests": {"command": "bun test", "status": "passed", "passed": 58, "failed": 0}
+    "review_remediation_suite": {
+      "command": "uv run pytest -q tests/doctrine/test_lea_526_jaimini_career.py tests/doctrine/test_lea_527_jaimini_relationships.py tests/doctrine/test_lea_536_prashna_renderer.py tests/doctrine/test_lea_530_jaimini_release.py tests/doctrine/test_lea_537_prashna_release.py tests/doctrine/test_lea_544_muhurta_release.py",
+      "status": "passed",
+      "passed": 40,
+      "failed": 0
+    },
+    "full_python_suite": {
+      "command": "uv run pytest -q",
+      "status": "passed",
+      "passed": 793,
+      "failed": 0,
+      "skipped": 2
+    },
+    "ruff": {
+      "command": "uv run ruff check src tests",
+      "status": "passed"
+    },
+    "typescript": {
+      "command": "bun run typecheck",
+      "status": "passed"
+    },
+    "bun_tests": {
+      "command": "bun test",
+      "status": "passed",
+      "passed": 58,
+      "failed": 0
+    }
   },
-  "private_source_scan": {"status": "passed", "tracked_private_source_count": 0},
+  "private_source_scan": {
+    "status": "passed",
+    "tracked_private_source_count": 0
+  },
   "all_domains_available": false,
   "public_release_ready": false,
   "blockers": [
     "jaimini: compiled_profile: no source-admitted production profile exists",
-    "jaimini: nilakantha_subodhini_translation: licensed local bytes missing",
-    "jaimini: practical_chara_dasha: licensed local source missing",
-    "jaimini: published_worked_charts: 20 traceable cases missing",
-    "jaimini: sanjay_rath_overlay: licensed local bytes missing",
-    "jaimini: kn_rao_overlay: selected licensed local source missing",
+    "jaimini: nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
+    "jaimini: practical_chara_dasha: procurement references captured, but licensed source bytes remain missing",
+    "jaimini: published_worked_charts: 20 traceable natal candidates imported, but zero published worked interpretations or independent expected outcomes",
+    "jaimini: sanjay_rath_overlay: official procurement references captured, but licensed source bytes remain missing",
+    "jaimini: kn_rao_overlay: official procurement reference captured, but licensed source bytes remain missing",
     "jaimini: specialist_review: no production rule/profile review",
     "prashna: published_outcome_cases: one additional complete traceable case is required",
     "prashna: tajika_source_admission: OCR, translation, and specialist review are incomplete",
@@ -75,5 +133,5 @@
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "ad1e9fca1e069e8cd9e1f9134e214c21af7f5b049df87fcb8d961b9eadb3e1c1"
+  "audit_sha256": "0f5c768ded63b39e06ef8972edfb7af3a5ee0326f17bc5466ab847f4cd6092a6"
 }

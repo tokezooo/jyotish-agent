@@ -104,8 +104,7 @@ def test_hash_mismatch_and_low_quality_are_explicit_and_page_offsets_are_tested(
 
     assert report.verified_source_ids == ()
     assert set(report.unverified_source_ids) == {
-        "jaimini_sutras_b_suryanarain_rao_1949",
-        "jaimini_sutras_vimala_achyutananda_jha_1943",
+        source.source_id for source in manifest.sources
     }
     assert report.low_quality_source_ids == ("jaimini_sutras_b_suryanarain_rao_1949",)
     by_id = {source.source_id: source for source in manifest.sources}

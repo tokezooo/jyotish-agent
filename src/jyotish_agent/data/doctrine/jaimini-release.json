@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "release_id": "full_jaimini_v1",
-  "corpus_manifest_sha256": "f7da1f4badda556e5cd772f0687a05936d1d522eb779dcf88f16a07ef4c9603e",
+  "corpus_manifest_sha256": "56c46d90e671cb6db8652a182b977eb36b7514f26f543c79254c256e129c44aa",
   "rule_inventory_sha256": "e52d07b2849ad054f6612d6215a5e886c699c6d785f9996af97a5ee409ff8496",
   "compiled_profile_sha256": null,
   "admission_state": "blocked_sources",
@@ -59,11 +59,11 @@
   ],
   "blockers": [
     "compiled_profile: no source-admitted production profile exists",
-    "nilakantha_subodhini_translation: licensed local bytes missing",
-    "practical_chara_dasha: licensed local source missing",
-    "published_worked_charts: 20 traceable cases missing",
-    "sanjay_rath_overlay: licensed local bytes missing",
-    "kn_rao_overlay: selected licensed local source missing",
+    "nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
+    "practical_chara_dasha: procurement references captured, but licensed source bytes remain missing",
+    "published_worked_charts: 20 traceable natal candidates imported, but zero published worked interpretations or independent expected outcomes",
+    "sanjay_rath_overlay: official procurement references captured, but licensed source bytes remain missing",
+    "kn_rao_overlay: official procurement reference captured, but licensed source bytes remain missing",
     "specialist_review: no production rule/profile review"
   ],
   "external_review_missing": true,
