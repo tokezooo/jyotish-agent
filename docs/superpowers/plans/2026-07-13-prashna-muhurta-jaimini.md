@@ -2,8 +2,8 @@
 
 # Plan: Praśna, Muhūrta, and Jaimini Analysis
 
-**Status:** reviewed implementation plan; Alternative B approved  
-**Repository baseline:** `origin/main` at `916185a`  
+**Status:** reviewed implementation plan; Alternative B approved
+**Repository baseline:** `origin/main` at `916185a`
 **Product posture:** local-only, deterministic calculation first, governed interpretation second
 
 ## Outcome
