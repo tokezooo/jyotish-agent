@@ -5,6 +5,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 from typing import Annotated, Literal
+from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, RootModel, computed_field, field_validator, model_validator
 
@@ -63,7 +64,10 @@ class MuhurtaSearchRequest(_Strict):
     activity: str = Field(min_length=1, max_length=80)
     place: EventPlace
     start: dt.datetime
-    end: dt.datetime
+    end: dt.datetime | None = Field(
+        default=None,
+        description="Optional exclusive end; omitted derives seven local civil days from start",
+    )
     start_fold: Literal[0, 1] | None = None
     end_fold: Literal[0, 1] | None = None
     duration_minutes: int = Field(ge=15, le=8 * 60)
@@ -91,6 +95,17 @@ class MuhurtaSearchRequest(_Strict):
 
     @model_validator(mode="after")
     def range_and_zone(self) -> "MuhurtaSearchRequest":
+        if self.end is None:
+            target_civil = self.start.replace(tzinfo=None) + dt.timedelta(days=7)
+            try:
+                derived = resolve_iana(
+                    target_civil, mode="iana", zone_id=self.place.zone_id,
+                    fold=self.end_fold, asserted_offset_hours=None, longitude=self.place.longitude,
+                )
+            except TimezoneResolutionError as exc:
+                raise ValueError(exc.error_code) from exc
+            object.__setattr__(self, "end", derived.utc_instant.astimezone(ZoneInfo(self.place.zone_id)))
+        assert self.end is not None
         if self.start.tzinfo is None or self.end.tzinfo is None or self.start.utcoffset() is None or self.end.utcoffset() is None:
             raise ValueError("search range must be timezone aware")
         if self.place.fold is not None:
@@ -128,6 +143,7 @@ class MuhurtaSearchRequest(_Strict):
         )
 
     def resolved_end(self):
+        assert self.end is not None
         return resolve_iana(
             self.end.replace(tzinfo=None), mode="iana", zone_id=self.place.zone_id,
             fold=self.end_fold, asserted_offset_hours=None, longitude=self.place.longitude,
@@ -172,7 +188,7 @@ class MuhurtaNearMiss(_Frozen):
 class MuhurtaTruncation(_Frozen):
     truncated: bool
     total_count: int = Field(ge=0)
-    returned_count: int = Field(ge=0, le=20)
+    returned_count: int = Field(ge=0, le=100)
 
     @model_validator(mode="after")
     def consistent(self) -> "MuhurtaTruncation":
@@ -229,6 +245,7 @@ class MuhurtaCompletedResult(_BaseResult):
     artifact_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     artifact_token: str = Field(pattern=r"^[0-9a-f]{64}$")
     trace: tuple[MuhurtaRuleTrace, ...] | None = Field(default=None, max_length=100)
+    trace_truncation: MuhurtaTruncation | None = None
 
 
 class _Rescue(_BaseResult):

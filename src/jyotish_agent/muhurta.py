@@ -139,7 +139,7 @@ class MuhurtaFacade:
         if _deadline_expired(request, self._clock):
             return incomplete("SEARCH_DEADLINE_EXCEEDED", "boundary_collection")
         try:
-            load_muhurta_rule_profile()
+            rule_profile = load_muhurta_rule_profile()
             source_map = load_muhurta_source_map()
             source_evidence = muhurta_source_admission_evidence()
         except MuhurtaGovernanceError:
@@ -169,16 +169,17 @@ class MuhurtaFacade:
                 return incomplete("SEARCH_CANCELLED", "boundary_collection", days=len(primitives), boundaries=boundary_progress)
             if _deadline_expired(request, self._clock):
                 return incomplete("SEARCH_DEADLINE_EXCEEDED", "boundary_collection", days=len(primitives), boundaries=boundary_progress)
-            offset = dt.datetime.combine(civil_day, dt.time(12), tzinfo=zone).utcoffset()
-            assert offset is not None
             try:
-                result = _run_muhurta_boundary_day(engine_profile, civil_day, offset.total_seconds() / 3600, engine_config)
+                result = _run_muhurta_boundary_day(
+                    engine_profile, civil_day, request.place.zone_id, engine_config,
+                    rule_profile.transition_canonicalization.tolerance_seconds,
+                )
             except (ConfigError, EngineOutputError, ArithmeticError, ValueError):
                 return incomplete("ENGINE_CROSSCHECK_FAILED", "boundary_collection", days=len(primitives), boundaries=boundary_progress)
             if applied_snapshot is not None and (result.config != applied_snapshot or result.ephemeris_mode != actual_ephemeris):
                 return incomplete("ENGINE_CROSSCHECK_FAILED", "boundary_collection", days=len(primitives), boundaries=boundary_progress)
             applied_snapshot, actual_ephemeris = result.config, result.ephemeris_mode
-            primitives.append((result.day, offset.total_seconds() / 3600))
+            primitives.append(result.day)
             boundary_progress += len(result.day.values)
         if request.cancel_requested or self._cancel_check():
             return incomplete("SEARCH_CANCELLED", "partition", days=len(primitives), boundaries=boundary_progress)
@@ -188,14 +189,17 @@ class MuhurtaFacade:
         bounds = EventInterval(request.start, request.end)
         boundaries: list[dt.datetime] = [request.start, request.end]
         kind_counts: dict[str, int] = {}
-        for day_values, day_offset in primitives:
+        for day_values in primitives:
             for value in day_values.values:
-                start = _local_instant(day_values.civil_date, value.start_hour, zone, day_offset)
+                if value.start_utc is None:
+                    return incomplete("ENGINE_CROSSCHECK_FAILED", "boundary_normalization", days=len(primitives), boundaries=boundary_progress)
+                start = value.start_utc.astimezone(zone)
                 boundaries.append(start)
                 kind_counts[value.kind] = kind_counts.get(value.kind, 0) + 1
                 if value.end_hour is not None:
-                    end_hour = value.end_hour + (24 if value.end_hour <= value.start_hour else 0)
-                    end = _local_instant(day_values.civil_date, end_hour, zone, day_offset)
+                    if value.end_utc is None:
+                        return incomplete("ENGINE_CROSSCHECK_FAILED", "boundary_normalization", days=len(primitives), boundaries=boundary_progress)
+                    end = value.end_utc.astimezone(zone)
                     boundaries.append(end)
         atoms = partition_interval(bounds, boundaries)
         if len(atoms) > request.max_candidate_intervals:
@@ -204,10 +208,10 @@ class MuhurtaFacade:
         # Sunrise is a point primitive; pair each day's sunrise and sunset explicitly.
         daylight = tuple(
             EventInterval(
-                _local_instant(day_values.civil_date, next(v.start_hour for v in day_values.values if v.kind == "sunrise"), zone, day_offset),
-                _local_instant(day_values.civil_date, next(v.start_hour for v in day_values.values if v.kind == "sunset"), zone, day_offset),
+                next(v.start_utc for v in day_values.values if v.kind == "sunrise").astimezone(zone),  # type: ignore[union-attr]
+                next(v.start_utc for v in day_values.values if v.kind == "sunset").astimezone(zone),  # type: ignore[union-attr]
             )
-            for day_values, day_offset in primitives
+            for day_values in primitives
             if any(v.kind == "sunrise" for v in day_values.values) and any(v.kind == "sunset" for v in day_values.values)
         )
 
@@ -312,6 +316,8 @@ class MuhurtaFacade:
             MuhurtaFact(fact_id="muhurta.search.source_gate", value="pending"),
             MuhurtaFact(fact_id="muhurta.search.natal_personalization", value="supplied_not_evaluated_pending_admission" if request.natal else "omitted"),
             MuhurtaFact(fact_id="muhurta.search.preferences_status", value="present_pending_not_applied" if preference_present else "omitted"),
+            MuhurtaFact(fact_id="muhurta.search.transition_canonicalization_version", value=rule_profile.transition_canonicalization.version),
+            MuhurtaFact(fact_id="muhurta.search.transition_cluster_tolerance_seconds", value=rule_profile.transition_canonicalization.tolerance_seconds),
         ]
         for kind, count in sorted(kind_counts.items()):
             safe_kind = kind.replace("-", "_")
@@ -373,4 +379,8 @@ class MuhurtaFacade:
             ),
             provenance=provenance, artifact_id=artifact["artifact_id"], artifact_sha256=artifact["artifact_sha256"], artifact_token=artifact["artifact_token"],
             trace=tuple(candidate_traces[:100]) if request.include_trace else None,
+            trace_truncation=MuhurtaTruncation(
+                truncated=len(candidate_traces[:100]) < len(candidate_traces),
+                total_count=len(candidate_traces), returned_count=len(candidate_traces[:100]),
+            ) if request.include_trace else None,
         )

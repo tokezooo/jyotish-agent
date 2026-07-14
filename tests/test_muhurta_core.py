@@ -5,6 +5,7 @@ import json
 import random
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+from zoneinfo import ZoneInfo
 
 import pytest
 from pydantic import ValidationError
@@ -14,7 +15,12 @@ from jyotish_agent.intervals import EventInterval, normalize_boundaries, partiti
 from jyotish_agent.muhurta import MuhurtaFacade, _local_instant
 from jyotish_agent.muhurta_models import MuhurtaSearchRequest
 from jyotish_agent.interpretations import iter_muhurta_fact_atoms, validate_muhurta_answer
-from jyotish_agent.pyjhora_facade import BirthProfile, _run_muhurta_boundary_day
+from jyotish_agent.pyjhora_facade import (
+    BirthProfile,
+    _MuhurtaBoundaryEstimate,
+    _canonicalize_muhurta_estimates,
+    _run_muhurta_boundary_day,
+)
 from jyotish_agent.muhurta_profiles import (
     MuhurtaSourceMap,
     load_muhurta_adjudication_fixtures,
@@ -113,6 +119,15 @@ def test_request_strict_range_offset_and_limits() -> None:
         _request(result_limit=21)
     with pytest.raises(ValidationError):
         _request(extra="forbidden")
+
+
+def test_default_end_is_seven_local_civil_days_across_dst() -> None:
+    london = EventPlace(name="private", latitude=51.5072, longitude=-0.1276, zone_id="Europe/London")
+    value = _request(place=london, start="2026-10-24T00:00:00+01:00", end=None, hard_constraints={})
+    assert value.end is not None
+    assert value.end.isoformat() == "2026-10-31T00:00:00+00:00"
+    assert value.end.replace(tzinfo=None) - value.start.replace(tzinfo=None) == dt.timedelta(days=7)
+    assert value.range_duration_seconds == 7 * 86400 + 3600
 
 
 def test_endpoint_specific_fold_and_spring_gap_validation() -> None:
@@ -216,6 +231,20 @@ def test_dst_crossing_preserves_calendar_ready_zone_offsets() -> None:
     assert all(window.start.tzinfo is not None and window.end.tzinfo is not None for window in result.windows)
 
 
+def test_boundary_probes_use_pre_and_post_dst_offsets() -> None:
+    profile = BirthProfile("event", (2026, 10, 25), (0, 0, 0), 51.5072, -0.1276, 0)
+    fallback = _run_muhurta_boundary_day(profile, dt.date(2026, 10, 25), "Europe/London")
+    assert fallback.probe_offsets[0] == (0, 60)
+    assert fallback.probe_offsets[-1] == (1439, 0)
+    spring = _run_muhurta_boundary_day(profile, dt.date(2026, 3, 29), "Europe/London")
+    assert spring.probe_offsets[0] == (0, 0)
+    assert spring.probe_offsets[-1] == (1439, 60)
+    zone = ZoneInfo("Europe/London")
+    for result in (fallback, spring):
+        assert all(item.start_utc.tzinfo is UTC for item in result.day.values)
+        assert all(item.start_utc.astimezone(zone).utcoffset() is not None for item in result.day.values)
+
+
 def test_concurrent_mixed_zones_are_config_isolated() -> None:
     moscow = _request(hard_constraints={})
     kolkata = _request(
@@ -273,10 +302,10 @@ def test_cooperative_mid_search_cancel_reports_real_progress() -> None:
 
 def test_boundary_batch_collects_second_karana_and_all_varjyam_pairs() -> None:
     profile = BirthProfile("event", (2026, 7, 15), (0, 0, 0), 55.7558, 37.6173, 3)
-    july15 = _run_muhurta_boundary_day(profile, dt.date(2026, 7, 15), 3)
+    july15 = _run_muhurta_boundary_day(profile, dt.date(2026, 7, 15), "Europe/Moscow")
     karana = sorted(item.start_hour for item in july15.day.values if item.kind == "karana_transition")
     assert any(abs(value - 19.824) < 0.05 for value in karana)
-    july27 = _run_muhurta_boundary_day(profile, dt.date(2026, 7, 27), 3)
+    july27 = _run_muhurta_boundary_day(profile, dt.date(2026, 7, 27), "Europe/Moscow")
     varjyam = [item for item in july27.day.values if item.kind == "varjyam"]
     assert len(varjyam) >= 2
     assert any(abs(item.start_hour - (-0.7287)) < 0.1 and abs(item.end_hour - 0.1422) < 0.1 for item in varjyam)
@@ -290,7 +319,7 @@ def test_returned_windows_never_cross_any_collected_boundary() -> None:
     result = MuhurtaFacade().search(_request(hard_constraints={}, result_limit=20))
     assert result.status == "completed"
     profile = BirthProfile("event", (2026, 7, 15), (0, 0, 0), 55.7558, 37.6173, 3)
-    day = _run_muhurta_boundary_day(profile, dt.date(2026, 7, 15), 3).day
+    day = _run_muhurta_boundary_day(profile, dt.date(2026, 7, 15), "Europe/Moscow").day
     zone = ZoneInfo("Europe/Moscow")
     boundaries = []
     for item in day.values:
@@ -304,6 +333,26 @@ def test_returned_windows_never_cross_any_collected_boundary() -> None:
     )
 
 
+def test_transition_canonicalization_clusters_estimates_but_preserves_distinct_identity() -> None:
+    base = dt.datetime(2026, 7, 15, 9, 20, tzinfo=UTC)
+    estimates = (
+        _MuhurtaBoundaryEstimate("karana_transition", "karana:to:3", base),
+        _MuhurtaBoundaryEstimate("karana_transition", "karana:to:3", base + dt.timedelta(seconds=40)),
+        _MuhurtaBoundaryEstimate("karana_transition", "karana:to:4", base + dt.timedelta(seconds=45)),
+    )
+    canonical = _canonicalize_muhurta_estimates(estimates, tolerance_seconds=120)
+    assert len(canonical) == 2
+    assert {item.identity for item in canonical} == {"karana:to:3", "karana:to:4"}
+
+
+def test_moscow_canonical_boundaries_have_no_same_identity_micro_duplicates() -> None:
+    profile = BirthProfile("event", (2026, 7, 15), (0, 0, 0), 55.7558, 37.6173, 3)
+    result = _run_muhurta_boundary_day(profile, dt.date(2026, 7, 15), "Europe/Moscow")
+    keys = [(item.kind, item.identity) for item in result.day.values]
+    assert len(keys) == len(set(keys))
+    assert result.canonicalization_tolerance_seconds == 900
+
+
 def test_provenance_uses_actual_ephemeris_mode(monkeypatch) -> None:
     import jyotish_agent.config as config
 
@@ -311,6 +360,15 @@ def test_provenance_uses_actual_ephemeris_mode(monkeypatch) -> None:
     result = MuhurtaFacade().search(_request())
     assert result.status == "completed"
     assert result.provenance.ephemeris_mode == "swiss"
+
+
+def test_trace_truncation_metadata_is_explicit() -> None:
+    result = MuhurtaFacade().search(_request(end="2026-07-22T00:00:00+03:00", hard_constraints={}, include_trace=True))
+    assert result.status == "completed"
+    assert result.trace is not None and len(result.trace) == 100
+    assert result.trace_truncation is not None
+    assert result.trace_truncation.truncated is True
+    assert result.trace_truncation.total_count > result.trace_truncation.returned_count == 100
 
 
 def test_packaged_fixtures_do_not_claim_human_approval() -> None:

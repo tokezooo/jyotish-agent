@@ -31,6 +31,12 @@ class MuhurtaRuleDefinition(_Frozen):
     weight: int | None
 
 
+class MuhurtaTransitionCanonicalization(_Frozen):
+    version: Literal["1.0.0"]
+    tolerance_seconds: Literal[900]
+    representative: Literal["median_utc_second_by_identity"]
+
+
 class MuhurtaRuleProfile(_Frozen):
     profile_id: Literal["muhurta_focused_work_v1"]
     version: Literal["1.0.0"]
@@ -39,6 +45,7 @@ class MuhurtaRuleProfile(_Frozen):
     max_range_days: Literal[31]
     max_candidates: Literal[5000]
     default_result_limit: Literal[5]
+    transition_canonicalization: MuhurtaTransitionCanonicalization
     rules: tuple[MuhurtaRuleDefinition, ...] = Field(min_length=4, max_length=4)
 
     @model_validator(mode="after")

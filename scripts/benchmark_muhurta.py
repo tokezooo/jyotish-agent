@@ -12,6 +12,7 @@ import time
 
 from jyotish_agent.muhurta import MuhurtaFacade
 from jyotish_agent.muhurta_models import MuhurtaCompletedResult, MuhurtaSearchRequest
+from jyotish_agent.muhurta_profiles import load_muhurta_rule_profile
 
 
 def main() -> None:
@@ -29,6 +30,7 @@ def main() -> None:
         "hard_constraints": {"require_daylight": True},
     })
     facade = MuhurtaFacade()
+    rule_profile = load_muhurta_rule_profile()
     facade.search(request)  # warm imports/caches
     samples: list[float] = []
     result = None
@@ -53,6 +55,12 @@ def main() -> None:
         "ephemeris_mode": result.provenance.ephemeris_mode,
         "config_sha256": result.provenance.config_sha256,
         "rule_profile_sha256": result.provenance.rule_profile_sha256,
+        "transition_canonicalization_version": (
+            rule_profile.transition_canonicalization.version
+        ),
+        "transition_cluster_tolerance_seconds": (
+            rule_profile.transition_canonicalization.tolerance_seconds
+        ),
         "source_map_sha256": result.provenance.source_map_sha256,
         "source_gate": result.provenance.source_review_status,
     }, sort_keys=True))

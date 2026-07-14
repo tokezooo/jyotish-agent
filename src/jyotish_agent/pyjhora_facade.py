@@ -16,7 +16,7 @@ import re
 import math
 import threading
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Callable, Generic, TypeVar
 
 from . import ENGINE_VERSION, names
@@ -96,8 +96,19 @@ class _EngineSessionReentryError(RuntimeError):
 @dataclass(frozen=True)
 class _MuhurtaBoundaryPrimitive:
     kind: str
+    identity: str
     start_hour: float
     end_hour: float | None = None
+    start_utc: datetime | None = None
+    end_utc: datetime | None = None
+
+
+@dataclass(frozen=True)
+class _MuhurtaBoundaryEstimate:
+    kind: str
+    identity: str
+    start_utc: datetime
+    end_utc: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -111,6 +122,8 @@ class _MuhurtaBoundaryDayResult:
     day: _MuhurtaDayPrimitives
     config: _EngineConfigSnapshot
     ephemeris_mode: str
+    probe_offsets: tuple[tuple[int, int], ...]
+    canonicalization_tolerance_seconds: int
 
 
 _ENGINE_SESSION_LOCAL = threading.local()
@@ -125,11 +138,49 @@ def _clock_hour(value: object) -> float:
     return day_offset + hour + minute / 60 + second / 3600
 
 
+def _canonicalize_muhurta_estimates(
+    estimates: tuple[_MuhurtaBoundaryEstimate, ...],
+    *,
+    tolerance_seconds: int,
+) -> tuple[_MuhurtaBoundaryEstimate, ...]:
+    """Cluster repeated estimates by semantic transition identity and UTC proximity."""
+    grouped: dict[tuple[str, str], list[_MuhurtaBoundaryEstimate]] = {}
+    for item in estimates:
+        if item.start_utc.tzinfo is None or item.start_utc.utcoffset() is None:
+            raise EngineOutputError("Muhurta transition estimate must be UTC-aware")
+        grouped.setdefault((item.kind, item.identity), []).append(item)
+    canonical: list[_MuhurtaBoundaryEstimate] = []
+    for key in sorted(grouped):
+        ordered = sorted(grouped[key], key=lambda item: item.start_utc.astimezone(UTC))
+        clusters: list[list[_MuhurtaBoundaryEstimate]] = []
+        for item in ordered:
+            if not clusters or (
+                item.start_utc.astimezone(UTC)
+                - clusters[-1][-1].start_utc.astimezone(UTC)
+            ).total_seconds() > tolerance_seconds:
+                clusters.append([item])
+            else:
+                clusters[-1].append(item)
+        for cluster in clusters:
+            starts = sorted(round(item.start_utc.astimezone(UTC).timestamp()) for item in cluster)
+            start = datetime.fromtimestamp(starts[(len(starts) - 1) // 2], tz=UTC)
+            ends = sorted(
+                round(item.end_utc.astimezone(UTC).timestamp())
+                for item in cluster if item.end_utc is not None
+            )
+            if ends and len(ends) != len(cluster):
+                raise EngineOutputError("mixed point/interval estimates share one transition identity")
+            end = datetime.fromtimestamp(ends[(len(ends) - 1) // 2], tz=UTC) if ends else None
+            canonical.append(_MuhurtaBoundaryEstimate(key[0], key[1], start, end))
+    return tuple(sorted(canonical, key=lambda item: (item.start_utc, item.kind, item.identity)))
+
+
 def _run_muhurta_boundary_day(
     profile: BirthProfile,
     civil_date: date,
-    utc_offset_hours: float,
+    zone_id: str,
     config: CalculationConfig | None = None,
+    canonicalization_tolerance_seconds: int = 900,
 ) -> _MuhurtaBoundaryDayResult:
     """Collect one civil day's transitions in one configured lock checkpoint.
 
@@ -149,48 +200,74 @@ def _run_muhurta_boundary_day(
             from jhora import utils
             from jhora.panchanga import drik
 
+            from zoneinfo import ZoneInfo
+
             applied = apply_config(config)
-            # PyJHora Place carries a numeric offset, so the range caller resolves
-            # the IANA offset independently for each civil day (DST-safe).
-            place = drik.Place(profile.name, profile.latitude, profile.longitude, utc_offset_hours)
-            values: list[_MuhurtaBoundaryPrimitive] = []
+            zone = ZoneInfo(zone_id)
+            estimates: list[_MuhurtaBoundaryEstimate] = []
 
             def jd_at(hour: int, minute: int = 0, second: int = 0):
                 return utils.julian_day_number(
                     (civil_date.year, civil_date.month, civil_date.day), (hour, minute, second)
                 )
 
-            midnight_jd = jd_at(0)
-            sunrise, sunset = drik.sunrise(midnight_jd, place), drik.sunset(midnight_jd, place)
-            values.extend((
-                _MuhurtaBoundaryPrimitive("sunrise", float(sunrise[0])),
-                _MuhurtaBoundaryPrimitive("sunset", float(sunset[0])),
-            ))
+            def probe_offset(hour: int, minute: int = 0) -> float:
+                naive = datetime.combine(civil_date, datetime.min.time()).replace(hour=hour, minute=minute)
+                candidates = {
+                    value.astimezone(UTC): value
+                    for value in (naive.replace(tzinfo=zone, fold=0), naive.replace(tzinfo=zone, fold=1))
+                    if value.astimezone(UTC).astimezone(zone).replace(tzinfo=None) == naive
+                }
+                if len(candidates) != 1:
+                    raise EngineOutputError("Muhurta probe local time is ambiguous or nonexistent")
+                offset = next(iter(candidates.values())).utcoffset()
+                assert offset is not None
+                return offset.total_seconds() / 3600
 
-            def add_current_period(kind: str, result: object, start_index: int, end_index: int) -> None:
+            probe_specs = ((0, 0), (6, 0), (12, 0), (18, 0), (23, 59))
+            offsets = tuple((hour * 60 + minute, round(probe_offset(hour, minute) * 60)) for hour, minute in probe_specs)
+
+            def to_utc(hour_value: float, engine_offset: float) -> datetime:
+                if not math.isfinite(hour_value):
+                    raise EngineOutputError("Muhurta transition hour is non-finite")
+                return datetime(civil_date.year, civil_date.month, civil_date.day, tzinfo=UTC) + timedelta(
+                    seconds=round((hour_value - engine_offset) * 3600)
+                )
+
+            def add_current_period(
+                kind: str,
+                result: object,
+                start_index: int,
+                end_index: int,
+                cycle: int,
+                engine_offset: float,
+            ) -> None:
                 if not isinstance(result, (tuple, list)) or len(result) <= max(start_index, end_index):
                     raise EngineOutputError(f"{kind} returned an unsupported transition shape")
                 try:
+                    period_id = int(result[0])
                     start_hour, end_hour = float(result[start_index]), float(result[end_index])
                 except (TypeError, ValueError) as exc:
                     raise EngineOutputError(f"{kind} returned a non-numeric transition") from exc
                 if not (math.isfinite(start_hour) and math.isfinite(end_hour) and end_hour > start_hour):
                     raise EngineOutputError(f"{kind} returned invalid transition bounds")
-                values.extend((
-                    _MuhurtaBoundaryPrimitive(kind, start_hour),
-                    _MuhurtaBoundaryPrimitive(kind, end_hour),
+                estimates.extend((
+                    _MuhurtaBoundaryEstimate(kind, f"{kind}:to:{period_id}", to_utc(start_hour, engine_offset)),
+                    _MuhurtaBoundaryEstimate(kind, f"{kind}:to:{period_id % cycle + 1}", to_utc(end_hour, engine_offset)),
                 ))
 
             # Six-hour astronomical probes are not minute brute force. Every
             # panchanga period here is longer than the probe step; aggregating its
             # current start/end catches every same-day transition, including the
             # second karana, while independently validating output variants.
-            for hour in (0, 6, 12, 18, 23):
-                probe = jd_at(hour, 59 if hour == 23 else 0)
-                add_current_period("tithi_transition", drik.tithi(probe, place), 1, 2)
-                add_current_period("nakshatra_transition", drik.nakshatra(probe, place), 2, 3)
-                add_current_period("yoga_transition", drik.yogam(probe, place), 1, 2)
-                add_current_period("karana_transition", drik.karana(probe, place), 1, 2)
+            for hour, minute in probe_specs:
+                engine_offset = probe_offset(hour, minute)
+                place = drik.Place(profile.name, profile.latitude, profile.longitude, engine_offset)
+                probe = jd_at(hour, minute)
+                add_current_period("tithi_transition", drik.tithi(probe, place), 1, 2, 30, engine_offset)
+                add_current_period("nakshatra_transition", drik.nakshatra(probe, place), 2, 3, 27, engine_offset)
+                add_current_period("yoga_transition", drik.yogam(probe, place), 1, 2, 27, engine_offset)
+                add_current_period("karana_transition", drik.karana(probe, place), 1, 2, 60, engine_offset)
                 varjyam = drik.varjyam(probe, place)
                 if not isinstance(varjyam, (tuple, list)) or len(varjyam) % 2:
                     raise EngineOutputError("varjyam returned an unsupported transition shape")
@@ -198,37 +275,85 @@ def _run_muhurta_boundary_day(
                     start_hour, end_hour = float(varjyam[index]), float(varjyam[index + 1])
                     if not (math.isfinite(start_hour) and math.isfinite(end_hour) and end_hour > start_hour):
                         raise EngineOutputError("varjyam returned invalid transition bounds")
-                    values.append(_MuhurtaBoundaryPrimitive("varjyam", start_hour, end_hour))
+                    nak_id = int(drik.nakshatra(probe, place)[0])
+                    estimates.append(_MuhurtaBoundaryEstimate(
+                        "varjyam", f"varjyam:nakshatra:{nak_id}:pair:{index // 2}",
+                        to_utc(start_hour, engine_offset), to_utc(end_hour, engine_offset),
+                    ))
 
-            for sign, start_hour, end_hour in drik.udhaya_lagna_muhurtha(midnight_jd, place):
-                values.append(_MuhurtaBoundaryPrimitive(f"lagna_{int(sign)}", float(start_hour), float(end_hour)))
-            for kind, function in (
-                ("rahu_kala", drik.raahu_kaalam),
-                ("yamaganda", drik.yamaganda_kaalam),
-                ("gulika", drik.gulikai_kaalam),
-                ("abhijit", drik.abhijit_muhurta),
-            ):
-                period = function(midnight_jd, place)
-                if not period or len(period) < 2:
-                    raise EngineOutputError(f"{kind} returned an unsupported period shape")
-                values.append(_MuhurtaBoundaryPrimitive(kind, _clock_hour(period[0]), _clock_hour(period[1])))
-            dur = drik.durmuhurtam(midnight_jd, place)
-            if len(dur) % 2:
-                raise EngineOutputError("durmuhurta returned an unsupported period shape")
-            for index in range(0, len(dur), 2):
-                values.append(_MuhurtaBoundaryPrimitive("durmuhurta", _clock_hour(dur[index]), _clock_hour(dur[index + 1])))
-            for period in drik.amrit_kaalam(midnight_jd, place) or ():
-                if not period or len(period) < 2:
-                    raise EngineOutputError("amrita returned an unsupported period shape")
-                values.append(_MuhurtaBoundaryPrimitive("amrita", _clock_hour(period[0]), _clock_hour(period[1])))
+            # Daily functions are evaluated once for every offset segment present
+            # on the civil day. Estimates of the same physical event are then
+            # canonicalized by semantic identity and UTC proximity.
+            distinct_offsets = sorted({minutes / 60 for _, minutes in offsets})
+            for engine_offset in distinct_offsets:
+                place = drik.Place(profile.name, profile.latitude, profile.longitude, engine_offset)
+                midnight_jd = jd_at(0)
+                sunrise, sunset = drik.sunrise(midnight_jd, place), drik.sunset(midnight_jd, place)
+                estimates.extend((
+                    _MuhurtaBoundaryEstimate("sunrise", "sunrise", to_utc(float(sunrise[0]), engine_offset)),
+                    _MuhurtaBoundaryEstimate("sunset", "sunset", to_utc(float(sunset[0]), engine_offset)),
+                ))
+                for sign, start_hour, end_hour in drik.udhaya_lagna_muhurtha(midnight_jd, place):
+                    estimates.append(_MuhurtaBoundaryEstimate(
+                        f"lagna_{int(sign)}", f"lagna:{int(sign)}", to_utc(float(start_hour), engine_offset),
+                        to_utc(float(end_hour) + (24 if float(end_hour) <= float(start_hour) else 0), engine_offset),
+                    ))
+                for kind, function in (
+                    ("rahu_kala", drik.raahu_kaalam), ("yamaganda", drik.yamaganda_kaalam),
+                    ("gulika", drik.gulikai_kaalam), ("abhijit", drik.abhijit_muhurta),
+                ):
+                    period = function(midnight_jd, place)
+                    if not period or len(period) < 2:
+                        raise EngineOutputError(f"{kind} returned an unsupported period shape")
+                    estimates.append(_MuhurtaBoundaryEstimate(
+                        kind, kind, to_utc(_clock_hour(period[0]), engine_offset),
+                        to_utc(_clock_hour(period[1]), engine_offset),
+                    ))
+                dur = drik.durmuhurtam(midnight_jd, place)
+                if len(dur) % 2:
+                    raise EngineOutputError("durmuhurta returned an unsupported period shape")
+                for index in range(0, len(dur), 2):
+                    estimates.append(_MuhurtaBoundaryEstimate(
+                        "durmuhurta", f"durmuhurta:{index // 2}",
+                        to_utc(_clock_hour(dur[index]), engine_offset),
+                        to_utc(_clock_hour(dur[index + 1]), engine_offset),
+                    ))
+                for index, period in enumerate(drik.amrit_kaalam(midnight_jd, place) or ()):
+                    if not period or len(period) < 2:
+                        raise EngineOutputError("amrita returned an unsupported period shape")
+                    estimates.append(_MuhurtaBoundaryEstimate(
+                        "amrita", f"amrita:{index}", to_utc(_clock_hour(period[0]), engine_offset),
+                        to_utc(_clock_hour(period[1]), engine_offset),
+                    ))
 
-            # Stable de-duplication after all independent probes.
-            unique: dict[tuple[str, float, float | None], _MuhurtaBoundaryPrimitive] = {}
-            for value in values:
-                key = (value.kind, round(value.start_hour, 6), None if value.end_hour is None else round(value.end_hour, 6))
-                if key[2] is not None and key[2] <= key[1]:
-                    continue
-                unique.setdefault(key, _MuhurtaBoundaryPrimitive(*key))
+            day_start = datetime(civil_date.year, civil_date.month, civil_date.day, tzinfo=zone).astimezone(UTC)
+            next_date = civil_date + timedelta(days=1)
+            day_end = datetime(next_date.year, next_date.month, next_date.day, tzinfo=zone).astimezone(UTC)
+            relevant = tuple(
+                item for item in estimates
+                if (
+                    day_start <= item.start_utc < day_end
+                    or item.end_utc is not None
+                    and item.start_utc < day_end
+                    and item.end_utc > day_start
+                )
+            )
+            canonical = _canonicalize_muhurta_estimates(
+                relevant, tolerance_seconds=canonicalization_tolerance_seconds,
+            )
+            midnight_local = datetime.combine(civil_date, datetime.min.time())
+            values: list[_MuhurtaBoundaryPrimitive] = []
+            for item in canonical:
+                start_local = item.start_utc.astimezone(zone)
+                start_hour = (start_local.replace(tzinfo=None) - midnight_local).total_seconds() / 3600
+                end_hour = None
+                if item.end_utc is not None:
+                    end_local = item.end_utc.astimezone(zone)
+                    end_hour = (end_local.replace(tzinfo=None) - midnight_local).total_seconds() / 3600
+                values.append(_MuhurtaBoundaryPrimitive(
+                    item.kind, item.identity, round(start_hour, 6),
+                    None if end_hour is None else round(end_hour, 6), item.start_utc, item.end_utc,
+                ))
             snapshot = _EngineConfigSnapshot(
                 ayanamsa=applied.ayanamsa.upper(), rahu_ketu=applied.rahu_ketu,
                 node_aspects=applied.node_aspects, charts=tuple(resolved_charts),
@@ -236,10 +361,11 @@ def _run_muhurta_boundary_day(
             )
             return _MuhurtaBoundaryDayResult(
                 day=_MuhurtaDayPrimitives(
-                    civil_date,
-                    tuple(unique[key] for key in sorted(unique, key=lambda item: (item[0], item[1], float("-inf") if item[2] is None else item[2]))),
+                    civil_date, tuple(values),
                 ),
                 config=snapshot, ephemeris_mode=runtime_config.ephemeris_mode(),
+                probe_offsets=offsets,
+                canonicalization_tolerance_seconds=canonicalization_tolerance_seconds,
             )
     finally:
         _ENGINE_SESSION_LOCAL.active = False

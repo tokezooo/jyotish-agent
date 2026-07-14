@@ -17,6 +17,8 @@ def test_one_day_benchmark_runner_emits_config_metadata() -> None:
     assert result["warm_runs"] == 1
     assert result["config_sha256"]
     assert result["rule_profile_sha256"]
+    assert result["transition_canonicalization_version"] == "1.0.0"
+    assert result["transition_cluster_tolerance_seconds"] == 900
     assert result["source_map_sha256"]
     assert result["ephemeris_mode"] in {"moshier", "swiss"}
     assert result["runner"] == "scripts/benchmark_muhurta.py"
