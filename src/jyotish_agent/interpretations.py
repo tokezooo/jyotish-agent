@@ -288,6 +288,36 @@ def validate_muhurta_answer(submission: object) -> list[str]:
         return ["ARTIFACT_ID_MISMATCH"]
     if artifact.get("artifact_sha256") != value.artifact_sha256:
         return ["ARTIFACT_SHA256_MISMATCH"]
+    from . import muhurta_profiles
+    from .config import ephemeris_mode
+    from .muhurta import muhurta_config_sha256
+
+    admission = muhurta_profiles.muhurta_source_admission_evidence()
+    current = {
+        "config_sha256": muhurta_config_sha256(),
+        "rule_profile_sha256": muhurta_profiles.muhurta_rule_profile_sha256(),
+        "source_map_sha256": muhurta_profiles.muhurta_source_map_sha256(),
+        "source_admission_sha256": admission["sha256"],
+        "ephemeris_mode": ephemeris_mode(),
+    }
+    if any(artifact.get(key) != expected for key, expected in current.items()):
+        return ["STALE_RUNTIME_MATERIAL"]
+    profile = muhurta_profiles.load_muhurta_rule_profile()
+    expected_rules = {rule.rule_id: rule for rule in profile.rules}
+    profile_traces = artifact.get("profile_rule_traces")
+    if not isinstance(profile_traces, list) or len(profile_traces) != len(expected_rules):
+        return ["ARTIFACT_RULE_COVERAGE_INVALID"]
+    traced: dict[str, dict] = {}
+    for trace in profile_traces:
+        if not isinstance(trace, dict) or not isinstance(trace.get("rule_id"), str) or trace["rule_id"] in traced:
+            return ["ARTIFACT_RULE_COVERAGE_INVALID"]
+        traced[trace["rule_id"]] = trace
+    if set(traced) != set(expected_rules) or any(
+        traced[rule_id].get("classification") != definition.classification
+        or traced[rule_id].get("source_status") != definition.source_status
+        for rule_id, definition in expected_rules.items()
+    ):
+        return ["ARTIFACT_RULE_COVERAGE_INVALID"]
     if artifact.get("search_range_sha256") != value.search_range_sha256:
         return ["SEARCH_RANGE_MISMATCH"]
     if tuple(artifact.get("window_ids", ())) != value.window_ids:

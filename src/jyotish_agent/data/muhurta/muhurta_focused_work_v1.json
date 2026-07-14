@@ -4,7 +4,6 @@
   "school": "calculation-only-source-pending",
   "activities": ["general", "focused_work_session_v1"],
   "max_range_days": 31,
-  "default_range_days": 7,
   "max_candidates": 5000,
   "default_result_limit": 5,
   "rules": [

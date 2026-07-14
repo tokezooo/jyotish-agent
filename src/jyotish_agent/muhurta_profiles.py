@@ -10,6 +10,8 @@ from zoneinfo import ZoneInfo
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
+from .corpus import load_builtin_manifest
+
 
 _DATA = resources.files("jyotish_agent").joinpath("data/muhurta")
 
@@ -35,7 +37,6 @@ class MuhurtaRuleProfile(_Frozen):
     school: Literal["calculation-only-source-pending"]
     activities: tuple[Literal["general", "focused_work_session_v1"], ...]
     max_range_days: Literal[31]
-    default_range_days: Literal[7]
     max_candidates: Literal[5000]
     default_result_limit: Literal[5]
     rules: tuple[MuhurtaRuleDefinition, ...] = Field(min_length=4, max_length=4)
@@ -72,9 +73,9 @@ class MuhurtaReview(_Frozen):
 
 
 class MuhurtaSourceRule(_Frozen):
-    rule_id: str
+    rule_id: str = Field(pattern=r"^muhurta\.[A-Za-z0-9_.-]+$")
     source_status: Literal["approved"]
-    fragment_id: str
+    fragment_id: str = Field(pattern=r"^sf_[A-Za-z0-9_.-]+$")
     fragment_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
@@ -89,8 +90,15 @@ class MuhurtaSourceMap(_Frozen):
 
     @model_validator(mode="after")
     def fail_closed(self) -> "MuhurtaSourceMap":
-        if self.interpretation_status == "available" and (self.review.status != "approved" or not self.rules):
-            raise ValueError("available interpretation requires approval and source mappings")
+        doctrinal = {"muhurta.general.doctrinal_eligibility", "muhurta.focused_work.preference"}
+        mapped = {rule.rule_id for rule in self.rules}
+        if len(mapped) != len(self.rules):
+            raise ValueError("source mappings must be unique")
+        if self.interpretation_status == "available":
+            if self.review.status != "approved" or mapped != doctrinal:
+                raise ValueError("available interpretation requires exact doctrinal rule coverage")
+        elif self.rules:
+            raise ValueError("unavailable source maps cannot carry partially admitted mappings")
         return self
 
 
@@ -111,12 +119,21 @@ class MuhurtaAdjudicationFixtures(_Frozen):
 
     @model_validator(mode="after")
     def coverage(self) -> "MuhurtaAdjudicationFixtures":
-        if {case.criterion for case in self.cases} != {"one_day", "multi_day", "empty", "cancellation", "high_stakes"}:
+        expected = {
+            "one_day": "focused_work_session_v1", "multi_day": "general",
+            "empty": "focused_work_session_v1", "cancellation": "general",
+            "high_stakes": "unsupported",
+        }
+        if {case.criterion for case in self.cases} != set(expected):
             raise ValueError("fixtures do not cover the frozen criteria")
         if len({case.case_id for case in self.cases}) != 5:
             raise ValueError("fixture IDs must be unique")
         for case in self.cases:
             ZoneInfo(case.zone_id)
+            if case.activity != expected[case.criterion]:
+                raise ValueError("fixture criterion/activity semantics are invalid")
+        if len({(case.criterion, case.activity, case.zone_id) for case in self.cases}) != 5:
+            raise ValueError("fixture coverage must be meaningful and unique")
         if self.gate_status == "approved" and not (self.reviewer and self.reviewer_role and all(c.review_status == "approved" for c in self.cases)):
             raise ValueError("approved fixtures require complete human sign-off")
         return self
@@ -178,11 +195,38 @@ def load_muhurta_adjudication_fixtures() -> MuhurtaAdjudicationFixtures:
 
 def muhurta_source_admission_evidence() -> dict[str, object]:
     profile, source, fixtures = load_muhurta_rule_profile(), load_muhurta_source_map(), load_muhurta_adjudication_fixtures()
+    admitted: dict[str, dict[str, str]] = {}
+    for item in load_builtin_manifest()["sources"]:
+        review = item.get("review", {})
+        if (
+            review.get("status") != "approved" or not review.get("reviewer")
+            or not review.get("reviewer_role") or not item.get("rights_note")
+            or not item.get("provenance_url") or not item.get("manifest_checksum")
+        ):
+            continue
+        for fragment in item.get("fragments", []):
+            admitted[fragment["fragment_id"]] = {
+                "checksum": fragment["checksum"],
+                "source_version_id": item["source_version_id"],
+                "provenance_url": item["provenance_url"],
+                "rights_sha256": hashlib.sha256(item["rights_note"].encode()).hexdigest(),
+                "reviewer": review["reviewer"],
+                "reviewer_role": review["reviewer_role"],
+            }
+    doctrinal = {rule.rule_id for rule in profile.rules if rule.source_status != "not_required"}
+    mappings = {rule.rule_id: rule for rule in source.rules}
     verified = bool(
         source.review.status == "approved"
         and source.interpretation_status == "available"
         and fixtures.gate_status == "approved"
-        and all(rule.source_status == "approved" for rule in source.rules)
+        and fixtures.reviewer and fixtures.reviewer_role
+        and all(case.review_status == "approved" for case in fixtures.cases)
+        and doctrinal == set(mappings)
+        and all(
+            mapping.fragment_id in admitted
+            and mapping.fragment_sha256 == admitted[mapping.fragment_id]["checksum"]
+            for mapping in mappings.values()
+        )
     )
     material = {
         "profile_sha256": muhurta_rule_profile_sha256(),
@@ -191,6 +235,10 @@ def muhurta_source_admission_evidence() -> dict[str, object]:
         "profile": profile.profile_id,
         "review": source.review.status,
         "verified": verified,
+        "rule_sources": {
+            rule_id: {"fragment_id": mapping.fragment_id, **admitted[mapping.fragment_id]}
+            for rule_id, mapping in mappings.items()
+        } if verified else {},
     }
     material["sha256"] = hashlib.sha256(json.dumps(material, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
     return material

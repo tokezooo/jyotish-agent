@@ -34,9 +34,8 @@ from .muhurta_profiles import (
     muhurta_source_admission_evidence,
     muhurta_source_map_sha256,
 )
-from .pyjhora_facade import BirthProfile, EngineOutputError, _run_muhurta_boundary_batch
+from .pyjhora_facade import BirthProfile, EngineOutputError, _EngineConfigSnapshot, _run_muhurta_boundary_day
 from .signing import cache_domain_artifact
-from .timezone_resolution import resolve_iana
 
 _SUPPORTED = {"general", "focused_work_session_v1"}
 _HIGH_STAKES = {
@@ -63,10 +62,53 @@ def _request_material(request: MuhurtaSearchRequest) -> dict:
     return request.model_dump(mode="json", exclude={"deadline_utc", "cancel_requested", "include_trace"})
 
 
-def _local_instant(civil_date: dt.date, hour: float, zone: ZoneInfo) -> dt.datetime:
+def _local_instant(civil_date: dt.date, hour: float, zone: ZoneInfo, preferred_offset_hours: float) -> dt.datetime:
     naive = dt.datetime.combine(civil_date, dt.time()) + dt.timedelta(seconds=round(hour * 3600))
-    local = naive.replace(tzinfo=zone)
-    return local.astimezone(dt.UTC).astimezone(zone)
+    target_noon_offset = dt.datetime.combine(naive.date(), dt.time(12), tzinfo=zone).utcoffset()
+    if naive.date() != civil_date and target_noon_offset is not None:
+        preferred_offset_hours = target_noon_offset.total_seconds() / 3600
+    candidates = [naive.replace(tzinfo=zone, fold=fold) for fold in (0, 1)]
+    roundtrip = [
+        value for value in candidates
+        if value.astimezone(dt.UTC).astimezone(zone).replace(tzinfo=None) == naive
+    ]
+    by_utc = {value.astimezone(dt.UTC): value for value in roundtrip}
+    if len(by_utc) == 1:
+        return next(iter(by_utc.values()))
+    valid = [
+        value for value in by_utc.values()
+        if value.utcoffset() is not None
+        and value.utcoffset().total_seconds() / 3600 == preferred_offset_hours
+    ]
+    if not valid:
+        raise ValueError("astronomical boundary cannot be bound to the day's resolved IANA offset")
+    return valid[0]
+
+
+def _add_utc(value: dt.datetime, delta: dt.timedelta, zone: ZoneInfo) -> dt.datetime:
+    return (value.astimezone(dt.UTC) + delta).astimezone(zone)
+
+
+def _utc_min(left: dt.datetime, right: dt.datetime) -> dt.datetime:
+    return left if left.astimezone(dt.UTC) <= right.astimezone(dt.UTC) else right
+
+
+def _config_material(config: CalculationConfig | _EngineConfigSnapshot) -> dict:
+    if isinstance(config, CalculationConfig):
+        return {
+            "ayanamsa": config.ayanamsa.upper(), "rahu_ketu": config.rahu_ketu,
+            "node_aspects": config.node_aspects, "charts": tuple(config.resolved_charts()),
+            "modules": tuple(sorted(config.resolved_modules())),
+        }
+    return {
+        "ayanamsa": config.ayanamsa, "rahu_ketu": config.rahu_ketu,
+        "node_aspects": config.node_aspects, "charts": config.charts,
+        "modules": config.modules,
+    }
+
+
+def muhurta_config_sha256() -> str:
+    return _sha(_config_material(CalculationConfig(charts=("D1",))))
 
 
 def _deadline_expired(request: MuhurtaSearchRequest, now: Callable[[], dt.datetime]) -> bool:
@@ -74,8 +116,9 @@ def _deadline_expired(request: MuhurtaSearchRequest, now: Callable[[], dt.dateti
 
 
 class MuhurtaFacade:
-    def __init__(self, *, clock: Callable[[], dt.datetime] | None = None):
+    def __init__(self, *, clock: Callable[[], dt.datetime] | None = None, cancel_check: Callable[[], bool] | None = None):
         self._clock = clock or (lambda: dt.datetime.now(dt.UTC))
+        self._cancel_check = cancel_check or (lambda: False)
 
     def search(self, request: MuhurtaSearchRequest) -> MuhurtaResult:
         range_hash = _sha(_request_material(request))
@@ -84,10 +127,17 @@ class MuhurtaFacade:
             return MuhurtaUnavailableResult(status="unavailable", **_error_fields("HIGH_STAKES_ACTIVITY", request_id, "activity_routing"))
         if request.activity not in _SUPPORTED:
             return MuhurtaNeedsInputResult(status="needs_input", **_error_fields("ACTIVITY_UNSUPPORTED", request_id, "activity_routing"))
-        if request.cancel_requested:
-            return MuhurtaIncompleteResult(status="incomplete", **_error_fields("SEARCH_CANCELLED", request_id, "boundary_collection"))
+        def incomplete(code: str, stage: str, *, days: int = 0, boundaries: int = 0, candidates: int = 0) -> MuhurtaIncompleteResult:
+            return MuhurtaIncompleteResult(
+                status="incomplete", days_processed=days, boundary_count=boundaries,
+                processed_candidate_intervals=candidates,
+                **_error_fields(code, request_id, stage),
+            )
+
+        if request.cancel_requested or self._cancel_check():
+            return incomplete("SEARCH_CANCELLED", "boundary_collection")
         if _deadline_expired(request, self._clock):
-            return MuhurtaIncompleteResult(status="incomplete", **_error_fields("SEARCH_DEADLINE_EXCEEDED", request_id, "boundary_collection"))
+            return incomplete("SEARCH_DEADLINE_EXCEEDED", "boundary_collection")
         try:
             load_muhurta_rule_profile()
             source_map = load_muhurta_source_map()
@@ -96,10 +146,12 @@ class MuhurtaFacade:
             return MuhurtaUnavailableResult(status="unavailable", **_error_fields("GOVERNANCE_INTEGRITY_ERROR", request_id, "governance"))
 
         zone = ZoneInfo(request.place.zone_id)
-        local_start, local_end = request.start.astimezone(zone), request.end.astimezone(zone)
+        start_resolution, end_resolution = request.resolved_start(), request.resolved_end()
+        local_start = start_resolution.utc_instant.astimezone(zone)
         days: list[dt.date] = []
         day = local_start.date()
-        while day <= local_end.date():
+        final_day = (end_resolution.utc_instant - dt.timedelta(microseconds=1)).astimezone(zone).date()
+        while day <= final_day:
             days.append(day)
             day += dt.timedelta(days=1)
         engine_profile = BirthProfile(
@@ -107,97 +159,159 @@ class MuhurtaFacade:
             latitude=request.place.latitude, longitude=request.place.longitude,
             timezone=local_start.utcoffset().total_seconds() / 3600,  # type: ignore[union-attr]
         )
-        try:
-            dated_offsets = tuple(
-                (
-                    civil_day,
-                    dt.datetime.combine(civil_day, dt.time(12), tzinfo=zone).utcoffset().total_seconds() / 3600,  # type: ignore[union-attr]
-                )
-                for civil_day in days
-            )
-            primitives = _run_muhurta_boundary_batch(engine_profile, dated_offsets, CalculationConfig(charts=("D1",)))
-        except (ConfigError, EngineOutputError, ArithmeticError, ValueError):
-            return MuhurtaIncompleteResult(status="incomplete", **_error_fields("ENGINE_CROSSCHECK_FAILED", request_id, "boundary_collection"))
+        primitives = []
+        boundary_progress = 0
+        engine_config = CalculationConfig(charts=("D1",))
+        applied_snapshot: _EngineConfigSnapshot | None = None
+        actual_ephemeris: str | None = None
+        for civil_day in days:
+            if request.cancel_requested or self._cancel_check():
+                return incomplete("SEARCH_CANCELLED", "boundary_collection", days=len(primitives), boundaries=boundary_progress)
+            if _deadline_expired(request, self._clock):
+                return incomplete("SEARCH_DEADLINE_EXCEEDED", "boundary_collection", days=len(primitives), boundaries=boundary_progress)
+            offset = dt.datetime.combine(civil_day, dt.time(12), tzinfo=zone).utcoffset()
+            assert offset is not None
+            try:
+                result = _run_muhurta_boundary_day(engine_profile, civil_day, offset.total_seconds() / 3600, engine_config)
+            except (ConfigError, EngineOutputError, ArithmeticError, ValueError):
+                return incomplete("ENGINE_CROSSCHECK_FAILED", "boundary_collection", days=len(primitives), boundaries=boundary_progress)
+            if applied_snapshot is not None and (result.config != applied_snapshot or result.ephemeris_mode != actual_ephemeris):
+                return incomplete("ENGINE_CROSSCHECK_FAILED", "boundary_collection", days=len(primitives), boundaries=boundary_progress)
+            applied_snapshot, actual_ephemeris = result.config, result.ephemeris_mode
+            primitives.append((result.day, offset.total_seconds() / 3600))
+            boundary_progress += len(result.day.values)
+        if request.cancel_requested or self._cancel_check():
+            return incomplete("SEARCH_CANCELLED", "partition", days=len(primitives), boundaries=boundary_progress)
         if _deadline_expired(request, self._clock):
-            return MuhurtaIncompleteResult(status="incomplete", **_error_fields("SEARCH_DEADLINE_EXCEEDED", request_id, "boundary_collection"))
+            return incomplete("SEARCH_DEADLINE_EXCEEDED", "partition", days=len(primitives), boundaries=boundary_progress)
 
         bounds = EventInterval(request.start, request.end)
         boundaries: list[dt.datetime] = [request.start, request.end]
         kind_counts: dict[str, int] = {}
-        for day_values in primitives:
+        for day_values, day_offset in primitives:
             for value in day_values.values:
-                start = _local_instant(day_values.civil_date, value.start_hour, zone)
+                start = _local_instant(day_values.civil_date, value.start_hour, zone, day_offset)
                 boundaries.append(start)
                 kind_counts[value.kind] = kind_counts.get(value.kind, 0) + 1
                 if value.end_hour is not None:
                     end_hour = value.end_hour + (24 if value.end_hour <= value.start_hour else 0)
-                    end = _local_instant(day_values.civil_date, end_hour, zone)
+                    end = _local_instant(day_values.civil_date, end_hour, zone, day_offset)
                     boundaries.append(end)
         atoms = partition_interval(bounds, boundaries)
         if len(atoms) > request.max_candidate_intervals:
-            return MuhurtaIncompleteResult(status="incomplete", **_error_fields("CANDIDATE_LIMIT_EXCEEDED", request_id, "partition"))
+            return incomplete("CANDIDATE_LIMIT_EXCEEDED", "partition", days=len(primitives), boundaries=boundary_progress)
 
         # Sunrise is a point primitive; pair each day's sunrise and sunset explicitly.
         daylight = tuple(
             EventInterval(
-                _local_instant(day_values.civil_date, next(v.start_hour for v in day_values.values if v.kind == "sunrise"), zone),
-                _local_instant(day_values.civil_date, next(v.start_hour for v in day_values.values if v.kind == "sunset"), zone),
+                _local_instant(day_values.civil_date, next(v.start_hour for v in day_values.values if v.kind == "sunrise"), zone, day_offset),
+                _local_instant(day_values.civil_date, next(v.start_hour for v in day_values.values if v.kind == "sunset"), zone, day_offset),
             )
-            for day_values in primitives
+            for day_values, day_offset in primitives
             if any(v.kind == "sunrise" for v in day_values.values) and any(v.kind == "sunset" for v in day_values.values)
         )
 
         duration = dt.timedelta(minutes=request.duration_minutes)
         accepted: list[MuhurtaWindow] = []
         rejected: list[MuhurtaNearMiss] = []
-        all_traces: list[MuhurtaRuleTrace] = []
-        for atom in atoms:
-            proposed_end = min(atom.start + duration, atom.end)
-            reasons: list[str] = []
-            if atom.end - atom.start < duration:
-                reasons.append("crosses_astronomical_boundary")
+        candidate_traces: list[MuhurtaRuleTrace] = []
+        pending_doctrine = MuhurtaRuleTrace(
+            rule_id="muhurta.general.doctrinal_eligibility", classification="hard",
+            status="pending", source_status="pending", outputs=("source_admission_required",),
+        )
+        preference_present = bool(
+            request.preferences.prefer_daylight
+            or request.preferences.preferred_local_time_start is not None
+        )
+        pending_preference = MuhurtaRuleTrace(
+            rule_id="muhurta.focused_work.preference", classification="soft",
+            status="pending" if preference_present else "not_applicable", source_status="pending",
+            outputs=(("present_but_not_applied",) if preference_present else ("no_preference_supplied",)),
+        )
+        for index, atom in enumerate(atoms):
+            if index % 32 == 0 and (request.cancel_requested or self._cancel_check()):
+                return incomplete("SEARCH_CANCELLED", "evaluation", days=len(primitives), boundaries=boundary_progress, candidates=index)
+            if index % 32 == 0 and _deadline_expired(request, self._clock):
+                return incomplete("SEARCH_DEADLINE_EXCEEDED", "evaluation", days=len(primitives), boundaries=boundary_progress, candidates=index)
+            full_end = _add_utc(atom.start, duration, zone)
+            proposed_end = _utc_min(full_end, atom.end)
+            rejection_rule_ids: list[str] = []
+            duration_pass = atom.duration_seconds >= duration.total_seconds()
+            if not duration_pass:
+                rejection_rule_ids.append("muhurta.boundary.event_duration")
             local = atom.start.astimezone(zone)
-            end_local = (atom.start + duration).astimezone(zone)
+            end_local = full_end.astimezone(zone)
             constraints = request.hard_constraints
+            explicit_outputs: list[str] = []
             if local.weekday() in constraints.excluded_weekdays:
-                reasons.append("excluded_weekday")
+                explicit_outputs.append("excluded_weekday")
             if constraints.local_time_start is not None and (
                 local.date() != end_local.date()
                 or local.timetz().replace(tzinfo=None) < constraints.local_time_start
                 or end_local.timetz().replace(tzinfo=None) > constraints.local_time_end
             ):
-                reasons.append("outside_explicit_local_hours")
-            if constraints.require_daylight and not any(period.start <= atom.start and atom.start + duration <= period.end for period in daylight):
-                reasons.append("outside_daylight")
+                explicit_outputs.append("outside_explicit_local_hours")
+            if constraints.require_daylight and not any(
+                period.start.astimezone(dt.UTC) <= atom.start.astimezone(dt.UTC)
+                and full_end.astimezone(dt.UTC) <= period.end.astimezone(dt.UTC)
+                for period in daylight
+            ):
+                explicit_outputs.append("outside_daylight")
+            if explicit_outputs:
+                rejection_rule_ids.append("muhurta.constraints.explicit")
             candidate_id = "mc_" + _sha({"range": range_hash, "start": atom.start.isoformat(), "end": proposed_end.isoformat()})[:24]
-            trace = MuhurtaRuleTrace(
+            explicit_trace = MuhurtaRuleTrace(
                 rule_id="muhurta.constraints.explicit", classification="hard",
-                status="fail" if reasons else "pass", source_status="not_required",
-                inputs=(atom.start.isoformat(),), outputs=tuple(reasons or ("eligible_by_explicit_constraints",)),
+                status="fail" if explicit_outputs else "pass", source_status="not_required",
+                inputs=(candidate_id,), outputs=tuple(explicit_outputs or ("eligible_by_explicit_constraints",)),
             )
-            all_traces.append(trace)
-            if reasons:
-                rejected.append(MuhurtaNearMiss(candidate_id=candidate_id, start=atom.start, end=proposed_end, rejection_reasons=tuple(reasons)))
+            duration_trace = MuhurtaRuleTrace(
+                rule_id="muhurta.boundary.event_duration", classification="hard",
+                status="pass" if duration_pass else "fail", source_status="not_required",
+                inputs=(candidate_id, str(request.duration_minutes)),
+                outputs=(("fits_atomic_interval",) if duration_pass else ("crosses_astronomical_boundary",)),
+            )
+            candidate_traces.extend((explicit_trace, duration_trace))
+            if rejection_rule_ids:
+                rejected.append(MuhurtaNearMiss(
+                    candidate_id=candidate_id, start=atom.start, end=proposed_end,
+                    rejection_rule_ids=tuple(sorted(rejection_rule_ids)),
+                ))
                 continue
-            end = atom.start + duration
+            end = full_end
             window_id = "mw_" + _sha({"range": range_hash, "start": atom.start.isoformat(), "end": end.isoformat()})[:24]
             accepted.append(MuhurtaWindow(
                 window_id=window_id, start=atom.start, end=end,
                 eligibility_tier="calculation_only_source_pending",
                 tradeoffs=("Astronomical boundaries are computed; doctrinal eligibility and ranking are unavailable pending source review.",),
-                rule_traces=(trace,),
+                rule_traces=(explicit_trace, duration_trace, pending_doctrine, pending_preference),
             ))
 
         # Stable key is frozen: chronological start, end, then opaque ID. No soft
         # score is applied while the governed pack is pending.
         accepted.sort(key=lambda item: (item.start.astimezone(dt.UTC), item.end.astimezone(dt.UTC), item.window_id))
-        rejected.sort(key=lambda item: (len(item.rejection_reasons), item.start.astimezone(dt.UTC), item.candidate_id))
+        rejected.sort(key=lambda item: (len(item.rejection_rule_ids), item.start.astimezone(dt.UTC), item.candidate_id))
         returned, near = tuple(accepted[:request.result_limit]), tuple(rejected[:request.near_miss_limit])
+        profile_rule_traces = (
+            MuhurtaRuleTrace(
+                rule_id="muhurta.constraints.explicit", classification="hard",
+                status="pass" if accepted else "fail", source_status="not_required",
+                outputs=("evaluated_for_every_candidate",),
+            ),
+            MuhurtaRuleTrace(
+                rule_id="muhurta.boundary.event_duration", classification="hard",
+                status="pass" if accepted else "fail", source_status="not_required",
+                outputs=("half_open_atomic_boundary_enforced",),
+            ),
+            pending_doctrine,
+            pending_preference,
+        )
         facts = [
             MuhurtaFact(fact_id="muhurta.search.atomic_interval_count", value=len(atoms)),
             MuhurtaFact(fact_id="muhurta.search.duration_minutes", value=request.duration_minutes),
             MuhurtaFact(fact_id="muhurta.search.source_gate", value="pending"),
-            MuhurtaFact(fact_id="muhurta.search.natal_personalization", value="supplied_calculation_only" if request.natal else "omitted"),
+            MuhurtaFact(fact_id="muhurta.search.natal_personalization", value="supplied_not_evaluated_pending_admission" if request.natal else "omitted"),
+            MuhurtaFact(fact_id="muhurta.search.preferences_status", value="present_pending_not_applied" if preference_present else "omitted"),
         ]
         for kind, count in sorted(kind_counts.items()):
             safe_kind = kind.replace("-", "_")
@@ -209,27 +323,36 @@ class MuhurtaFacade:
             ))
         facts.sort(key=lambda item: item.fact_id)
 
-        resolved = resolve_iana(local_start.replace(tzinfo=None), mode="iana", zone_id=request.place.zone_id, fold=request.place.fold, asserted_offset_hours=None, longitude=request.place.longitude)
+        assert applied_snapshot is not None and actual_ephemeris is not None
+        config_sha256 = _sha(_config_material(applied_snapshot))
+        if config_sha256 != muhurta_config_sha256():
+            return incomplete("ENGINE_CROSSCHECK_FAILED", "provenance", days=len(primitives), boundaries=boundary_progress, candidates=len(atoms))
         provenance = MuhurtaProvenance(
-            zone_id=request.place.zone_id, tzdb_fingerprint=resolved.tzdb_fingerprint,
-            ephemeris_mode="moshier", engine_version=ENGINE_VERSION,
+            zone_id=request.place.zone_id, tzdb_fingerprint=start_resolution.tzdb_fingerprint,
+            start_normalized_utc=start_resolution.utc_instant.isoformat(timespec="seconds").replace("+00:00", "Z"),
+            end_normalized_utc=end_resolution.utc_instant.isoformat(timespec="seconds").replace("+00:00", "Z"),
+            start_resolved_offset_minutes=start_resolution.offset_minutes,
+            end_resolved_offset_minutes=end_resolution.offset_minutes,
+            start_fold=start_resolution.fold, end_fold=end_resolution.fold,
+            ephemeris_mode=actual_ephemeris, engine_version=ENGINE_VERSION, config_sha256=config_sha256,
             rule_profile_sha256=muhurta_rule_profile_sha256(), source_map_sha256=muhurta_source_map_sha256(),
             source_admission_sha256=str(source_evidence["sha256"]), source_review_status=source_map.review.status,
             boundary_collector="pyjhora_daily_transition_batch_v1",
         )
         artifact = cache_domain_artifact({
             "mode": "muhurta", "activity": request.activity, "search_range_sha256": range_hash,
-            "config_sha256": _sha({"ayanamsa": "LAHIRI", "charts": ["D1"]}),
+            "config_sha256": config_sha256, "ephemeris_mode": actual_ephemeris,
             "rule_profile_sha256": muhurta_rule_profile_sha256(),
             "source_map_sha256": muhurta_source_map_sha256(), "source_admission_sha256": source_evidence["sha256"],
             "window_ids": [window.window_id for window in returned],
             "facts": [fact.model_dump(mode="json") for fact in facts],
-            "rule_traces": [trace.model_dump(mode="json") for trace in all_traces],
+            "profile_rule_traces": [trace.model_dump(mode="json") for trace in profile_rule_traces],
+            "candidate_rule_traces": [trace.model_dump(mode="json") for trace in candidate_traces],
             "truncation": {"windows": [len(accepted), len(returned)], "near_misses": [len(rejected), len(near)]},
             "provenance": provenance.model_dump(mode="json"),
         })
         only_too_short = bool(rejected) and all(
-            item.rejection_reasons == ("crosses_astronomical_boundary",) for item in rejected
+            item.rejection_rule_ids == ("muhurta.boundary.event_duration",) for item in rejected
         )
         return MuhurtaCompletedResult(
             status="completed", request_id=request_id, activity=request.activity,
@@ -239,13 +362,15 @@ class MuhurtaFacade:
             total_candidate_intervals=len(atoms), processed_candidate_intervals=len(atoms),
             window_truncation=MuhurtaTruncation(truncated=len(returned) < len(accepted), total_count=len(accepted), returned_count=len(returned)),
             near_miss_truncation=MuhurtaTruncation(truncated=len(near) < len(rejected), total_count=len(rejected), returned_count=len(near)),
+            rule_traces=profile_rule_traces,
             limitations=(
                 "Doctrinal eligibility, soft ranking, and interpretation are unavailable until a source pack and qualified human review are admitted.",
                 "Varjyam, amrita, durmuhurta and weekday periods are returned only as calculated boundaries; they are not applied as doctrine.",
-                "Optional natal input is bound to the request but tara-bala and candra-bala remain unavailable pending governed rule admission.",
+                "Optional natal input, when supplied, is bound but explicitly not evaluated; tara-bala and candra-bala remain unavailable pending governed rule admission.",
+                "Preferences are recorded only as present/omitted and are not scored while the soft-rule source gate is pending.",
                 "Requested planetary-change boundaries are not accepted because no independently verified request primitive is exposed.",
                 "No calendar, persistence, ResearchRun, REST, or external side effect is performed.",
             ),
             provenance=provenance, artifact_id=artifact["artifact_id"], artifact_sha256=artifact["artifact_sha256"], artifact_token=artifact["artifact_token"],
-            trace=tuple(all_traces) if request.include_trace else None,
+            trace=tuple(candidate_traces[:100]) if request.include_trace else None,
         )
