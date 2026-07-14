@@ -463,14 +463,38 @@ class JyotishMcpFacade:
     def muhurta_full(self, value: MuhurtaFullMcpInput) -> MuhurtaFullReleaseResult:
         """Run the immutable private experimental baseline with no side effects."""
 
-        from .doctrine.muhurta_pack import MuhurtaReleaseAudit
+        from .doctrine.muhurta_pack import (
+            load_muhurta_release_audit,
+            route_muhurta_activity,
+        )
         from .doctrine.muhurta_release import execute_muhurta_full
 
-        audit = MuhurtaReleaseAudit.model_validate_json(
-            (Path(__file__).parent / "data/doctrine/muhurta-release.json").read_text(
-                encoding="utf-8"
+        audit = load_muhurta_release_audit()
+        if not audit.available:
+            route = route_muhurta_activity(value.activity, locale=value.locale)
+            if route.status == "unsupported_high_stakes":
+                error_code = "HIGH_STAKES_ACTIVITY"
+                status = "unavailable"
+            elif route.status != "supported":
+                error_code = route.reason_code or "ACTIVITY_UNSUPPORTED"
+                status = "needs_input"
+            elif value.natal is not None:
+                error_code = "NATAL_PERSONALIZATION_NOT_COMPILED"
+                status = "unavailable"
+            else:
+                error_code = "RELEASE_GATES_INCOMPLETE"
+                status = "unavailable"
+            return MuhurtaFullReleaseResult(
+                status=status,
+                request_mode=value.mode,
+                locale=value.locale,
+                profile=route.profile,
+                admission_state=audit.admission_state,
+                public_release_blockers=list(audit.public_release_blockers),
+                external_review_missing=audit.external_review_missing,
+                report=None,
+                error_code=error_code,
             )
-        )
         execution = execute_muhurta_full(
             value,
             locale=value.locale,
@@ -481,7 +505,7 @@ class JyotishMcpFacade:
             request_mode=value.mode,
             locale=value.locale,
             profile=execution.profile,
-            admission_state="private_experimental",
+            admission_state=audit.admission_state,
             public_release_blockers=list(audit.public_release_blockers),
             external_review_missing=audit.external_review_missing,
             report=(

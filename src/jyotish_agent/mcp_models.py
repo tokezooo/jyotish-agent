@@ -223,7 +223,7 @@ class MuhurtaFullReleaseResult(BaseModel):
         "low_risk_travel_planning",
         "general_private_task",
     ] | None = None
-    admission_state: Literal["private_experimental"] | None = None
+    admission_state: Literal["blocked_evaluation", "private_experimental"] | None = None
     public_release_blockers: list[str] = Field(default_factory=list)
     external_review_missing: bool
     report: dict[str, Any] | None = None

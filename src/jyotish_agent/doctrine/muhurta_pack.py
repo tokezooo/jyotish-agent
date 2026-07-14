@@ -10,14 +10,21 @@ from __future__ import annotations
 import json
 import datetime as dt
 import hashlib
+import os
 from enum import StrEnum
 from importlib import resources
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, model_validator
 
 from .models import FrozenModel
-from .sources import SourceId, SourceManifest, SourceVerificationReport
+from .sources import (
+    SourceId,
+    SourceManifest,
+    SourceVerificationReport,
+    SourceVerifier,
+)
 
 
 class MuhurtaCorpusRequirement(StrEnum):
@@ -1008,6 +1015,36 @@ def load_muhurta_admitted_rule_pack() -> MuhurtaAdmittedRulePack:
     return MuhurtaAdmittedRulePack.model_validate(json.loads(payload))
 
 
+def _muhurta_resource_json(name: str) -> object:
+    payload = resources.files("jyotish_agent").joinpath(
+        f"data/doctrine/{name}"
+    ).read_text(encoding="utf-8")
+    return json.loads(payload)
+
+
+def muhurta_compiled_profile_sha256() -> str:
+    """Bind every executable profile input and its source manifest semantically."""
+
+    payload = {
+        name: _muhurta_resource_json(name)
+        for name in (
+            "muhurta-sources.json",
+            "muhurta-corpus.json",
+            "muhurta-examples.json",
+            "muhurta-profiles.json",
+            "muhurta-admitted-rules-v1.json",
+            "muhurta-ranking-v1.json",
+        )
+    }
+    canonical = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
 class MuhurtaReleaseGate(FrozenModel):
     gate_id: str = Field(min_length=1)
     status: Literal["passed", "missing", "optional_missing"]
@@ -1046,8 +1083,8 @@ class MuhurtaReleaseAudit(FrozenModel):
     release_id: Literal["expanded_muhurta_v1"]
     corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     compiled_profile_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
-    admission_state: Literal["private_experimental"]
-    available: Literal[True]
+    admission_state: Literal["blocked_evaluation", "private_experimental"]
+    available: bool
     public_release_ready: Literal[False]
     external_review_missing: Literal[True]
     gates: tuple[MuhurtaReleaseGate, ...] = Field(min_length=1)
@@ -1070,4 +1107,39 @@ class MuhurtaReleaseAudit(FrozenModel):
             raise ValueError("release audit must report all doctrine domains")
         if not any(gate.status == "missing" for gate in self.gates):
             raise ValueError("private release must retain its missing external gates")
+        required_missing = any(
+            gate.status == "missing"
+            and gate.gate_id
+            in {"independent_held_out_evaluation", "source_manifest", "profile_identity"}
+            for gate in self.gates
+        )
+        if self.available == required_missing:
+            raise ValueError("required missing gates must keep the release unavailable")
+        if self.available != (self.admission_state == "private_experimental"):
+            raise ValueError("availability and admission state disagree")
         return self
+
+
+def load_muhurta_release_audit(*, verify_source_bytes: bool = True) -> MuhurtaReleaseAudit:
+    """Load the release audit and fail closed on any identity/source substitution."""
+
+    audit = MuhurtaReleaseAudit.model_validate(
+        _muhurta_resource_json("muhurta-release.json")
+    )
+    manifest = SourceManifest.model_validate(
+        _muhurta_resource_json("muhurta-sources.json")
+    )
+    if audit.corpus_manifest_sha256 != manifest.manifest_sha256:
+        raise ValueError("MUHURTA_SOURCE_MANIFEST_SUBSTITUTED")
+    if audit.compiled_profile_sha256 != muhurta_compiled_profile_sha256():
+        raise ValueError("MUHURTA_COMPILED_PROFILE_SUBSTITUTED")
+    if audit.available and verify_source_bytes:
+        root = Path(
+            os.environ.get(
+                "JYOTISH_PRIVATE_SOURCES_ROOT",
+                str(Path.cwd() / "private_sources"),
+            )
+        )
+        if not SourceVerifier.verify(manifest, root).ok:
+            raise ValueError("MUHURTA_SOURCE_BYTES_UNVERIFIED")
+    return audit

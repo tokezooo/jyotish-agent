@@ -10,15 +10,16 @@ From the repository root:
 
 ```bash
 install -d -m 700 \
-  private_sources/jaimini/{subodhini,sanjay-rath,kn-rao,worked-cases} \
-  private_sources/prashna/{prasna-marga,daivajna-vallabha,satpancasika,tajika,worked-cases} \
-  private_sources/muhurta/{muhurta-cintamani,kalaprakasika,pancanga,overlay,worked-cases}
+  private_sources/jaimini \
+  private_sources/prashna \
+  private_sources/muhurta
 ```
 
 Acquire each edition through a lawful purchase, library, author/publisher grant,
 or a verified public-domain archive. Do not copy a book into `src/`, `tests/`,
-`docs/`, or any Git fixture. Keep the original filename inside the matching
-private directory and set file permissions:
+`docs/`, or any Git fixture. Use the exact relative filename declared by the
+applicable tracked `local_file` entry in `jaimini-sources.json`,
+`prashna-sources.json`, or `muhurta-sources.json`, then set file permissions:
 
 ```bash
 find private_sources -type d -exec chmod 700 {} +
@@ -33,7 +34,7 @@ field with the exact title page/copyright page metadata. For each file, calculat
 the hash from the repository root:
 
 ```bash
-shasum -a 256 private_sources/<domain>/<edition>/<file.pdf>
+shasum -a 256 private_sources/<local_file-from-domain-manifest>
 ```
 
 Put the 64-character lowercase digest in `sha256`. `local_file` is relative to

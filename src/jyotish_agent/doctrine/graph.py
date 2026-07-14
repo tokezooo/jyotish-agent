@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import Field
 
 from ..research_store import canonical_json
+from ..signing import get_cached_domain_artifact, verify_domain_artifact
 from .dsl import CompiledProfile, CompiledRule
 from .evidence import EvidenceFailure, EvidenceStore, FragmentRef
 from .models import FrozenModel
@@ -25,28 +26,85 @@ class GraphFailure(RuntimeError):
 
 class SignedFactProjection(FrozenModel):
     artifact_id: str = Field(min_length=3, max_length=120)
+    artifact_token: str = Field(pattern=r"^[0-9a-f]{64}$")
     facts: dict[str, FactValue]
     provenance_sha256: Sha256
     artifact_sha256: Sha256
 
     @classmethod
-    def create(
+    def from_artifact_token(
         cls,
         *,
-        artifact_id: str,
-        facts: dict[str, FactValue],
-        provenance_sha256: str,
+        artifact_token: str,
+        allowed_fact_paths: tuple[str, ...],
     ) -> "SignedFactProjection":
-        payload = {
-            "artifact_id": artifact_id,
-            "facts": dict(facts),
-            "provenance_sha256": provenance_sha256,
-        }
-        return cls(**payload, artifact_sha256=_hash_payload(payload))
+        if not allowed_fact_paths or len(allowed_fact_paths) != len(set(allowed_fact_paths)):
+            raise GraphFailure(
+                "FACT_ALLOWLIST_INVALID",
+                "A non-empty unique fact allowlist is required.",
+            )
+        artifact = get_cached_domain_artifact(artifact_token)
+        if artifact is None or not verify_domain_artifact(artifact):
+            raise GraphFailure(
+                "FACT_ARTIFACT_UNTRUSTED",
+                "Fact projection requires a cached service-signed artifact.",
+            )
+        raw_facts = artifact.get("facts")
+        if isinstance(raw_facts, dict):
+            available = raw_facts
+        elif isinstance(raw_facts, list):
+            available = {
+                str(item["fact_id"]): item["value"]
+                for item in raw_facts
+                if isinstance(item, dict) and "fact_id" in item and "value" in item
+            }
+        else:
+            raise GraphFailure("FACT_ARTIFACT_INVALID", "Signed artifact has no fact map.")
+        missing = sorted(set(allowed_fact_paths) - set(available))
+        if missing:
+            raise GraphFailure(
+                "FACT_ALLOWLIST_MISSING",
+                "Requested fact paths are absent from the signed artifact.",
+            )
+        provenance = artifact.get("provenance", {})
+        provenance_sha256 = str(
+            artifact.get("provenance_sha256") or _hash_payload(provenance)
+        )
+        return cls(
+            artifact_id=str(artifact["artifact_id"]),
+            artifact_token=artifact_token,
+            facts={path: available[path] for path in sorted(allowed_fact_paths)},
+            provenance_sha256=provenance_sha256,
+            artifact_sha256=str(artifact["artifact_sha256"]),
+        )
 
     def identity_is_valid(self) -> bool:
-        payload = self.model_dump(mode="json", exclude={"artifact_sha256"})
-        return _hash_payload(payload) == self.artifact_sha256
+        artifact = get_cached_domain_artifact(self.artifact_token)
+        if artifact is None or not verify_domain_artifact(artifact):
+            return False
+        raw_facts = artifact.get("facts")
+        if isinstance(raw_facts, dict):
+            available = raw_facts
+        elif isinstance(raw_facts, list):
+            available = {
+                str(item["fact_id"]): item["value"]
+                for item in raw_facts
+                if isinstance(item, dict) and "fact_id" in item and "value" in item
+            }
+        else:
+            return False
+        provenance_sha256 = str(
+            artifact.get("provenance_sha256")
+            or _hash_payload(artifact.get("provenance", {}))
+        )
+        return (
+            artifact.get("artifact_id") == self.artifact_id
+            and artifact.get("artifact_sha256") == self.artifact_sha256
+            and provenance_sha256 == self.provenance_sha256
+            and self.facts
+            == {path: available.get(path) for path in sorted(self.facts)}
+            and all(path in available for path in self.facts)
+        )
 
 
 class FactNode(FrozenModel):

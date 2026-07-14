@@ -18,6 +18,7 @@ from jyotish_agent.doctrine.graph import (
     SignedFactProjection,
 )
 from jyotish_agent.doctrine.sources import SourceManifest
+from jyotish_agent.signing import cache_domain_artifact
 
 
 def _fixture() -> tuple[EvidenceStore, object, FragmentDraft]:
@@ -140,10 +141,16 @@ def _facts(**updates: object) -> SignedFactProjection:
         "jaimini.dasha.active.sign": "Gemini",
     }
     facts.update(updates)
-    return SignedFactProjection.create(
-        artifact_id="dom_graph_fixture",
-        facts=facts,
-        provenance_sha256=hashlib.sha256(b"provenance").hexdigest(),
+    artifact = cache_domain_artifact(
+        {
+            "mode": "test",
+            "facts": facts,
+            "provenance_sha256": hashlib.sha256(b"provenance").hexdigest(),
+        }
+    )
+    return SignedFactProjection.from_artifact_token(
+        artifact_token=artifact["artifact_token"],
+        allowed_fact_paths=tuple(facts),
     )
 
 
@@ -153,10 +160,17 @@ def test_same_inputs_are_order_independent_and_every_conclusion_has_complete_edg
     store, compiled, _ = _fixture()
     builder = DoctrineGraphBuilder(store)
     first = builder.build(compiled, _facts(), prohibited_topics=("medical",))
-    reverse = SignedFactProjection.create(
-        artifact_id="dom_graph_fixture",
-        facts=dict(reversed(list(_facts().facts.items()))),
-        provenance_sha256=_facts().provenance_sha256,
+    reverse_values = dict(reversed(list(_facts().facts.items())))
+    reverse_artifact = cache_domain_artifact(
+        {
+            "mode": "test",
+            "facts": reverse_values,
+            "provenance_sha256": hashlib.sha256(b"provenance").hexdigest(),
+        }
+    )
+    reverse = SignedFactProjection.from_artifact_token(
+        artifact_token=reverse_artifact["artifact_token"],
+        allowed_fact_paths=tuple(reverse_values),
     )
     second = builder.build(compiled, reverse, prohibited_topics=("medical",))
 
@@ -213,6 +227,16 @@ def test_substituted_fact_profile_and_stale_source_fail_closed() -> None:
             facts.model_copy(update={"facts": {**facts.facts, "invented": True}}),
         )
     assert bad_facts.value.code == "FACT_ARTIFACT_SUBSTITUTED"
+
+    forged = facts.model_copy(
+        update={
+            "facts": {**facts.facts, "jaimini.karakas.AmK.planet": "Jupiter"},
+            "artifact_sha256": hashlib.sha256(b"self-hashed-forgery").hexdigest(),
+        }
+    )
+    with pytest.raises(GraphFailure) as forged_facts:
+        builder.build(compiled, forged)
+    assert forged_facts.value.code == "FACT_ARTIFACT_SUBSTITUTED"
 
     with pytest.raises(GraphFailure) as bad_profile:
         builder.build(

@@ -48,7 +48,7 @@ class FirewallResult(FrozenModel):
 
 class RenderedReport(FrozenModel):
     locale: Literal["ru", "en"]
-    admission_status: Literal["experimental_full"] = "experimental_full"
+    admission_status: Literal["not_evaluated"] = "not_evaluated"
     claims: tuple[StructuredClaim, ...]
     violations: tuple[FirewallViolation, ...]
     repairs_attempted: int = Field(ge=0, le=2)
@@ -270,7 +270,7 @@ class ConstrainedRenderer:
             lines = [
                 "# Доктринальный анализ",
                 "",
-                "Статус: experimental_full — автоматические проверки пройдены; внешняя экспертная проверка может отсутствовать.",
+                "Статус допуска здесь не оценивается; его определяет вызывающий release-аудит.",
                 "",
             ]
             empty = "Проверенных утверждений не осталось."
@@ -280,7 +280,7 @@ class ConstrainedRenderer:
             lines = [
                 "# Doctrine analysis",
                 "",
-                "Status: experimental_full — automated gates passed; external specialist review may be absent.",
+                "Admission is not evaluated here; the calling release audit decides eligibility.",
                 "",
             ]
             empty = "No validated claims remain."

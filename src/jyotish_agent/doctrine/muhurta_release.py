@@ -19,6 +19,7 @@ from .muhurta_pack import (
     MuhurtaRuleInterval,
     evaluate_muhurta_eligibility,
     load_muhurta_admitted_rule_pack,
+    load_muhurta_release_audit,
     load_muhurta_ranking_profile,
     rank_muhurta_candidates,
     render_muhurta_report,
@@ -107,6 +108,16 @@ def execute_muhurta_full(
 ) -> MuhurtaFullExecution:
     """Run the immutable private baseline; never select the missing modern overlay."""
 
+    try:
+        load_muhurta_release_audit(verify_source_bytes=False)
+    except ValueError:
+        return MuhurtaFullExecution(
+            status="unavailable",
+            profile=None,
+            report=None,
+            reason_code="RELEASE_IDENTITY_INVALID",
+        )
+
     route = route_muhurta_activity(value.activity, locale=locale)
     if route.status == "unsupported_high_stakes":
         return MuhurtaFullExecution(
@@ -122,9 +133,19 @@ def execute_muhurta_full(
             report=None,
             reason_code=route.reason_code,
         )
+    if value.natal is not None:
+        return MuhurtaFullExecution(
+            status="unavailable",
+            profile=route.profile,
+            report=None,
+            reason_code="NATAL_PERSONALIZATION_NOT_COMPILED",
+        )
 
     request = _base_request(value)
-    base = MuhurtaFacade().search(request)
+    base = MuhurtaFacade().search(
+        request,
+        internal_result_limit=request.max_candidate_intervals,
+    )
     if base.status != "completed":
         return MuhurtaFullExecution(
             status="incomplete" if base.status == "incomplete" else "needs_input",
@@ -215,6 +236,12 @@ def execute_muhurta_full(
 
     ranking = rank_muhurta_candidates(
         tuple(candidates), load_muhurta_ranking_profile(route.profile)
+    )
+    ranking = ranking.model_copy(
+        update={
+            "ranked": ranking.ranked[: value.result_limit],
+            "near_misses": ranking.near_misses[: value.near_miss_limit],
+        }
     )
     report = render_muhurta_report(
         ranking,

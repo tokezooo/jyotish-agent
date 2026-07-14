@@ -15,6 +15,7 @@ from jyotish_agent.doctrine.graph import (
     SignedFactProjection,
 )
 from jyotish_agent.doctrine.sources import SourceManifest
+from jyotish_agent.signing import cache_domain_artifact
 
 
 def build_jaimini_graph(
@@ -103,10 +104,17 @@ def build_jaimini_graph(
         definitions,
         fact_catalog=frozenset(facts),
     )
-    projection = SignedFactProjection.create(
-        artifact_id=artifact_id,
-        facts=facts,
-        provenance_sha256=hashlib.sha256(b"fixture-provenance").hexdigest(),
+    artifact = cache_domain_artifact(
+        {
+            "mode": "test",
+            "fixture_artifact_id": artifact_id,
+            "facts": facts,
+            "provenance_sha256": hashlib.sha256(b"fixture-provenance").hexdigest(),
+        }
+    )
+    projection = SignedFactProjection.from_artifact_token(
+        artifact_token=artifact["artifact_token"],
+        allowed_fact_paths=tuple(facts),
     )
     return DoctrineGraphBuilder(evidence).build(
         compiled,

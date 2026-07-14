@@ -612,21 +612,45 @@ async def muhurta_full_release(
 ) -> MuhurtaFullReleaseResult:
     """Run the read-only private Expanded Muhurta baseline."""
 
-    from .doctrine.muhurta_pack import MuhurtaReleaseAudit
+    from .doctrine.muhurta_pack import (
+        load_muhurta_release_audit,
+        route_muhurta_activity,
+    )
     from .doctrine.muhurta_release import execute_muhurta_full
 
-    audit = MuhurtaReleaseAudit.model_validate_json(
-        (Path(__file__).parent / "data/doctrine/muhurta-release.json").read_text(
-            encoding="utf-8"
+    audit = load_muhurta_release_audit()
+    if not audit.available:
+        route = route_muhurta_activity(req.activity, locale=req.locale)
+        if route.status == "unsupported_high_stakes":
+            error_code = "HIGH_STAKES_ACTIVITY"
+            status = "unavailable"
+        elif route.status != "supported":
+            error_code = route.reason_code or "ACTIVITY_UNSUPPORTED"
+            status = "needs_input"
+        elif req.natal is not None:
+            error_code = "NATAL_PERSONALIZATION_NOT_COMPILED"
+            status = "unavailable"
+        else:
+            error_code = "RELEASE_GATES_INCOMPLETE"
+            status = "unavailable"
+        return MuhurtaFullReleaseResult(
+            status=status,
+            request_mode=req.mode,
+            locale=req.locale,
+            profile=route.profile,
+            admission_state=audit.admission_state,
+            public_release_blockers=list(audit.public_release_blockers),
+            external_review_missing=audit.external_review_missing,
+            report=None,
+            error_code=error_code,
         )
-    )
     execution = execute_muhurta_full(req, locale=req.locale, mode=req.mode)
     return MuhurtaFullReleaseResult(
         status=execution.status,
         request_mode=req.mode,
         locale=req.locale,
         profile=execution.profile,
-        admission_state="private_experimental",
+        admission_state=audit.admission_state,
         public_release_blockers=list(audit.public_release_blockers),
         external_review_missing=audit.external_review_missing,
         report=(

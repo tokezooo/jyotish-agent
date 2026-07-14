@@ -1,0 +1,81 @@
+{
+  "schema_version": "1.0",
+  "audit_id": "jyotish_doctrine_platform_v1",
+  "domains": [
+    {
+      "domain": "jaimini",
+      "release_id": "full_jaimini_v1",
+      "evidence_sha256": "095617c625fa92e4fcaaf0ee6a049d7597b7685093b7ec82f668f23b8991c330",
+      "admission_state": "blocked_sources",
+      "available": false,
+      "gate_statuses": {"rule_fixtures": "passed", "hand_worked_cases": "missing", "school_conflict_cases": "passed", "metamorphic_tests": "passed", "held_out_cases": "missing", "conversational_e2e_ru": "passed", "conversational_e2e_en": "passed", "privacy_adversarial": "passed", "payload_performance": "passed", "deep_conversational_e2e": "missing"},
+      "blockers": [
+        "compiled_profile: no source-admitted production profile exists",
+        "nilakantha_subodhini_translation: licensed local bytes missing",
+        "practical_chara_dasha: licensed local source missing",
+        "published_worked_charts: 20 traceable cases missing",
+        "sanjay_rath_overlay: licensed local bytes missing",
+        "kn_rao_overlay: selected licensed local source missing",
+        "specialist_review: no production rule/profile review"
+      ]
+    },
+    {
+      "domain": "prashna",
+      "release_id": "full_prashna_v1",
+      "evidence_sha256": "4650bb728752375cb7171d64f3c559286495c07ac1d95d4db5f70fece531a117",
+      "admission_state": "blocked_sources",
+      "available": false,
+      "gate_statuses": {"source_manifest": "passed", "radicality_and_anchor_suite": "passed", "taxonomy_ru_en": "passed", "geometry_property_suite": "passed", "outcome_graph_and_privacy": "passed", "tajika_source_admission": "failed", "published_outcome_cases": "missing", "held_out_questions": "missing", "concierge_future_outcomes": "missing", "specialist_review": "missing"},
+      "blockers": [
+        "published_outcome_cases: one additional complete traceable case is required",
+        "tajika_source_admission: OCR, translation, and specialist review are incomplete",
+        "compiled_profile: no production source-admitted Prashna profile exists",
+        "held_out_questions: no independent held-out set has been evaluated"
+      ]
+    },
+    {
+      "domain": "muhurta",
+      "release_id": "expanded_muhurta_v1",
+      "evidence_sha256": "862cf23ca56bb1b891a4ca8e1f85be436daab83c82fafd54ec1e2da6671a30f9",
+      "admission_state": "blocked_evaluation",
+      "available": false,
+      "gate_statuses": {"source_manifest": "passed", "profile_identity": "passed", "private_baseline_profile": "passed", "profile_rule_fixture_suite": "passed", "private_runtime_e2e": "passed", "independent_held_out_evaluation": "missing", "modern_overlay": "optional_missing", "specialist_review": "missing", "cross_domain_concierge_sessions": "missing", "whole_project_independent_review": "missing"},
+      "blockers": [
+        "independent_held_out_evaluation: no independently designed outcome corpus and evaluator result exists",
+        "specialist_review: external rule-pack review is missing",
+        "cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
+        "whole_project_independent_review: no independent final review has been recorded",
+        "modern_overlay: the named modern source has not been lawfully supplied and reviewed"
+      ]
+    }
+  ],
+  "verification": {
+    "review_remediation_suite": {"command": "uv run pytest -q tests/test_task7_release.py::test_domain_tool_snapshot_matches_live_discovery tests/doctrine/test_lea_544_muhurta_release.py", "status": "passed", "passed": 11, "failed": 0},
+    "full_python_suite": {"command": "uv run pytest -q", "status": "passed", "passed": 788, "failed": 0, "skipped": 2},
+    "ruff": {"command": "uv run ruff check src tests", "status": "passed"},
+    "typescript": {"command": "bun run typecheck", "status": "passed"},
+    "bun_tests": {"command": "bun test", "status": "passed", "passed": 58, "failed": 0}
+  },
+  "private_source_scan": {"status": "passed", "tracked_private_source_count": 0},
+  "all_domains_available": false,
+  "public_release_ready": false,
+  "blockers": [
+    "jaimini: compiled_profile: no source-admitted production profile exists",
+    "jaimini: nilakantha_subodhini_translation: licensed local bytes missing",
+    "jaimini: practical_chara_dasha: licensed local source missing",
+    "jaimini: published_worked_charts: 20 traceable cases missing",
+    "jaimini: sanjay_rath_overlay: licensed local bytes missing",
+    "jaimini: kn_rao_overlay: selected licensed local source missing",
+    "jaimini: specialist_review: no production rule/profile review",
+    "prashna: published_outcome_cases: one additional complete traceable case is required",
+    "prashna: tajika_source_admission: OCR, translation, and specialist review are incomplete",
+    "prashna: compiled_profile: no production source-admitted Prashna profile exists",
+    "prashna: held_out_questions: no independent held-out set has been evaluated",
+    "muhurta: independent_held_out_evaluation: no independently designed outcome corpus and evaluator result exists",
+    "muhurta: specialist_review: external rule-pack review is missing",
+    "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
+    "muhurta: whole_project_independent_review: no independent final review has been recorded",
+    "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
+  ],
+  "audit_sha256": "5554153679e61d3fd368f303b300e1983758ecfcc2843283c38af6e4c41012b8"
+}

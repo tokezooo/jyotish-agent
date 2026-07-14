@@ -14,6 +14,7 @@ from jyotish_agent.doctrine.renderer import (
     ConstrainedRenderer,
 )
 from jyotish_agent.doctrine.sources import SourceManifest
+from jyotish_agent.signing import cache_domain_artifact
 
 
 def _renderer_and_graph():
@@ -104,10 +105,16 @@ def _renderer_and_graph():
         [rule],
         fact_catalog=frozenset({"jaimini.karakas.AmK.planet"}),
     )
-    facts = SignedFactProjection.create(
-        artifact_id="dom_renderer",
-        facts={"jaimini.karakas.AmK.planet": "Mercury"},
-        provenance_sha256=hashlib.sha256(b"provenance").hexdigest(),
+    artifact = cache_domain_artifact(
+        {
+            "mode": "test",
+            "facts": {"jaimini.karakas.AmK.planet": "Mercury"},
+            "provenance_sha256": hashlib.sha256(b"provenance").hexdigest(),
+        }
+    )
+    facts = SignedFactProjection.from_artifact_token(
+        artifact_token=artifact["artifact_token"],
+        allowed_fact_paths=("jaimini.karakas.AmK.planet",),
     )
     graph = DoctrineGraphBuilder(store).build(
         compiled, facts, prohibited_topics=("medical", "longevity")
@@ -122,8 +129,9 @@ def test_deterministic_ru_en_reports_validate_identically_and_hide_internals() -
 
     assert ru.claims == en.claims
     assert ru.violations == en.violations == ()
-    assert "experimental_full" in ru.markdown
-    assert "experimental_full" in en.markdown
+    assert ru.admission_status == en.admission_status == "not_evaluated"
+    assert "release-аудит" in ru.markdown
+    assert "release audit" in en.markdown
     assert "A bounded symbolic career theme is supported." in ru.markdown
     for secret in (
         "frag_",
