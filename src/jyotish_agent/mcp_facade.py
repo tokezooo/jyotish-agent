@@ -296,15 +296,27 @@ class JyotishMcpFacade:
         """Compute one stateless, sealed question-time Praśna result."""
         return PrashnaFacade(clock=self.clock).calculate(value)
 
-    def prashna_payload(self, value: dict[str, Any]) -> PrashnaResult:
+    def prashna_payload(
+        self,
+        value: object,
+        *,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> PrashnaResult:
         """Sanitize adapter validation failures into the stable domain envelope."""
-        try:
-            parsed = PrashnaMcpInput.model_validate(value)
-        except ValidationError:
+        parsed: PrashnaMcpInput | None = None
+        if not outer_arguments and isinstance(value, dict):
+            try:
+                parsed = PrashnaMcpInput.model_validate(value)
+            except ValidationError:
+                pass
+        if parsed is None:
             import hashlib
 
             request_id = "prq_" + hashlib.sha256(
-                json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode()
+                json.dumps(
+                    {"request": value, "outer": outer_arguments},
+                    sort_keys=True, separators=(",", ":"), default=str,
+                ).encode()
             ).hexdigest()[:24]
             from .error_registry import error_record
             from .prashna_models import PrashnaNeedsInputResult

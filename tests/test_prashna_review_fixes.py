@@ -9,7 +9,7 @@ from pydantic import ValidationError
 from jyotish_agent import interpretations
 from jyotish_agent.event_models import EventAnchor, EventPlace
 from jyotish_agent.prashna import PrashnaFacade
-from jyotish_agent.prashna_models import PrashnaRequest
+from jyotish_agent.prashna_models import PrashnaAnswerSubmission, PrashnaRequest
 from jyotish_agent.prashna_profiles import (
     PrashnaAdjudicationFixtures,
     PrashnaRuleProfile,
@@ -236,11 +236,22 @@ def test_checker_accepts_only_canonical_structured_computed_claims():
         "value": "10",
         "text": "prashna.topic.primary_house = 10",
     }
-    predictive = {**valid, "text": "Project Alpha will definitely succeed."}
-    assert interpretations.validate_prashna_answer([valid], result.artifact_token) == []
-    assert interpretations.validate_prashna_answer([predictive], result.artifact_token) == [
+    submission = PrashnaAnswerSubmission(
+        artifact_id=result.artifact_id, artifact_sha256=result.artifact_sha256,
+        artifact_token=result.artifact_token, anchor_token=result.anchor_token,
+        normalized_anchor_sha256=result.normalized_anchor_sha256,
+        question_fingerprint=result.question_fingerprint,
+        current_question_fingerprint=result.current_question_fingerprint,
+        question_relation=result.question_relation, claims=[valid], visible_text=valid["text"],
+    )
+    assert interpretations.validate_prashna_answer(submission) == []
+    predictive = submission.model_copy(update={
+        "claims": (submission.claims[0].model_copy(update={"text": "Project Alpha will definitely succeed."}),),
+        "visible_text": "Project Alpha will definitely succeed.",
+    })
+    assert interpretations.validate_prashna_answer(predictive) == [
         "UNSUPPORTED_CLAIM_TEXT:prashna.topic.primary_house"
     ]
-    assert interpretations.validate_prashna_answer(
-        [{"path": valid["path"], "value": valid["value"]}], result.artifact_token
-    ) == ["INVALID_CLAIM_STRUCTURE"]
+    invalid = submission.model_dump(mode="json")
+    invalid["claims"] = [{"path": valid["path"], "value": valid["value"]}]
+    assert interpretations.validate_prashna_answer(invalid) == ["INVALID_ANSWER_SUBMISSION"]

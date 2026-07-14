@@ -27,6 +27,13 @@ ERROR_REGISTRY: dict[str, dict[str, Any]] = {
         "fix": "Create a new anchor for this question.",
         "next_action": "create_new_anchor",
     },
+    "ANCHOR_STALE": {
+        "retryable": False,
+        "problem": "The sealed question anchor cannot be replayed under current material.",
+        "cause": "Timezone, rule-profile, or calculation-configuration material changed.",
+        "fix": "Create a new anchor under the current verified runtime material.",
+        "next_action": "create_new_anchor",
+    },
     "TOPIC_UNSUPPORTED": {
         "retryable": False,
         "problem": "The question is outside the admitted Praśna family.",

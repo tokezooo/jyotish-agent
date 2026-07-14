@@ -7,7 +7,7 @@ import pytest
 
 from jyotish_agent import interpretations, signing
 from jyotish_agent.prashna import PrashnaFacade, route_prashna_topic
-from jyotish_agent.prashna_models import PrashnaRequest
+from jyotish_agent.prashna_models import PrashnaAnswerSubmission, PrashnaRequest
 
 
 ANCHOR = {
@@ -57,18 +57,24 @@ def test_explicit_anchor_calculates_bounded_signed_facts_and_fails_source_closed
         changed = copy.deepcopy(artifact)
         changed[field] = "0" * 64 if "sha256" in field or field == "question_fingerprint" else []
         assert signing.verify_domain_artifact(changed) is False
-    assert interpretations.validate_prashna_answer(
-        [{
+    claim = {
             "claim_type": "computed_fact",
             "path": "prashna.topic.primary_house",
             "value": "10",
             "text": "prashna.topic.primary_house = 10",
-        }],
-        result.artifact_token,
-    ) == []
-    assert interpretations.validate_prashna_answer([], result.artifact_token, interpretation_requested=True) == [
-        "INTERPRETATION_SOURCE_UNAVAILABLE"
-    ]
+    }
+    submission = PrashnaAnswerSubmission(
+        artifact_id=result.artifact_id, artifact_sha256=result.artifact_sha256,
+        artifact_token=result.artifact_token, anchor_token=result.anchor_token,
+        normalized_anchor_sha256=result.normalized_anchor_sha256,
+        question_fingerprint=result.question_fingerprint,
+        current_question_fingerprint=result.current_question_fingerprint,
+        question_relation=result.question_relation, claims=[claim], visible_text=claim["text"],
+    )
+    assert interpretations.validate_prashna_answer(submission) == []
+    assert interpretations.validate_prashna_answer(
+        submission.model_copy(update={"claims": (), "visible_text": "Project will succeed."})
+    ) == ["UNSUPPORTED_VISIBLE_TEXT"]
 
 
 def test_exactly_once_now_capture_and_anchor_reuse_mismatch_and_tamper():

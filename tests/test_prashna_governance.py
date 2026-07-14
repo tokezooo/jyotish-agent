@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from jyotish_agent import interpretations, signing
 from jyotish_agent.prashna import PrashnaFacade
-from jyotish_agent.prashna_models import PrashnaRequest, PrashnaRuleResult
+from jyotish_agent.prashna_models import PrashnaAnswerSubmission, PrashnaRequest, PrashnaRuleResult
 from jyotish_agent.prashna_profiles import (
     load_prashna_adjudication_fixtures,
     load_prashna_rule_profile,
@@ -33,7 +33,7 @@ def test_profile_source_and_five_cases_are_checksum_bound_and_honestly_pending()
     }
     assert fixtures.gate_status == "pending"
     assert fixtures.reviewer is fixtures.reviewer_role is None
-    assert len(fixtures.cases) == 5
+    assert len(fixtures.cases) >= 7
     assert all(case.review_status == "pending" for case in fixtures.cases)
 
 
@@ -54,11 +54,19 @@ def test_checker_rejects_mixed_anchor_fingerprint_and_duplicate_atoms():
         _request("Europe/Moscow", "2026-07-14T12:00:00+03:00", "A", 55.75, 37.61)
     )
     artifact = signing.get_cached_domain_artifact(result.artifact_token)
+    submission = PrashnaAnswerSubmission(
+        artifact_id=result.artifact_id, artifact_sha256=result.artifact_sha256,
+        artifact_token=result.artifact_token, anchor_token=result.anchor_token,
+        normalized_anchor_sha256=result.normalized_anchor_sha256,
+        question_fingerprint=result.question_fingerprint,
+        current_question_fingerprint=result.current_question_fingerprint,
+        question_relation=result.question_relation, claims=(), visible_text="",
+    )
     assert interpretations.validate_prashna_answer(
-        [], result.artifact_token, normalized_anchor_sha256="0" * 64
+        submission.model_copy(update={"normalized_anchor_sha256": "0" * 64})
     ) == ["ANCHOR_MISMATCH"]
     assert interpretations.validate_prashna_answer(
-        [], result.artifact_token, question_fingerprint="0" * 64
+        submission.model_copy(update={"question_fingerprint": "0" * 64})
     ) == ["QUESTION_FINGERPRINT_MISMATCH"]
     facts = artifact["facts"]
     try:

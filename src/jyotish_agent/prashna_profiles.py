@@ -6,6 +6,7 @@ import hashlib
 import json
 from importlib import resources
 from typing import Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
@@ -106,9 +107,16 @@ class PrashnaSourceMap(_Frozen):
 
 class PrashnaAdjudicationCase(_Frozen):
     case_id: str = Field(min_length=1, max_length=100)
-    family: str = Field(min_length=1, max_length=100)
+    criterion: Literal[
+        "explicit_anchor", "now_retry_reuse", "clarification_reuse",
+        "material_mismatch", "unsafe_topic", "unsupported_topic", "dst_error",
+    ]
+    profile_id: Literal["prashna_work_v1"]
+    family: Literal[
+        "work_project_status_and_obstacles", "material_mismatch", "unsafe", "unsupported",
+    ]
     zone_id: str = Field(min_length=1, max_length=100)
-    anchor_kind: str = Field(min_length=1, max_length=100)
+    anchor_kind: Literal["explicit", "captured_now", "token_reuse", "error"]
     review_status: Literal["pending", "approved", "rejected"]
 
 
@@ -117,7 +125,57 @@ class PrashnaAdjudicationFixtures(_Frozen):
     reviewer: str | None = None
     reviewer_role: str | None = None
     reason: str = Field(min_length=1, max_length=500)
-    cases: tuple[PrashnaAdjudicationCase, ...] = Field(min_length=5, max_length=5)
+    cases: tuple[PrashnaAdjudicationCase, ...] = Field(min_length=7, max_length=7)
+
+    @model_validator(mode="after")
+    def semantic_coverage(self) -> "PrashnaAdjudicationFixtures":
+        if not _adjudication_semantics_valid(self.cases):
+            raise ValueError("adjudication cases do not cover the frozen unique criteria")
+        return self
+
+
+_REQUIRED_CASES = {
+    "explicit_anchor": ("work_project_status_and_obstacles", "explicit"),
+    "now_retry_reuse": ("work_project_status_and_obstacles", "captured_now"),
+    "clarification_reuse": ("work_project_status_and_obstacles", "token_reuse"),
+    "material_mismatch": ("material_mismatch", "token_reuse"),
+    "unsafe_topic": ("unsafe", "explicit"),
+    "unsupported_topic": ("unsupported", "explicit"),
+    "dst_error": ("work_project_status_and_obstacles", "error"),
+}
+
+
+def _adjudication_semantics_valid(cases: tuple[PrashnaAdjudicationCase, ...]) -> bool:
+    try:
+        criteria = {case.criterion for case in cases}
+        ids = [case.case_id for case in cases]
+        content = [
+            (case.criterion, case.profile_id, case.family, case.zone_id, case.anchor_kind)
+            for case in cases
+        ]
+        zones_valid = True
+        for case in cases:
+            if "/" not in case.zone_id or case.zone_id.startswith(("Etc/", "posix/", "right/")):
+                zones_valid = False
+                break
+            try:
+                ZoneInfo(case.zone_id)
+            except (ValueError, ZoneInfoNotFoundError):
+                zones_valid = False
+                break
+        return bool(
+            _REQUIRED_CASES.keys() == criteria
+            and len(criteria) == len(cases)
+            and len(ids) == len(set(ids))
+            and len(content) == len(set(content))
+            and zones_valid
+            and all(
+                (case.family, case.anchor_kind) == _REQUIRED_CASES.get(case.criterion)
+                for case in cases
+            )
+        )
+    except (AttributeError, TypeError):
+        return False
 
 
 def _bytes(name: str) -> bytes:
@@ -223,6 +281,7 @@ def prashna_source_admission_evidence() -> dict:
         and fixtures.gate_status == "approved"
         and fixtures.reviewer
         and fixtures.reviewer_role
+        and _adjudication_semantics_valid(fixtures.cases)
         and all(case.review_status == "approved" for case in fixtures.cases)
         and doctrinal_rules
         and doctrinal_rules == set(mappings)

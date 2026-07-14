@@ -116,6 +116,7 @@ class PrashnaCompletedResult(_BaseResult):
     status: Literal["completed"]
     anchor_token: str = Field(pattern=r"^[0-9a-f]{64}$")
     anchor_summary: str = Field(max_length=200)
+    normalized_anchor_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     question_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
     current_question_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
     question_relation: Literal["new_anchor", "exact_duplicate", "bounded_clarification"]
@@ -134,7 +135,7 @@ class PrashnaCompletedResult(_BaseResult):
 
 class PrashnaNeedsInputResult(_ErrorResultBase):
     status: Literal["needs_input"]
-    error_code: Literal["ANCHOR_MISMATCH", "TOPIC_UNSUPPORTED", "TOPIC_COMPOSITE", "IDEMPOTENCY_CONFLICT", "INPUT_INVALID"]
+    error_code: Literal["ANCHOR_MISMATCH", "ANCHOR_STALE", "TOPIC_UNSUPPORTED", "TOPIC_COMPOSITE", "IDEMPOTENCY_CONFLICT", "INPUT_INVALID"]
     next_action: Literal["create_new_anchor", "provide_primary_question", "use_new_idempotency_key", "correct_request"]
     supported_values: tuple[str, ...] = ("work_project_status_and_obstacles",)
 
@@ -160,3 +161,25 @@ PrashnaResult = Annotated[
 
 class PrashnaResultModel(RootModel[PrashnaResult]):
     pass
+
+
+class PrashnaAnswerClaim(_Frozen):
+    claim_type: Literal["computed_fact"]
+    path: str = Field(pattern=r"^prashna\.[A-Za-z0-9_.-]+$", max_length=180)
+    value: str = Field(max_length=500)
+    text: str = Field(max_length=800)
+
+
+class PrashnaAnswerSubmission(_Strict):
+    """Complete facts-only answer boundary; every replay binding is mandatory."""
+
+    artifact_id: str = Field(pattern=r"^jya_[0-9a-f]{24}$")
+    artifact_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    artifact_token: str = Field(pattern=r"^[0-9a-f]{64}$")
+    anchor_token: str = Field(pattern=r"^[0-9a-f]{64}$")
+    normalized_anchor_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    question_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
+    current_question_fingerprint: str = Field(pattern=r"^[0-9a-f]{64}$")
+    question_relation: Literal["new_anchor", "exact_duplicate", "bounded_clarification"]
+    claims: tuple[PrashnaAnswerClaim, ...] = Field(max_length=100)
+    visible_text: str = Field(max_length=100_000)

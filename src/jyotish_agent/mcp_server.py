@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.utilities.func_metadata import ArgModelBase
 from mcp.types import ToolAnnotations
+from pydantic import BaseModel, ConfigDict
 
 from .mcp_facade import JyotishMcpFacade, facade_from_environment
 from .jaimini_models import JaiminiResultModel
@@ -17,6 +19,7 @@ from .mcp_models import (
     FinalizeResearchInput,
     InspectResearchInput,
     JaiminiMcpInput,
+    PrashnaMcpInput,
     ProfileInput,
     ProfileResult,
     ResearchBundle,
@@ -25,6 +28,26 @@ from .mcp_models import (
     SourceSearchInput,
     SourceSearchResult,
 )
+
+
+class _PrashnaPublishedArguments(BaseModel):
+    """Strict discovery schema, kept separate from the total privacy adapter."""
+
+    model_config = ConfigDict(extra="forbid")
+    request: PrashnaMcpInput
+
+
+class _PrashnaWireArguments(ArgModelBase):
+    """Accept every outer shape so invalid values reach our sanitized envelope."""
+
+    request: Any = None
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+
+    def model_dump_one_level(self) -> dict[str, Any]:
+        return {
+            "request": self.request,
+            "outer_arguments": dict(self.model_extra or {}),
+        }
 
 
 SERVER_INSTRUCTIONS = """Normal conversation is the default. Use quick, stateless tools for focused personal questions and follow-ups. Create a ResearchRun only for broad multi-factor analysis or when the user explicitly asks for deep research. Влад is the default profile; use an inline profile only when the user clearly identifies another person and supplies their birth data. For deep research, the final visible answer must equal finalize_research.markdown exactly; never expand or rewrite it. Keep evidence IDs, claim graphs, confidence machinery, hashes, and run-state details out of normal visible answers. Explain Jyotish as symbolic interpretation, not guaranteed prediction.
@@ -112,8 +135,25 @@ def build_server(facade: JyotishMcpFacade | None = None) -> FastMCP:
         annotations=READ_ONLY,
         structured_output=True,
     )
-    def prashna(request: dict[str, Any]) -> PrashnaResultModel:
-        return PrashnaResultModel(root=runtime.prashna_payload(request))
+    def prashna(
+        request: Any = None,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> PrashnaResultModel:
+        return PrashnaResultModel(
+            root=runtime.prashna_payload(
+                request,
+                outer_arguments=outer_arguments,
+            )
+        )
+
+    # FastMCP normally uses one generated Pydantic model for both discovery and
+    # execution. Decouple them here: discovery remains fully strict, while the
+    # execution model is total and sends every malformed outer/nested value to the
+    # privacy-safe INPUT_INVALID domain result instead of a value-echoing ToolError.
+    prashna_tool = server._tool_manager.get_tool("prashna")
+    assert prashna_tool is not None
+    prashna_tool.parameters = _PrashnaPublishedArguments.model_json_schema()
+    prashna_tool.fn_metadata.arg_model = _PrashnaWireArguments
 
     @server.tool(
         name="search_sources",

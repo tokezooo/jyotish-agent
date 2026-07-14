@@ -255,56 +255,58 @@ def iter_prashna_fact_atoms(facts: list[dict]) -> dict[str, str]:
     return atoms
 
 
-def validate_prashna_answer(
-    claims: list[dict],
-    artifact_token: str,
-    *,
-    interpretation_requested: bool = False,
-    normalized_anchor_sha256: str | None = None,
-    question_fingerprint: str | None = None,
-    current_question_fingerprint: str | None = None,
-    question_relation: str | None = None,
-) -> list[str]:
-    """Validate citations and keep Praśna doctrine fail-closed."""
-    from .prashna_profiles import prashna_source_admission_evidence
+def validate_prashna_answer(submission: object) -> list[str]:
+    """Validate one complete canonical facts-only answer and all replay bindings."""
+    from pydantic import ValidationError
 
-    artifact = get_cached_domain_artifact(artifact_token)
+    from .prashna_models import PrashnaAnswerSubmission
+
+    try:
+        value = (
+            submission
+            if isinstance(submission, PrashnaAnswerSubmission)
+            else PrashnaAnswerSubmission.model_validate(submission)
+        )
+    except ValidationError:
+        return ["INVALID_ANSWER_SUBMISSION"]
+
+    artifact = get_cached_domain_artifact(value.artifact_token)
     if artifact is None:
         return ["ARTIFACT_NOT_FOUND"]
     if not verify_domain_artifact(artifact) or artifact.get("mode") != "prashna":
         return ["ARTIFACT_INVALID"]
-    if normalized_anchor_sha256 is not None and artifact.get("normalized_anchor_sha256") != normalized_anchor_sha256:
+    if artifact.get("artifact_id") != value.artifact_id:
+        return ["ARTIFACT_ID_MISMATCH"]
+    if artifact.get("artifact_sha256") != value.artifact_sha256:
+        return ["ARTIFACT_SHA256_MISMATCH"]
+    if artifact.get("anchor_token") != value.anchor_token:
+        return ["ANCHOR_TOKEN_MISMATCH"]
+    if artifact.get("normalized_anchor_sha256") != value.normalized_anchor_sha256:
         return ["ANCHOR_MISMATCH"]
-    if question_fingerprint is not None and artifact.get("question_fingerprint") != question_fingerprint:
+    if artifact.get("question_fingerprint") != value.question_fingerprint:
         return ["QUESTION_FINGERPRINT_MISMATCH"]
-    if current_question_fingerprint is not None and artifact.get("current_question_fingerprint") != current_question_fingerprint:
+    if artifact.get("current_question_fingerprint") != value.current_question_fingerprint:
         return ["CURRENT_QUESTION_FINGERPRINT_MISMATCH"]
-    if question_relation is not None and artifact.get("question_relation") != question_relation:
+    if artifact.get("question_relation") != value.question_relation:
         return ["QUESTION_RELATION_MISMATCH"]
-    if interpretation_requested:
-        admission = prashna_source_admission_evidence()
-        if not admission["verified"]:
-            return ["INTERPRETATION_SOURCE_UNAVAILABLE"]
-        if artifact.get("source_admission_sha256") != admission["sha256"]:
-            return ["SOURCE_ADMISSION_MISMATCH"]
-        return ["INTERPRETATION_RENDERER_UNAVAILABLE"]
     atoms = iter_prashna_fact_atoms(artifact.get("facts", []))
     violations: list[str] = []
-    for claim in claims:
-        if not isinstance(claim, dict) or set(claim) != {"claim_type", "path", "value", "text"}:
-            violations.append("INVALID_CLAIM_STRUCTURE")
-            continue
-        if claim.get("claim_type") != "computed_fact":
-            violations.append("UNSUPPORTED_CLAIM_TYPE")
-            continue
-        path, value = str(claim["path"]).strip(), str(claim["value"]).strip()
-        if claim.get("text") != f"{path} = {value}":
+    seen: set[str] = set()
+    for claim in value.claims:
+        path, cited = claim.path.strip(), claim.value.strip()
+        if path in seen:
+            return [f"DUPLICATE_CLAIM:{path}"]
+        seen.add(path)
+        if claim.text != f"{path} = {cited}":
             violations.append(f"UNSUPPORTED_CLAIM_TEXT:{path}")
             continue
         if path not in atoms:
             violations.append(f"FACT_NOT_IN_ARTIFACT:{path}")
-        elif not _values_match(value, atoms[path]):
+        elif not _values_match(cited, atoms[path]):
             violations.append(f"FACT_VALUE_MISMATCH:{path}")
+    expected_visible = "\n".join(claim.text for claim in value.claims)
+    if value.visible_text != expected_visible:
+        return ["UNSUPPORTED_VISIBLE_TEXT"]
     return violations
 
 

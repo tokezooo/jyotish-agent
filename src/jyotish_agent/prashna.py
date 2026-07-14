@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from typing import Callable, Literal
 from zoneinfo import ZoneInfo
 
+from pydantic import ValidationError
+
 from . import ENGINE_VERSION, names
 from .config import CalculationConfig, ConfigError
 from .error_registry import error_record
@@ -137,6 +139,17 @@ def _anchor_payload(anchor: EventAnchor) -> dict:
 
 def _request_id(fingerprint: str, anchor_hash: str) -> str:
     return "prq_" + hashlib.sha256(f"{fingerprint}:{anchor_hash}".encode()).hexdigest()[:24]
+
+
+def _prashna_config_sha256() -> str:
+    config = CalculationConfig(charts=("D1",))
+    return _sha({
+        "ayanamsa": config.ayanamsa,
+        "rahu_ketu": config.rahu_ketu,
+        "node_aspects": config.node_aspects,
+        "charts": tuple(config.resolved_charts()),
+        "modules": tuple(sorted(config.resolved_modules())),
+    })
 
 
 @dataclass(frozen=True)
@@ -281,6 +294,7 @@ class PrashnaFacade:
                 "topic_family": route.family,
                 "rule_profile": rule_profile,
                 "rule_profile_sha256": prashna_rule_profile_sha256(),
+                "config_sha256": _prashna_config_sha256(),
             }
         )
 
@@ -305,6 +319,17 @@ class PrashnaFacade:
                 "ANCHOR_MISMATCH",
                 request_id="prq_" + fingerprint[:24],
                 stage="anchor_reuse",
+            ),
+        )
+
+    @staticmethod
+    def _stale(fingerprint: str) -> PrashnaNeedsInputResult:
+        return PrashnaNeedsInputResult(
+            status="needs_input",
+            **_error_fields(
+                "ANCHOR_STALE",
+                request_id="prq_" + fingerprint[:24],
+                stage="anchor_replay",
             ),
         )
 
@@ -349,11 +374,23 @@ class PrashnaFacade:
             ):
                 return self._mismatch(current_fingerprint)
             anchor_data = sealed["normalized_anchor"]
-            anchor = EventAnchor(
-                asked_at=anchor_data["asked_at"],
-                place=anchor_data["place"],
-                time_confidence=anchor_data["time_confidence"],
-            )
+            try:
+                anchor = EventAnchor(
+                    asked_at=anchor_data["asked_at"],
+                    place=anchor_data["place"],
+                    time_confidence=anchor_data["time_confidence"],
+                )
+                replayed_anchor = _anchor_payload(anchor)
+            except ValidationError:
+                return self._stale(current_fingerprint)
+            if (
+                sealed.get("rule_profile_sha256") != prashna_rule_profile_sha256()
+                or sealed.get("config_sha256") != _prashna_config_sha256()
+                or sealed.get("normalized_anchor_sha256") != _sha(replayed_anchor)
+                or anchor_data != replayed_anchor
+            ):
+                return self._stale(current_fingerprint)
+            anchor_data = replayed_anchor
             anchor_token = request.anchor_token
             fingerprint = str(sealed["question_fingerprint"])
             relation = "exact_duplicate" if exact else "bounded_clarification"
@@ -597,6 +634,7 @@ class PrashnaFacade:
         artifact = cache_domain_artifact(
             {
                 "mode": "prashna",
+                "anchor_token": anchor_token,
                 "normalized_anchor_sha256": anchor_hash,
                 "question_fingerprint": fingerprint,
                 "current_question_fingerprint": current_fingerprint,
@@ -620,6 +658,7 @@ class PrashnaFacade:
             request_id=request_id,
             anchor_token=anchor_token,
             anchor_summary=f"sealed question moment: {anchor_data['normalized_utc']}; {anchor_data['zone_id']}",
+            normalized_anchor_sha256=anchor_hash,
             question_fingerprint=fingerprint,
             current_question_fingerprint=current_fingerprint,
             question_relation=question_relation,
