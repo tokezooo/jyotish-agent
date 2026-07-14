@@ -59,6 +59,19 @@ async def _stdio_initializes_lists_and_calls_profile(tmp_path: Path):
             result = await session.call_tool("get_profile", {"request": {}})
 
     assert initialized.serverInfo.name == "jyotish"
-    assert len(tools.tools) == 9
+    assert {tool.name for tool in tools.tools} == {
+        "get_profile",
+        "calculate",
+        "jaimini",
+        "jaimini_full",
+        "prashna",
+        "prashna_full",
+        "muhurta",
+        "muhurta_full",
+        "search_sources",
+        "research",
+        "finalize_research",
+        "inspect_research",
+    }
     assert result.isError is False
     assert result.structuredContent["profile"]["name"] == "Vlad"
