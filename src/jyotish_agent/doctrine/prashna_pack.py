@@ -1141,3 +1141,62 @@ def decide_prashna_clarification(
         anchor_sha256=None,
         reason_code="MATERIAL_MISMATCH",
     )
+
+
+class PrashnaReleaseGate(FrozenModel):
+    gate_id: str = Field(min_length=1)
+    status: Literal["passed", "failed", "missing"]
+    evidence: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _honest_evidence(self) -> "PrashnaReleaseGate":
+        if self.status == "passed" and self.evidence is None:
+            raise ValueError("passed release gate requires evidence")
+        if self.status == "missing" and self.evidence is not None:
+            raise ValueError("missing release gate cannot claim evidence")
+        return self
+
+
+class PrashnaReleaseMetrics(FrozenModel):
+    published_outcome_case_count: int = Field(ge=0)
+    held_out_question_count: int = Field(ge=0)
+    material_error_rate: float | None = Field(default=None, ge=0.0, le=1.0)
+    no_answer_rate: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
+class PrashnaReleaseAudit(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    release_id: Literal["full_prashna_v1"]
+    corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    compiled_profile_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    admission_state: Literal[
+        "blocked_sources", "automated_verified", "experimental_full", "reviewed"
+    ]
+    gates: tuple[PrashnaReleaseGate, ...]
+    metrics: PrashnaReleaseMetrics
+    completed_evidence: tuple[str, ...]
+    future_outcome_follow_up: tuple[str, ...]
+    blockers: tuple[str, ...]
+    external_review_missing: bool
+    available: bool
+
+    @model_validator(mode="after")
+    def _honest_release(self) -> "PrashnaReleaseAudit":
+        ids = [gate.gate_id for gate in self.gates]
+        if len(ids) != len(set(ids)):
+            raise ValueError("release gate IDs must be unique")
+        expected_available = self.admission_state in {"experimental_full", "reviewed"}
+        if self.available != expected_available:
+            raise ValueError("release availability must follow admission state")
+        if self.available and (self.compiled_profile_sha256 is None or self.blockers):
+            raise ValueError("available release requires a profile and no blockers")
+        if (
+            self.compiled_profile_sha256 is None
+            and self.admission_state != "blocked_sources"
+        ):
+            raise ValueError("missing compiled profile is source-blocked")
+        if not self.completed_evidence or not self.future_outcome_follow_up:
+            raise ValueError(
+                "release audit must separate completed and future evidence"
+            )
+        return self

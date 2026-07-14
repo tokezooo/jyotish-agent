@@ -23,6 +23,8 @@ from .mcp_models import (
     JaiminiFullReleaseResult,
     JaiminiMcpInput,
     MuhurtaMcpInput,
+    PrashnaFullMcpInput,
+    PrashnaFullReleaseResult,
     PrashnaMcpInput,
     ProfileInput,
     ProfileResult,
@@ -44,6 +46,22 @@ class _PrashnaPublishedArguments(BaseModel):
 class _PrashnaWireArguments(ArgModelBase):
     """Accept every outer shape so invalid values reach our sanitized envelope."""
 
+    request: Any = None
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+
+    def model_dump_one_level(self) -> dict[str, Any]:
+        return {
+            "request": self.request,
+            "outer_arguments": dict(self.model_extra or {}),
+        }
+
+
+class _PrashnaFullPublishedArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    request: PrashnaFullMcpInput
+
+
+class _PrashnaFullWireArguments(ArgModelBase):
     request: Any = None
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
@@ -119,6 +137,8 @@ Routing:
   facts; reuse its opaque anchor token for clarification and never invent doctrine. While
   source review is pending, report literal computed facts/statuses only: do not infer a
   practical obstacle, theme, advice, or area to watch from planets, houses, signs, or lords.
+- prashna_full is the additive governed interpretation surface. Respect its release audit;
+  when unavailable, report blockers and do not convert computed facts into a judgement.
 - muhurta searches calculated event boundaries for general/private focused-work sessions;
   ranking and interpretation remain unavailable until their governed source pack is admitted.
 - research creates exactly one authoritative run and returns evidence for synthesis.
@@ -252,6 +272,32 @@ def build_server(facade: JyotishMcpFacade | None = None) -> FastMCP:
     assert prashna_tool is not None
     prashna_tool.parameters = _PrashnaPublishedArguments.model_json_schema()
     prashna_tool.fn_metadata.arg_model = _PrashnaWireArguments
+
+    @server.tool(
+        name="prashna_full",
+        description=(
+            "Request the source-bound Full Prashna experimental surface. It preserves "
+            "the sealed-anchor contract and fails closed with release-audit blockers "
+            "until the production doctrine profile is admitted."
+        ),
+        annotations=READ_ONLY,
+        structured_output=True,
+    )
+    def prashna_full(
+        request: Any = None,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> PrashnaFullReleaseResult:
+        return runtime.prashna_full_payload(request, outer_arguments=outer_arguments)
+
+    prashna_full_tool = server._tool_manager.get_tool("prashna_full")
+    assert prashna_full_tool is not None
+    prashna_full_tool.parameters = {
+        "type": "object",
+        "properties": {"request": PrashnaFullMcpInput.model_json_schema()},
+        "required": ["request"],
+        "additionalProperties": False,
+    }
+    prashna_full_tool.fn_metadata.arg_model = _PrashnaFullWireArguments
 
     @server.tool(
         name="muhurta",

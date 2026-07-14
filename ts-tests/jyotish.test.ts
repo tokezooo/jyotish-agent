@@ -7,6 +7,7 @@ import {
   AnswerContractV2Schema,
   BirthProfileSchema,
   JaiminiFullRequestSchema,
+  PrashnaFullRequestSchema,
   FAIL_CLOSED_TEXT,
   RESEARCH_MIRROR_TYPE,
   ResearchRuntime,
@@ -176,6 +177,68 @@ describe("JaiminiFullRequestSchema", () => {
     }) as any;
     try {
       const result = await tool.execute("tc_full", request, new AbortController().signal);
+      expect(result.content[0].text).toContain("compiled_profile: missing");
+      expect(result.details.status).toBe("unavailable");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("PrashnaFullRequestSchema", () => {
+  const request = {
+    question: "What blocks this low-risk work project?",
+    anchor: {
+      asked_at: "2026-07-14T12:00:00+03:00",
+      place: {
+        name: "Moscow",
+        latitude: 55.7558,
+        longitude: 37.6173,
+        zone_id: "Europe/Moscow",
+        fold: 0,
+      },
+      time_confidence: "explicit",
+    },
+    mode: "full",
+    locale: "en",
+    include_evidence: false,
+  };
+
+  test("accepts a sealed explicit anchor and reserves evidence for inspection", () => {
+    expect(Value.Check(PrashnaFullRequestSchema, request)).toBe(true);
+    expect(
+      Value.Check(PrashnaFullRequestSchema, { ...request, include_evidence: true }),
+    ).toBe(false);
+    expect(
+      Value.Check(PrashnaFullRequestSchema, {
+        ...request,
+        mode: "inspection",
+        include_evidence: true,
+      }),
+    ).toBe(true);
+  });
+
+  test("registered tool preserves release blockers", async () => {
+    const tools = new Map<string, any>();
+    const fakePi = {
+      registerTool(tool: any) { tools.set(tool.name, tool); },
+      on() {},
+      appendEntry() {},
+    };
+    registerJyotishExtension(fakePi as any);
+    const tool = tools.get("jyotish_prashna_full");
+    expect(tool).toBeDefined();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock(async (input: string | URL | Request) => {
+      expect(String(input)).toContain("/v2/doctrine/prashna/full");
+      return new Response(JSON.stringify({
+        surface: "experimental_full",
+        status: "unavailable",
+        blockers: ["compiled_profile: missing"],
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as any;
+    try {
+      const result = await tool.execute("tc_prashna", request, new AbortController().signal);
       expect(result.content[0].text).toContain("compiled_profile: missing");
       expect(result.details.status).toBe("unavailable");
     } finally {

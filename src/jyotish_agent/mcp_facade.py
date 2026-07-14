@@ -34,6 +34,8 @@ from .mcp_models import (
     JaiminiFullReleaseResult,
     JaiminiMcpInput,
     MuhurtaMcpInput,
+    PrashnaFullMcpInput,
+    PrashnaFullReleaseResult,
     PrashnaMcpInput,
     ProfileInput,
     ProfileResult,
@@ -409,6 +411,48 @@ class JyotishMcpFacade:
     def prashna(self, value: PrashnaMcpInput) -> PrashnaResult:
         """Compute one stateless, sealed question-time Praśna result."""
         return PrashnaFacade(clock=self.clock).calculate(value)
+
+    def prashna_full(self, value: PrashnaFullMcpInput) -> PrashnaFullReleaseResult:
+        """Expose Full Prashna only when the packaged release audit permits it."""
+
+        from .doctrine.prashna_pack import PrashnaReleaseAudit
+
+        audit = PrashnaReleaseAudit.model_validate_json(
+            (Path(__file__).parent / "data/doctrine/prashna-release.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        if audit.available:  # pragma: no cover - future admitted production release
+            raise McpFacadeError("PRASHNA_FULL_RUNTIME_NOT_CONFIGURED")
+        return PrashnaFullReleaseResult(
+            status="unavailable",
+            request_mode=value.mode,
+            locale=value.locale,
+            admission_state="blocked_sources",
+            blockers=list(audit.blockers),
+            external_review_missing=audit.external_review_missing,
+            report=None,
+        )
+
+    def prashna_full_payload(
+        self,
+        value: object,
+        *,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> PrashnaFullReleaseResult:
+        parsed: PrashnaFullMcpInput | None = None
+        if not outer_arguments and isinstance(value, dict):
+            try:
+                parsed = PrashnaFullMcpInput.model_validate(value)
+            except ValidationError:
+                pass
+        if parsed is not None:
+            return self.prashna_full(parsed)
+        return PrashnaFullReleaseResult(
+            status="needs_input",
+            external_review_missing=True,
+            error_code="INPUT_INVALID",
+        )
 
     def muhurta(self, value: MuhurtaMcpInput) -> MuhurtaResult:
         """Search calculated event boundaries without persistence or side effects."""

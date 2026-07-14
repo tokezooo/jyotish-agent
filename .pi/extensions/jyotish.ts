@@ -120,6 +120,51 @@ export const JaiminiFullRequestSchema = Type.Union([
   ),
 ]);
 
+const PrashnaPlaceSchema = Type.Object(
+  {
+    name: Type.String({ minLength: 1, maxLength: 200 }),
+    latitude: Type.Number({ minimum: -90, maximum: 90 }),
+    longitude: Type.Number({ minimum: -180, maximum: 180 }),
+    zone_id: Type.String({ minLength: 1, maxLength: 100 }),
+    fold: Type.Optional(Type.Union([Type.Literal(0), Type.Literal(1)])),
+  },
+  NO_EXTRA,
+);
+
+const PrashnaFullCommon = {
+  question: Type.String({ minLength: 1, maxLength: 2_000 }),
+  anchor: Type.Object(
+    {
+      asked_at: Type.String({ minLength: 1, maxLength: 100 }),
+      place: PrashnaPlaceSchema,
+      time_confidence: Type.Literal("explicit"),
+    },
+    NO_EXTRA,
+  ),
+  locale: StringEnum(["ru", "en"] as const),
+  rule_profile: Type.Optional(Type.Literal("prashna_work_v1")),
+  include_trace: Type.Optional(Type.Boolean()),
+};
+
+export const PrashnaFullRequestSchema = Type.Union([
+  Type.Object(
+    {
+      ...PrashnaFullCommon,
+      mode: StringEnum(["quick", "full", "deep"] as const),
+      include_evidence: Type.Optional(Type.Literal(false)),
+    },
+    NO_EXTRA,
+  ),
+  Type.Object(
+    {
+      ...PrashnaFullCommon,
+      mode: Type.Literal("inspection"),
+      include_evidence: Type.Optional(Type.Boolean()),
+    },
+    NO_EXTRA,
+  ),
+]);
+
 const ConfigSchema = Type.Object(
   {
     ayanamsa: Type.Optional(
@@ -1504,6 +1549,38 @@ export default function (pi: ExtensionAPI) {
     async execute(_toolCallId, params, signal) {
       const { ok, status, body } = await postJson(
         "/v2/doctrine/jaimini/full",
+        params,
+        signal,
+      );
+      if (!ok) {
+        return {
+          content: [{ type: "text", text: formatProblem(status, body) }],
+          details: {},
+        };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(body, null, 2) }],
+        details: body as Record<string, unknown>,
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "jyotish_prashna_full",
+    label: "Full Prashna (governed)",
+    description:
+      "Request the source-bound Full Prashna experimental surface for one sealed " +
+      "low-risk question. The endpoint returns release blockers and no judgement " +
+      "until its production doctrine profile is admitted.",
+    promptGuidelines: [
+      "If status is unavailable, report the blockers and do not invent a Prashna judgement.",
+      "Use inspection mode only when the user asks for evidence details.",
+      "A materially different question requires a new explicit anchor.",
+    ],
+    parameters: PrashnaFullRequestSchema,
+    async execute(_toolCallId, params, signal) {
+      const { ok, status, body } = await postJson(
+        "/v2/doctrine/prashna/full",
         params,
         signal,
       );

@@ -40,7 +40,12 @@ from .models import (
     ValidateRequest,
     ValidateResponse,
 )
-from .mcp_models import JaiminiFullMcpInput, JaiminiFullReleaseResult
+from .mcp_models import (
+    JaiminiFullMcpInput,
+    JaiminiFullReleaseResult,
+    PrashnaFullMcpInput,
+    PrashnaFullReleaseResult,
+)
 from .pyjhora_facade import compute_chart
 from .research_models import (
     CorpusFragmentsIngestRequest,
@@ -560,6 +565,35 @@ async def jaimini_full_release(
         request_mode=req.mode,
         locale=req.locale,
         topics=req.topics,
+        admission_state="blocked_sources",
+        blockers=list(audit.blockers),
+        external_review_missing=audit.external_review_missing,
+        report=None,
+    )
+
+
+@app.post(
+    "/v2/doctrine/prashna/full",
+    response_model=PrashnaFullReleaseResult,
+)
+async def prashna_full_release(
+    req: PrashnaFullMcpInput,
+) -> PrashnaFullReleaseResult:
+    """Fail closed until the packaged Full Prashna audit permits release."""
+
+    from .doctrine.prashna_pack import PrashnaReleaseAudit
+
+    audit = PrashnaReleaseAudit.model_validate_json(
+        (Path(__file__).parent / "data/doctrine/prashna-release.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    if audit.available:  # pragma: no cover - future admitted production release
+        raise RuntimeError("Full Prashna runtime is not configured")
+    return PrashnaFullReleaseResult(
+        status="unavailable",
+        request_mode=req.mode,
+        locale=req.locale,
         admission_state="blocked_sources",
         blockers=list(audit.blockers),
         external_review_missing=audit.external_review_missing,

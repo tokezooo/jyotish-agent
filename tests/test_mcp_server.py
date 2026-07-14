@@ -49,10 +49,11 @@ def test_server_metadata_and_tool_contract(tmp_path: Path):
     assert "jaimini is stateless" in SERVER_INSTRUCTIONS
     assert {tool.name for tool in tools} == {
         "get_profile",
-            "calculate",
-            "jaimini",
-            "jaimini_full",
-            "prashna",
+        "calculate",
+        "jaimini",
+        "jaimini_full",
+        "prashna",
+        "prashna_full",
         "muhurta",
         "search_sources",
         "research",
@@ -82,9 +83,7 @@ def test_server_metadata_and_tool_contract(tmp_path: Path):
 def test_in_process_get_profile_is_structured(tmp_path: Path):
     facade = JyotishMcpFacade(tmp_path / "data", _profile_path(tmp_path))
     server = build_server(facade)
-    _content, result = asyncio.run(
-        server.call_tool("get_profile", {"request": {}})
-    )
+    _content, result = asyncio.run(server.call_tool("get_profile", {"request": {}}))
 
     assert isinstance(result, dict)
     assert result["mode"] == "profile"

@@ -155,6 +155,42 @@ class PrashnaMcpInput(PrashnaRequest):
     """Additive MCP input; intentionally independent from natal profiles."""
 
 
+class PrashnaFullMcpInput(PrashnaRequest):
+    """Governed Full Prashna request over the existing sealed-anchor contract."""
+
+    mode: Literal["quick", "full", "deep", "inspection"] = "full"
+    locale: Literal["ru", "en"] = "ru"
+    include_evidence: bool = False
+
+    @model_validator(mode="after")
+    def _inspection_owns_evidence(self) -> "PrashnaFullMcpInput":
+        if self.include_evidence and self.mode != "inspection":
+            raise ValueError("include_evidence is available only in inspection mode")
+        return self
+
+
+class PrashnaFullReleaseResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    surface: Literal["experimental_full"] = "experimental_full"
+    status: Literal["unavailable", "needs_input"]
+    request_mode: Literal["quick", "full", "deep", "inspection"] | None = None
+    locale: Literal["ru", "en"] | None = None
+    admission_state: Literal["blocked_sources"] | None = None
+    blockers: list[str] = Field(default_factory=list)
+    external_review_missing: bool
+    report: dict[str, Any] | None = None
+    error_code: Literal["INPUT_INVALID"] | None = None
+
+    @model_validator(mode="after")
+    def _status_contract(self) -> "PrashnaFullReleaseResult":
+        if self.status == "unavailable":
+            if self.admission_state != "blocked_sources" or self.error_code is not None:
+                raise ValueError("unavailable release requires blocked source audit")
+        elif self.error_code != "INPUT_INVALID" or self.admission_state is not None:
+            raise ValueError("needs_input release requires sanitized input error")
+        return self
+
+
 class MuhurtaMcpInput(MuhurtaSearchRequest):
     """Additive event-search input; it never selects or persists a natal profile."""
 
