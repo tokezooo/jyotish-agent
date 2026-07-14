@@ -18,3 +18,6 @@ tests/fixtures/golden_chennai_1990_swiss_modules.json
 .gstack/
 .worktrees/
 .superpowers/
+# Copyrighted/licensed doctrine sources are local-only. Git stores manifests,
+# hashes, permitted excerpts, normalized rules, and fixtures — never the books.
+private_sources/
