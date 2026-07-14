@@ -582,3 +582,191 @@ def evaluate_muhurta_natal_factors(
             "Kalaprakasika, printed pp. 207-208",
         ),
     )
+
+
+class MuhurtaRankingProfile(FrozenModel):
+    profile: MuhurtaActivityProfile
+    version: Literal["1.0.0"]
+    doctrine_weight: int = Field(ge=1, le=10)
+    natal_weight: int = Field(ge=0, le=5)
+    user_preference_weight: int = Field(ge=0, le=5)
+    tie_break: Literal["start_utc_then_candidate_id"]
+
+
+class MuhurtaRankingCatalog(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    profiles: tuple[MuhurtaRankingProfile, ...] = Field(min_length=6)
+
+    @model_validator(mode="after")
+    def _complete(self) -> "MuhurtaRankingCatalog":
+        profiles = [item.profile for item in self.profiles]
+        if len(profiles) != len(set(profiles)) or set(profiles) != set(
+            MuhurtaActivityProfile
+        ):
+            raise ValueError("ranking catalog must cover every Muhurta profile")
+        return self
+
+
+class MuhurtaRankingCandidate(FrozenModel):
+    candidate_id: str = Field(min_length=1)
+    start: dt.datetime
+    end: dt.datetime
+    eligibility_status: Literal["eligible", "ineligible", "unavailable"]
+    hard_failure_ids: tuple[str, ...] = ()
+    doctrinal_soft_score: int = Field(ge=-10, le=10)
+    natal_soft_adjustment: int = Field(ge=-2, le=2)
+    user_preference_score: int = Field(ge=-2, le=2)
+    confidence: float = Field(ge=0.0, le=1.0)
+
+    @model_validator(mode="after")
+    def _coherent_candidate(self) -> "MuhurtaRankingCandidate":
+        if any(
+            value.tzinfo is None or value.utcoffset() is None
+            for value in (self.start, self.end)
+        ):
+            raise ValueError("candidate endpoints must be timezone-aware")
+        if self.end.astimezone(dt.UTC) <= self.start.astimezone(dt.UTC):
+            raise ValueError("candidate end must be after start")
+        if self.eligibility_status == "eligible" and self.hard_failure_ids:
+            raise ValueError("eligible candidate cannot have hard failures")
+        if self.eligibility_status == "ineligible" and not self.hard_failure_ids:
+            raise ValueError("ineligible candidate requires a hard failure")
+        if len(set(self.hard_failure_ids)) != len(self.hard_failure_ids):
+            raise ValueError("hard failures must be unique")
+        return self
+
+
+class MuhurtaRankedWindow(FrozenModel):
+    candidate_id: str
+    start: dt.datetime
+    end: dt.datetime
+    rank: int = Field(ge=1)
+    total_score: int
+    score_components: dict[str, int]
+    confidence: float = Field(ge=0.0, le=1.0)
+    pareto_dominated_by: tuple[str, ...] = ()
+
+
+class MuhurtaRankingNearMiss(FrozenModel):
+    candidate_id: str
+    start: dt.datetime
+    end: dt.datetime
+    hard_failure_ids: tuple[str, ...] = Field(min_length=1)
+
+
+class MuhurtaRankingResult(FrozenModel):
+    status: Literal["completed", "no_window", "unavailable"]
+    profile: MuhurtaActivityProfile
+    ranking_version: Literal["1.0.0"]
+    ranked: tuple[MuhurtaRankedWindow, ...] = ()
+    near_misses: tuple[MuhurtaRankingNearMiss, ...] = ()
+
+
+def load_muhurta_ranking_profile(
+    profile: MuhurtaActivityProfile,
+) -> MuhurtaRankingProfile:
+    payload = resources.files("jyotish_agent").joinpath(
+        "data/doctrine/muhurta-ranking-v1.json"
+    ).read_text(encoding="utf-8")
+    catalog = MuhurtaRankingCatalog.model_validate(json.loads(payload))
+    return next(item for item in catalog.profiles if item.profile == profile)
+
+
+def _dominates(left: MuhurtaRankingCandidate, right: MuhurtaRankingCandidate) -> bool:
+    left_values = (
+        left.doctrinal_soft_score,
+        left.natal_soft_adjustment,
+        left.user_preference_score,
+        left.confidence,
+    )
+    right_values = (
+        right.doctrinal_soft_score,
+        right.natal_soft_adjustment,
+        right.user_preference_score,
+        right.confidence,
+    )
+    return all(a >= b for a, b in zip(left_values, right_values, strict=True)) and any(
+        a > b for a, b in zip(left_values, right_values, strict=True)
+    )
+
+
+def rank_muhurta_candidates(
+    candidates: tuple[MuhurtaRankingCandidate, ...],
+    profile: MuhurtaRankingProfile,
+) -> MuhurtaRankingResult:
+    """Rank eligible candidates only and retain rejected candidates as near misses."""
+
+    eligible = [item for item in candidates if item.eligibility_status == "eligible"]
+    unavailable = [
+        item for item in candidates if item.eligibility_status == "unavailable"
+    ]
+    ineligible = [
+        item for item in candidates if item.eligibility_status == "ineligible"
+    ]
+
+    scored: list[tuple[MuhurtaRankingCandidate, dict[str, int], int]] = []
+    for item in eligible:
+        components = {
+            "doctrine": item.doctrinal_soft_score * profile.doctrine_weight,
+            "natal": item.natal_soft_adjustment * profile.natal_weight,
+            "user_preference": item.user_preference_score
+            * profile.user_preference_weight,
+        }
+        scored.append((item, components, sum(components.values())))
+    scored.sort(
+        key=lambda row: (
+            -row[2],
+            row[0].start.astimezone(dt.UTC),
+            row[0].candidate_id,
+        )
+    )
+    ordering = {item.candidate_id: index for index, (item, _, _) in enumerate(scored)}
+    ranked = tuple(
+        MuhurtaRankedWindow(
+            candidate_id=item.candidate_id,
+            start=item.start,
+            end=item.end,
+            rank=index,
+            total_score=total,
+            score_components=components,
+            confidence=item.confidence,
+            pareto_dominated_by=tuple(
+                candidate.candidate_id
+                for candidate in sorted(
+                    (other for other in eligible if _dominates(other, item)),
+                    key=lambda other: ordering[other.candidate_id],
+                )
+            ),
+        )
+        for index, (item, components, total) in enumerate(scored, start=1)
+    )
+    ineligible.sort(
+        key=lambda item: (
+            len(item.hard_failure_ids),
+            item.start.astimezone(dt.UTC),
+            item.candidate_id,
+        )
+    )
+    near_misses = tuple(
+        MuhurtaRankingNearMiss(
+            candidate_id=item.candidate_id,
+            start=item.start,
+            end=item.end,
+            hard_failure_ids=tuple(sorted(item.hard_failure_ids)),
+        )
+        for item in ineligible
+    )
+    status: Literal["completed", "no_window", "unavailable"]
+    if ranked:
+        status = "completed"
+    elif unavailable:
+        status = "unavailable"
+    else:
+        status = "no_window"
+    return MuhurtaRankingResult(
+        status=status,
+        profile=profile.profile,
+        ranking_version=profile.version,
+        ranked=ranked,
+        near_misses=near_misses,
+    )
