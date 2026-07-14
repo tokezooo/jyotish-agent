@@ -17,7 +17,7 @@
     {"gate_id": "modern_overlay", "status": "optional_missing", "evidence": null},
     {"gate_id": "specialist_review", "status": "missing", "evidence": null},
     {"gate_id": "cross_domain_concierge_sessions", "status": "missing", "evidence": null},
-    {"gate_id": "whole_project_independent_review", "status": "missing", "evidence": null}
+    {"gate_id": "whole_project_independent_review", "status": "passed", "evidence": "Independent read-only review of origin/main..a07c068 reported zero Critical and zero Important findings and a Ready to merge verdict."}
   ],
   "domain_metrics": [
     {"domain": "jaimini", "automated_held_out_count": 0, "material_error_count": null, "material_error_rate": null, "concierge_session_count": 0, "value_score": null},
@@ -26,18 +26,18 @@
   ],
   "completed_evidence": [
     "The private baseline, deterministic runtime, ranking, reports, and privacy projections are automated and packaged.",
-    "High-stakes activity routing, DST folds, half-open intervals, score manipulation, and prose tampering are covered."
+    "High-stakes activity routing, DST folds, half-open intervals, score manipulation, and prose tampering are covered.",
+    "Independent whole-project code review completed with no Critical or Important findings."
   ],
   "future_follow_up": [
     "Run 10-20 opt-in concierge sessions across Jaimini, Prashna, and Muhurta and record domain value scores.",
-    "Obtain specialist review of the private Muhurta rule pack and the whole-project independent review.",
+    "Obtain specialist review of the private Muhurta rule pack.",
     "Acquire and review the named modern B. V. Raman overlay before enabling overlay comparison results."
   ],
   "public_release_blockers": [
     "independent_held_out_evaluation: no independently designed outcome corpus and evaluator result exists",
     "specialist_review: external rule-pack review is missing",
     "cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
-    "whole_project_independent_review: no independent final review has been recorded",
     "modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ]
 }

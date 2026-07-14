@@ -36,15 +36,14 @@
     {
       "domain": "muhurta",
       "release_id": "expanded_muhurta_v1",
-      "evidence_sha256": "862cf23ca56bb1b891a4ca8e1f85be436daab83c82fafd54ec1e2da6671a30f9",
+      "evidence_sha256": "460f521312e83a5b19e1e277fb010bdff5be8cd525579b1c372d9956c9ed275d",
       "admission_state": "blocked_evaluation",
       "available": false,
-      "gate_statuses": {"source_manifest": "passed", "profile_identity": "passed", "private_baseline_profile": "passed", "profile_rule_fixture_suite": "passed", "private_runtime_e2e": "passed", "independent_held_out_evaluation": "missing", "modern_overlay": "optional_missing", "specialist_review": "missing", "cross_domain_concierge_sessions": "missing", "whole_project_independent_review": "missing"},
+      "gate_statuses": {"source_manifest": "passed", "profile_identity": "passed", "private_baseline_profile": "passed", "profile_rule_fixture_suite": "passed", "private_runtime_e2e": "passed", "independent_held_out_evaluation": "missing", "modern_overlay": "optional_missing", "specialist_review": "missing", "cross_domain_concierge_sessions": "missing", "whole_project_independent_review": "passed"},
       "blockers": [
         "independent_held_out_evaluation: no independently designed outcome corpus and evaluator result exists",
         "specialist_review: external rule-pack review is missing",
         "cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
-        "whole_project_independent_review: no independent final review has been recorded",
         "modern_overlay: the named modern source has not been lawfully supplied and reviewed"
       ]
     }
@@ -74,8 +73,7 @@
     "muhurta: independent_held_out_evaluation: no independently designed outcome corpus and evaluator result exists",
     "muhurta: specialist_review: external rule-pack review is missing",
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
-    "muhurta: whole_project_independent_review: no independent final review has been recorded",
     "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "67743462f10346226049f471473ca342029d8ff33254d189ebb7a2d5f3964bf4"
+  "audit_sha256": "ad1e9fca1e069e8cd9e1f9134e214c21af7f5b049df87fcb8d961b9eadb3e1c1"
 }

@@ -90,8 +90,10 @@ def test_audit_blocks_release_until_real_held_out_evaluation_exists() -> None:
         "specialist_review",
         "independent_held_out_evaluation",
         "cross_domain_concierge_sessions",
-        "whole_project_independent_review",
     }
+    assert next(
+        gate for gate in audit.gates if gate.gate_id == "whole_project_independent_review"
+    ).status == "passed"
 
 
 def test_ru_en_public_adapters_fail_closed_while_release_gate_is_missing(tmp_path) -> None:
