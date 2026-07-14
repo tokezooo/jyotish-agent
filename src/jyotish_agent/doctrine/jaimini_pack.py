@@ -7,13 +7,15 @@ known. Later Jaimini slices consume this same verified corpus identity.
 
 from __future__ import annotations
 
+import hashlib
 from enum import StrEnum
 from typing import Literal
 
 from pydantic import Field, model_validator
 
 from .models import FrozenModel, ScanQuality
-from .sources import SourceId, SourceManifest, SourceVerificationReport
+from ..research_store import canonical_json
+from .sources import Sha256, SourceId, SourceManifest, SourceVerificationReport
 
 
 class JaiminiCorpusRequirement(StrEnum):
@@ -159,3 +161,67 @@ def render_jaimini_corpus_coverage(report: JaiminiCorpusCoverage) -> dict[str, o
 
     return report.model_dump(mode="json")
 
+
+class JaiminiRuleStatus(StrEnum):
+    ANCHORED_UNREVIEWED = "anchored_unreviewed"
+    QUARANTINED_MISSING_ANCHOR = "quarantined_missing_anchor"
+    QUARANTINED_CONFLICT = "quarantined_conflict"
+    ADMITTED = "admitted"
+
+
+class JaiminiSourceAnchor(FrozenModel):
+    pdf_page: int = Field(ge=1)
+    printed_page: int
+    sutra: str = Field(min_length=1)
+    fragment_sha256: Sha256
+
+
+class JaiminiRuleCandidate(FrozenModel):
+    rule_id: str = Field(pattern=r"^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$")
+    school: str = Field(min_length=1)
+    source_id: SourceId
+    fact_families: tuple[str, ...] = Field(min_length=1)
+    anchor: JaiminiSourceAnchor | None = None
+    status: JaiminiRuleStatus
+    ambiguity: str | None = Field(default=None, min_length=1)
+    discrepancy: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _anchor_matches_status(self) -> "JaiminiRuleCandidate":
+        anchored = self.status in {
+            JaiminiRuleStatus.ANCHORED_UNREVIEWED,
+            JaiminiRuleStatus.ADMITTED,
+        }
+        if anchored and self.anchor is None:
+            raise ValueError("anchored or admitted candidates require an exact anchor")
+        if self.status == JaiminiRuleStatus.QUARANTINED_MISSING_ANCHOR:
+            if self.anchor is not None or self.discrepancy is None:
+                raise ValueError("missing-anchor quarantine requires only a discrepancy")
+        if self.status == JaiminiRuleStatus.QUARANTINED_CONFLICT and (
+            self.anchor is None or self.discrepancy is None
+        ):
+            raise ValueError("conflict quarantine requires an anchor and discrepancy")
+        return self
+
+
+class JaiminiRuleInventory(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    school: Literal["nilakantha_baseline"]
+    candidates: tuple[JaiminiRuleCandidate, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _coherent_inventory(self) -> "JaiminiRuleInventory":
+        ids = [candidate.rule_id for candidate in self.candidates]
+        if len(ids) != len(set(ids)):
+            raise ValueError("duplicate Jaimini rule candidate")
+        if any(candidate.school != self.school for candidate in self.candidates):
+            raise ValueError("baseline inventory cannot blend schools")
+        return self
+
+    @property
+    def inventory_sha256(self) -> str:
+        payload = self.model_dump(mode="json")
+        payload["candidates"] = sorted(
+            payload["candidates"], key=lambda candidate: candidate["rule_id"]
+        )
+        return hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
