@@ -76,7 +76,10 @@ def test_rasi_drishti_modal_geometry(source, expected):
 
 def test_arudha_all_twelve_and_same_or_seventh_exception_are_hand_counted():
     data = FIXTURE["arudha"]
-    assert [arudha_pada(h, l) for h, l in zip(data["house_signs"], data["lord_signs"])] == data["padas"]
+    assert [
+        arudha_pada(house_sign, lord_sign)
+        for house_sign, lord_sign in zip(data["house_signs"], data["lord_signs"])
+    ] == data["padas"]
     assert arudha_pada(0, 0) == 9
     assert arudha_pada(0, 6) == 9
     padas = arudha_padas(0, data["lord_signs"])
