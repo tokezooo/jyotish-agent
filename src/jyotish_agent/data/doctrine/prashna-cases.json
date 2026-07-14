@@ -1,0 +1,20 @@
+{
+  "schema_version": "1.0",
+  "cases": [
+    {
+      "case_id": "raman_1983_marriage_alliance_broke_off",
+      "source_id": "prasna_marga_bv_raman_part_2_1992",
+      "question": "Whether the proposed marriage alliance would materialize",
+      "question_at": "1983-03-31T18:30:00+05:30",
+      "place_label": "Bangalore, India",
+      "question_class": "relationship_marriage",
+      "source_pdf_pages": [22, 23],
+      "source_printed_pages": [6, 7],
+      "judgment": "negative",
+      "timing": "No timing interval was stated in the published example.",
+      "observed_outcome": "alliance_broke_off",
+      "outcome_traceable": true,
+      "admissibility": "excluded_high_stakes"
+    }
+  ]
+}
