@@ -39,7 +39,10 @@ from .pyjhora_facade import (
     CivilDateUnavailableError,
     EngineOutputError,
     _EngineConfigSnapshot,
+    _civil_day_utc_bounds,
+    _offset_segment_starts,
     _run_muhurta_boundary_day,
+    _valid_local_candidates,
 )
 from .signing import cache_domain_artifact
 
@@ -93,6 +96,26 @@ def _local_instant(civil_date: dt.date, hour: float, zone: ZoneInfo, preferred_o
 
 def _add_utc(value: dt.datetime, delta: dt.timedelta, zone: ZoneInfo) -> dt.datetime:
     return (value.astimezone(dt.UTC) + delta).astimezone(zone)
+
+
+def _local_constraint_boundaries(civil_date: dt.date, wall_time: dt.time, zone: ZoneInfo) -> tuple[dt.datetime, ...]:
+    """Project a local wall-clock bound onto every physical occurrence in a civil day."""
+    naive = dt.datetime.combine(civil_date, wall_time)
+    day_start, day_end = _civil_day_utc_bounds(civil_date, zone)
+    candidates = tuple(
+        instant.astimezone(zone) for instant in _valid_local_candidates(naive, zone)
+        if day_start <= instant < day_end
+    )
+    if candidates:
+        return candidates
+    # For a bound inside a spring-forward gap, the offset transition is the
+    # physical boundary at which local times after the requested wall time begin.
+    for transition in _offset_segment_starts(day_start, day_end, zone)[1:]:
+        before = (transition - dt.timedelta(microseconds=1)).astimezone(zone).replace(tzinfo=None)
+        after = transition.astimezone(zone).replace(tzinfo=None)
+        if before < naive < after:
+            return (transition.astimezone(zone),)
+    return ()
 
 
 def _utc_min(left: dt.datetime, right: dt.datetime) -> dt.datetime:
@@ -212,6 +235,12 @@ class MuhurtaFacade:
                         return incomplete("ENGINE_CROSSCHECK_FAILED", "boundary_normalization", days=len(primitives), boundaries=boundary_progress)
                     end = value.end_utc.astimezone(zone)
                     boundaries.append(end)
+        constraints = request.hard_constraints
+        if constraints.local_time_start is not None:
+            assert constraints.local_time_end is not None
+            for civil_day in days:
+                boundaries.extend(_local_constraint_boundaries(civil_day, constraints.local_time_start, zone))
+                boundaries.extend(_local_constraint_boundaries(civil_day, constraints.local_time_end, zone))
         atoms = partition_interval(bounds, boundaries)
         if len(atoms) > request.max_candidate_intervals:
             return incomplete("CANDIDATE_LIMIT_EXCEEDED", "partition", days=len(primitives), boundaries=boundary_progress)
@@ -256,7 +285,6 @@ class MuhurtaFacade:
                 rejection_rule_ids.append("muhurta.boundary.event_duration")
             local = atom.start.astimezone(zone)
             end_local = full_end.astimezone(zone)
-            constraints = request.hard_constraints
             explicit_outputs: list[str] = []
             if local.weekday() in constraints.excluded_weekdays:
                 explicit_outputs.append("excluded_weekday")

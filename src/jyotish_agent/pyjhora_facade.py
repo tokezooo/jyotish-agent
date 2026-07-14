@@ -379,19 +379,33 @@ def _run_muhurta_boundary_day(
             # canonicalized by semantic identity and UTC proximity.
             distinct_offsets = sorted({minutes / 60 for _, minutes in offsets})
             daily_anchor = day_start.astimezone(zone)
+
+            def add_daily_estimate(item: _MuhurtaBoundaryEstimate, engine_offset: float) -> None:
+                """Keep the fixed-offset evaluation consistent with IANA at the event."""
+                actual_offset = item.start_utc.astimezone(zone).utcoffset()
+                if actual_offset is not None and round(actual_offset.total_seconds() / 60) == round(engine_offset * 60):
+                    estimates.append(item)
+
             for engine_offset in distinct_offsets:
                 place = drik.Place(profile.name, profile.latitude, profile.longitude, engine_offset)
                 daily_jd = jd_at(daily_anchor.hour, daily_anchor.minute, daily_anchor.second)
                 sunrise, sunset = drik.sunrise(daily_jd, place), drik.sunset(daily_jd, place)
-                estimates.extend((
+                add_daily_estimate(
                     _MuhurtaBoundaryEstimate("sunrise", "sunrise", to_utc(float(sunrise[0]), engine_offset)),
+                    engine_offset,
+                )
+                add_daily_estimate(
                     _MuhurtaBoundaryEstimate("sunset", "sunset", to_utc(float(sunset[0]), engine_offset)),
-                ))
+                    engine_offset,
+                )
                 for sign, start_hour, end_hour in drik.udhaya_lagna_muhurtha(daily_jd, place):
-                    estimates.append(_MuhurtaBoundaryEstimate(
-                        f"lagna_{int(sign)}", f"lagna:{int(sign)}", to_utc(float(start_hour), engine_offset),
-                        to_utc(float(end_hour) + (24 if float(end_hour) <= float(start_hour) else 0), engine_offset),
-                    ))
+                    add_daily_estimate(
+                        _MuhurtaBoundaryEstimate(
+                            f"lagna_{int(sign)}", f"lagna:{int(sign)}", to_utc(float(start_hour), engine_offset),
+                            to_utc(float(end_hour) + (24 if float(end_hour) <= float(start_hour) else 0), engine_offset),
+                        ),
+                        engine_offset,
+                    )
                 for kind, function in (
                     ("rahu_kala", drik.raahu_kaalam), ("yamaganda", drik.yamaganda_kaalam),
                     ("gulika", drik.gulikai_kaalam), ("abhijit", drik.abhijit_muhurta),
@@ -399,26 +413,35 @@ def _run_muhurta_boundary_day(
                     period = function(daily_jd, place)
                     if not period or len(period) < 2:
                         raise EngineOutputError(f"{kind} returned an unsupported period shape")
-                    estimates.append(_MuhurtaBoundaryEstimate(
-                        kind, kind, to_utc(_clock_hour(period[0]), engine_offset),
-                        to_utc(_clock_hour(period[1]), engine_offset),
-                    ))
+                    add_daily_estimate(
+                        _MuhurtaBoundaryEstimate(
+                            kind, kind, to_utc(_clock_hour(period[0]), engine_offset),
+                            to_utc(_clock_hour(period[1]), engine_offset),
+                        ),
+                        engine_offset,
+                    )
                 dur = drik.durmuhurtam(daily_jd, place)
                 if len(dur) % 2:
                     raise EngineOutputError("durmuhurta returned an unsupported period shape")
                 for index in range(0, len(dur), 2):
-                    estimates.append(_MuhurtaBoundaryEstimate(
-                        "durmuhurta", f"durmuhurta:{index // 2}",
-                        to_utc(_clock_hour(dur[index]), engine_offset),
-                        to_utc(_clock_hour(dur[index + 1]), engine_offset),
-                    ))
+                    add_daily_estimate(
+                        _MuhurtaBoundaryEstimate(
+                            "durmuhurta", f"durmuhurta:{index // 2}",
+                            to_utc(_clock_hour(dur[index]), engine_offset),
+                            to_utc(_clock_hour(dur[index + 1]), engine_offset),
+                        ),
+                        engine_offset,
+                    )
                 for index, period in enumerate(drik.amrit_kaalam(daily_jd, place) or ()):
                     if not period or len(period) < 2:
                         raise EngineOutputError("amrita returned an unsupported period shape")
-                    estimates.append(_MuhurtaBoundaryEstimate(
-                        "amrita", f"amrita:{index}", to_utc(_clock_hour(period[0]), engine_offset),
-                        to_utc(_clock_hour(period[1]), engine_offset),
-                    ))
+                    add_daily_estimate(
+                        _MuhurtaBoundaryEstimate(
+                            "amrita", f"amrita:{index}", to_utc(_clock_hour(period[0]), engine_offset),
+                            to_utc(_clock_hour(period[1]), engine_offset),
+                        ),
+                        engine_offset,
+                    )
 
             relevant = tuple(
                 item for item in estimates

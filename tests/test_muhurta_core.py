@@ -219,6 +219,27 @@ def test_hard_exclusion_is_monotone_and_candidate_budget_is_typed() -> None:
     assert limited.error_code == "CANDIDATE_LIMIT_EXCEEDED"
 
 
+def test_explicit_local_start_becomes_a_candidate_boundary() -> None:
+    result = MuhurtaFacade().search(_request(
+        duration_minutes=30,
+        hard_constraints={"local_time_start": "09:30", "local_time_end": "17:00"},
+        preferences={},
+        result_limit=20,
+    ))
+    assert result.status == "completed"
+    assert any(window.start.timetz().replace(tzinfo=None) == dt.time(9, 30) for window in result.windows)
+
+
+def test_spring_forward_daily_periods_have_unique_semantic_identities() -> None:
+    result = _run_muhurta_boundary_day(
+        BirthProfile("event", (2026, 3, 8), (0, 0, 0), 40.7128, -74.0060, 0),
+        dt.date(2026, 3, 8),
+        "America/New_York",
+    )
+    lagna_identities = [item.identity for item in result.day.values if item.kind.startswith("lagna_")]
+    assert len(lagna_identities) == len(set(lagna_identities))
+
+
 def test_dst_crossing_preserves_calendar_ready_zone_offsets() -> None:
     london = EventPlace(name="private", latitude=51.5072, longitude=-0.1276, zone_id="Europe/London")
     result = MuhurtaFacade().search(_request(
