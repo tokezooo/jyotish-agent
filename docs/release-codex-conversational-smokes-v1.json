@@ -14,7 +14,7 @@
       "tool_routing": ["jaimini"], "result_status": "completed",
       "raw_transcript_sha256": "4e7e6de19dd3e3474ebf8075944bc1d7d06c090d038c7e54629b7283f26b4c35",
       "execution_record": "docs/evidence/codex-smokes/cs_jaimini_ru_quick.json",
-      "execution_record_sha256": "d234f105de7c9101474891db4c305d6887b3828c8415a3e384e97a9be02b2064",
+      "execution_record_sha256": "b7acd6cc141f549dd67a99b0611d6ad8367069ae47ff1ad7a011c1cf4695251f",
       "checks": {"natural_answer":true,"source_gate_honest":true,"no_internal_ledger":true,"no_private_material":true,"expected_route":true},
       "passed": true, "failure": null
     },
@@ -25,7 +25,7 @@
       "tool_routing": ["jaimini"], "result_status": "completed",
       "raw_transcript_sha256": "7c5c410f6d2170978d923b41cdc8c307aa7351c91cea2a45fcf4640c29268119",
       "execution_record": "docs/evidence/codex-smokes/cs_jaimini_ru_inspection.json",
-      "execution_record_sha256": "f86ee3c10e553d3c28ff0203e01c1ab758f35ec4245652f01816d7a97c0c62c0",
+      "execution_record_sha256": "b85c8d29106a193156b48c852469f7af5aa5b87917c938e2413e72dbfa49194c",
       "checks": {"natural_answer":true,"source_gate_honest":true,"no_internal_ledger":true,"no_private_material":true,"expected_route":true},
       "passed": true, "failure": null
     },
@@ -36,7 +36,7 @@
       "tool_routing": ["muhurta"], "result_status": "completed",
       "raw_transcript_sha256": "b5c7787a63917db2de32637aa10292edd1e17d4bb6ba52c8a406add94a977720",
       "execution_record": "docs/evidence/codex-smokes/cs_muhurta_ru_quick.json",
-      "execution_record_sha256": "f4146864be4932ea019fe6a01f78e2199a39528422d39c913a804768b215fcc6",
+      "execution_record_sha256": "96f5bfed80e10b44dac7324e4ca00cbe0e70b148baf912d9dc79dcf57502609c",
       "checks": {"natural_answer":true,"source_gate_honest":true,"no_internal_ledger":true,"no_private_material":true,"expected_route":true},
       "passed": true, "failure": null
     },
@@ -47,7 +47,7 @@
       "tool_routing": ["muhurta"], "result_status": "completed",
       "raw_transcript_sha256": "b557063dccc3e4f4d1dafc9693e103be02722ab1a965c7666ed53c2d66044212",
       "execution_record": "docs/evidence/codex-smokes/cs_muhurta_en_inspection.json",
-      "execution_record_sha256": "3f0adf4447ba3072c2d8391ef766535a76e868c7ac5d2c22b27647f219f8790b",
+      "execution_record_sha256": "87da3a2e59b23aad2e0ad3b51267ddd1c43875a2e586cd4ba72473fa21df88e9",
       "checks": {"natural_answer":true,"source_gate_honest":true,"no_internal_ledger":true,"no_private_material":true,"expected_route":true},
       "passed": true, "failure": null
     },
@@ -58,7 +58,7 @@
       "tool_routing": ["prashna"], "result_status": "completed",
       "raw_transcript_sha256": "da133771fa2f56592d9e6d4a126108b676cccc00b1ba809ca26a6ed27be0eecf",
       "execution_record": "docs/evidence/codex-smokes/cs_prashna_ru_quick.json",
-      "execution_record_sha256": "fa43c9114ffd1fe7230885bc86679b17f37414eab7e111fc72974b62567453c7",
+      "execution_record_sha256": "969f1c039c02c6219ce65431a481a83ed5438fd1263c0a55c7f85d22fd15db5c",
       "checks": {"natural_answer":true,"source_gate_honest":true,"no_internal_ledger":true,"no_private_material":true,"expected_route":true},
       "passed": true, "failure": null
     },
@@ -69,7 +69,7 @@
       "tool_routing": ["prashna"], "result_status": "completed",
       "raw_transcript_sha256": "fddd8669a341f46e3683bcfb19f218ea69cc5ac5c6deebb0101c22912c183cff",
       "execution_record": "docs/evidence/codex-smokes/cs_prashna_en_inspection.json",
-      "execution_record_sha256": "22f626c63967a3ed58d9331768e2afc74327a8d31ed165ba8340049a985684d4",
+      "execution_record_sha256": "7d41e75939d58050512bd12a532b3e7c8de061048add427080022df123144c1a",
       "checks": {"natural_answer":true,"source_gate_honest":true,"no_internal_ledger":true,"no_private_material":true,"expected_route":true},
       "passed": true, "failure": null
     }
@@ -77,12 +77,12 @@
   "excluded_failed_attempts": [
     {
       "id": "cs_failed_prashna_pre_guard_inference",
-      "prompt": "RU quick obstacle question produced unsupported practical inference",
-      "output_redacted": "The pre-fix answer hid internals but inferred a practical communication or ownership theme from computed factors while source review was pending.",
+      "prompt_summary": "RU quick obstacle question produced unsupported practical inference",
+      "final_output_summary": "The pre-fix answer hid internals but inferred a practical communication or ownership theme from computed factors while source review was pending.",
       "failure": "Source-gate honesty failed: practical meaning was inferred from literal chart facts.",
       "raw_transcript_sha256": "544a6265959aa52e0cd75dac5b06b1a298531b8e9dd9f187c86869eba419dd94",
       "execution_record": "docs/evidence/codex-smokes/cs_failed_prashna_pre_guard_inference.json",
-      "execution_record_sha256": "1a2fb4547ed8c0cc7481999a365341e06adc229ce364631c289136ef779d19c5",
+      "execution_record_sha256": "2da2051a2ed30d04317c6c3e4099f10b0185971d9fc8664efcdd9112adacd2f6",
       "counted": false,
       "corrective_commit": "75e16b0"
     }

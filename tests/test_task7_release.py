@@ -197,7 +197,12 @@ def test_codex_smoke_artifact_schema_requires_real_routing_and_leak_checks() -> 
     assert schema["properties"]["summary"]["properties"]["release_gate"]["enum"] == ["passed", "failed"]
     excluded = schema["properties"]["excluded_failed_attempts"]["items"]
     assert excluded["additionalProperties"] is False
-    assert {"failure", "counted", "corrective_commit"} <= set(excluded["required"])
+    assert {
+        "prompt_summary", "final_output_summary", "failure", "counted",
+        "corrective_commit",
+    } <= set(excluded["required"])
+    assert "prompt" not in excluded["properties"]
+    assert "output_redacted" not in excluded["properties"]
     assert excluded["properties"]["counted"]["const"] is False
 
 
@@ -220,12 +225,12 @@ def test_real_codex_smokes_cover_quick_and_inspection_for_every_domain() -> None
     }
     assert artifact["excluded_failed_attempts"] == [{
         "id": "cs_failed_prashna_pre_guard_inference",
-        "prompt": "RU quick obstacle question produced unsupported practical inference",
-        "output_redacted": "The pre-fix answer hid internals but inferred a practical communication or ownership theme from computed factors while source review was pending.",
+        "prompt_summary": "RU quick obstacle question produced unsupported practical inference",
+        "final_output_summary": "The pre-fix answer hid internals but inferred a practical communication or ownership theme from computed factors while source review was pending.",
         "failure": "Source-gate honesty failed: practical meaning was inferred from literal chart facts.",
         "raw_transcript_sha256": "544a6265959aa52e0cd75dac5b06b1a298531b8e9dd9f187c86869eba419dd94",
         "execution_record": "docs/evidence/codex-smokes/cs_failed_prashna_pre_guard_inference.json",
-        "execution_record_sha256": "1a2fb4547ed8c0cc7481999a365341e06adc229ce364631c289136ef779d19c5",
+        "execution_record_sha256": "2da2051a2ed30d04317c6c3e4099f10b0185971d9fc8664efcdd9112adacd2f6",
         "counted": False,
         "corrective_commit": "75e16b0",
     }]
@@ -255,12 +260,20 @@ def test_codex_smoke_execution_records_are_canonical_durable_evidence() -> None:
         tool = record["ordered_events"][1]
         assert tool["server"] == "jyotish" and tool["status"] == "completed"
         assert tool["tool"] in {"jaimini", "prashna", "muhurta"}
-        assert record["final_output_sanitized"]
         assert record["redaction_policy"] == (
             "Private computed body/sign/date/window details are replaced by "
             "[redacted computed detail] or an equally specific bracketed redaction; "
             "raw JSONL remains local and untracked."
         )
+        if record["counted"]:
+            assert record["content_kind"] == "exact_prompt_full_sanitized_output"
+            assert set(("prompt", "final_output_sanitized")) <= record.keys()
+            assert record["final_output_sanitized"]
+            assert "prompt_summary" not in record and "final_output_summary" not in record
+        else:
+            assert record["content_kind"] == "summary"
+            assert set(("prompt_summary", "final_output_summary")) <= record.keys()
+            assert "prompt" not in record and "final_output_sanitized" not in record
         assert len(record["raw_transcript_sha256"]) == 64
         serialized = raw.decode().lower()
         assert not any(marker in serialized for marker in (
@@ -288,6 +301,7 @@ def test_codex_smoke_execution_records_are_canonical_durable_evidence() -> None:
         assert hashlib.sha256(path.read_bytes()).hexdigest() == case["execution_record_sha256"]
         assert record["counted"] is True and record["passed"] is True
         assert record["prompt"] == case["prompt"]
+        assert record["final_output_sanitized"]
         assert record["raw_transcript_sha256"] == case["raw_transcript_sha256"]
         assert record["ordered_events"][1]["tool"] == case["tool_routing"][0]
 
@@ -296,6 +310,8 @@ def test_codex_smoke_execution_records_are_canonical_durable_evidence() -> None:
     failed_path = ROOT / excluded["execution_record"]
     assert hashlib.sha256(failed_path.read_bytes()).hexdigest() == excluded["execution_record_sha256"]
     assert failed_record["counted"] is False and failed_record["passed"] is False
+    assert failed_record["prompt_summary"] == excluded["prompt_summary"]
+    assert failed_record["final_output_summary"] == excluded["final_output_summary"]
     assert failed_record["failure_reason"] == "unsupported doctrine-like practical inference"
     assert failed_record["corrected_by"] == "75e16b0"
 

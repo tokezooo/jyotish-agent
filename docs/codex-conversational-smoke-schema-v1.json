@@ -52,11 +52,11 @@
       "type": "array",
       "items": {
         "type": "object", "additionalProperties": false,
-        "required": ["id", "prompt", "output_redacted", "failure", "raw_transcript_sha256", "execution_record", "execution_record_sha256", "counted", "corrective_commit"],
+        "required": ["id", "prompt_summary", "final_output_summary", "failure", "raw_transcript_sha256", "execution_record", "execution_record_sha256", "counted", "corrective_commit"],
         "properties": {
           "id": {"type": "string", "pattern": "^cs_failed_[a-z0-9_]+$"},
-          "prompt": {"type": "string", "minLength": 1, "maxLength": 2000},
-          "output_redacted": {"type": "string", "minLength": 1, "maxLength": 4000},
+          "prompt_summary": {"type": "string", "minLength": 1, "maxLength": 2000},
+          "final_output_summary": {"type": "string", "minLength": 1, "maxLength": 4000},
           "failure": {"type": "string", "minLength": 1, "maxLength": 1000},
           "raw_transcript_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
           "execution_record": {"type": "string", "pattern": "^docs/evidence/codex-smokes/cs_failed_[a-z0-9_]+\\.json$"},

@@ -165,11 +165,14 @@ The first Task 7 review requested changes. The following fixes landed test-first
    communication/ownership theme from literal factors while source review was pending.
    It is retained as an excluded failed attempt. Commit `75e16b0` added explicit skill
    and server guards; the original normal prompt then passed without practical inference.
-   Each counted smoke and the excluded failure now has a canonical privacy-safe execution
+   Each of the six counted PASS smokes now has a canonical privacy-safe execution
    record under `docs/evidence/codex-smokes/`, including client/version, completion time,
    read-only sandbox, path-free MCP command identity, ordered thread/tool/final events,
-   complete sanitized natural output, redaction policy, and raw untracked JSONL SHA-256.
-   The index binds every record by a second SHA-256; tests recompute both layers.
+   exact prompt, complete sanitized natural output, redaction policy, and raw untracked
+   JSONL SHA-256. The excluded pre-guard failure is instead a durable hash-bound summary:
+   it stores only prompt/output summaries plus raw transcript hash, failure reason,
+   uncounted status, and corrective commit. The index binds every record by a second
+   SHA-256; tests recompute both layers and prevent the summary record from being counted.
 5. A genuinely held-out static calculation/trust fixture now drives 15 adversarial cases:
    Jaimini tie/approximate/source-prose/substitution, Prashna anchor/retry/privacy/safety/
    source state, and Muhurta skipped-date/stale-window/cancel/deadline/payload/source state.
@@ -185,15 +188,18 @@ Task 7 focused tests:
 - the pending-source practical-inference guard was absent from skill/server instructions
 - no durable, independently hash-bound execution records existed for the six counted
   Codex smokes or the excluded pre-guard failure
+- the excluded failure record used exact/full field names even though its retained
+  content was a summary, overstating the evidence metadata
 ```
 
 Review-fix GREEN evidence:
 
 ```text
 tests/test_task7_release.py: 13 passed
+Codex smoke metadata slice: 3 passed
 Held-out calculation/trust eval: 15 passed, 0 failed
-Task 7 release + MCP focused suite: 24 passed in 17.35s
-Full Python suite: 578 passed, 2 Swiss-only skipped in 156.70s
+Task 7 release + MCP focused suite: 24 passed in 17.31s
+Full Python suite: 578 passed, 2 Swiss-only skipped in 157.31s
 Codex smoke privacy scan: clean
 Ruff: All checks passed
 git diff --check: clean
