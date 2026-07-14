@@ -405,7 +405,8 @@ def render_jaimini_topic_report(
             JaiminiTopic.TIMING: "Jaimini: периоды",
         },
     }
-    lines = [f"## {titles[locale][analysis.topic]} — admission not evaluated"]
+    admission_label = "admission not evaluated" if locale == "en" else "допуск не оценён"
+    lines = [f"## {titles[locale][analysis.topic]} — {admission_label}"]
     if locale == "en":
         lines.append(f"Status: {'available' if analysis.available else 'unavailable'}")
         signal_phrase = "Source-bound symbolic signal"
@@ -602,7 +603,8 @@ def render_jaimini_timing_report(
     locale: Literal["ru", "en"],
 ) -> str:
     title = "Jaimini timing windows" if locale == "en" else "Окна периодов Jaimini"
-    lines = [f"## {title} — admission not evaluated"]
+    admission_label = "admission not evaluated" if locale == "en" else "допуск не оценён"
+    lines = [f"## {title} — {admission_label}"]
     for window in analysis.windows:
         lines.append(
             f"- {window.sign}: {window.start.date().isoformat()} — "

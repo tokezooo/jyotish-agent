@@ -139,7 +139,9 @@ def test_relationship_report_is_symbolic_and_blocks_high_stakes_categories() -> 
     analysis = analyze_jaimini_topic(graph, JaiminiTopic.RELATIONSHIPS)
     for locale in ("ru", "en"):
         report = render_jaimini_topic_report(analysis, locale=locale).casefold()
-        assert "admission not evaluated" in report
+        assert (
+            "admission not evaluated" if locale == "en" else "допуск не оценён"
+        ) in report
         assert "nilakantha_baseline" in report
         assert not any(
             forbidden in report
