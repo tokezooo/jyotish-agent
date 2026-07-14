@@ -18,6 +18,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
+from .evaluation import AdmissionEvaluator
 from .models import FrozenModel
 from .sources import (
     SourceId,
@@ -1047,15 +1048,17 @@ def muhurta_compiled_profile_sha256() -> str:
 
 class MuhurtaReleaseGate(FrozenModel):
     gate_id: str = Field(min_length=1)
-    status: Literal["passed", "missing", "optional_missing"]
+    status: Literal["passed", "failed", "missing", "optional_missing"]
     evidence: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def _honest_gate(self) -> "MuhurtaReleaseGate":
         if self.status == "passed" and self.evidence is None:
             raise ValueError("passed gate requires evidence")
-        if self.status != "passed" and self.evidence is not None:
-            raise ValueError("non-passed gate cannot claim completed evidence")
+        if self.status == "failed" and self.evidence is None:
+            raise ValueError("failed gate requires failure evidence")
+        if self.status in {"missing", "optional_missing"} and self.evidence is not None:
+            raise ValueError("missing gate cannot claim completed evidence")
         return self
 
 
@@ -1107,16 +1110,20 @@ class MuhurtaReleaseAudit(FrozenModel):
             raise ValueError("release audit must report all doctrine domains")
         if not any(gate.status == "missing" for gate in self.gates):
             raise ValueError("private release must retain its missing external gates")
-        required_missing = any(
-            gate.status == "missing"
-            and gate.gate_id
-            in {"independent_held_out_evaluation", "source_manifest", "profile_identity"}
-            for gate in self.gates
-        )
-        if self.available == required_missing:
-            raise ValueError("required missing gates must keep the release unavailable")
         if self.available != (self.admission_state == "private_experimental"):
             raise ValueError("availability and admission state disagree")
+        AdmissionEvaluator.assert_required_gates(
+            gates=self.gates,
+            required_gate_ids=(
+                "source_manifest",
+                "profile_identity",
+                "private_baseline_profile",
+                "profile_rule_fixture_suite",
+                "private_runtime_e2e",
+                "independent_held_out_evaluation",
+            ),
+            available=self.available,
+        )
         return self
 
 

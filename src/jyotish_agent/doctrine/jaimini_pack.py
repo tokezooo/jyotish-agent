@@ -16,6 +16,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from ..research_store import canonical_json
+from .evaluation import AdmissionEvaluator, REQUIRED_AUTOMATED_GATES
 from .graph import AnalysisGraph
 from .models import FrozenModel, ScanQuality
 from .sources import Sha256, SourceId, SourceManifest, SourceVerificationReport
@@ -404,7 +405,7 @@ def render_jaimini_topic_report(
             JaiminiTopic.TIMING: "Jaimini: периоды",
         },
     }
-    lines = [f"## {titles[locale][analysis.topic]} — experimental_full"]
+    lines = [f"## {titles[locale][analysis.topic]} — admission not evaluated"]
     if locale == "en":
         lines.append(f"Status: {'available' if analysis.available else 'unavailable'}")
         signal_phrase = "Source-bound symbolic signal"
@@ -601,7 +602,7 @@ def render_jaimini_timing_report(
     locale: Literal["ru", "en"],
 ) -> str:
     title = "Jaimini timing windows" if locale == "en" else "Окна периодов Jaimini"
-    lines = [f"## {title} — experimental_full"]
+    lines = [f"## {title} — admission not evaluated"]
     for window in analysis.windows:
         lines.append(
             f"- {window.sign}: {window.start.date().isoformat()} — "
@@ -760,6 +761,11 @@ class JaiminiReleaseAudit(FrozenModel):
             raise ValueError(
                 "available release requires a compiled profile and no blockers"
             )
+        AdmissionEvaluator.assert_required_gates(
+            gates=self.gates,
+            required_gate_ids=REQUIRED_AUTOMATED_GATES,
+            available=self.available,
+        )
         if (
             self.compiled_profile_sha256 is None
             and self.admission_state != "blocked_sources"

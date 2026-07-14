@@ -4,6 +4,7 @@ import json
 import time
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from jyotish_agent.api import app
@@ -15,6 +16,27 @@ from jyotish_agent.mcp_server import build_server
 
 ROOT = Path(__file__).parents[2]
 AUDIT = ROOT / "docs/evidence/doctrine/jaimini-release.json"
+
+
+def test_available_audit_requires_every_automated_gate_to_pass() -> None:
+    payload = json.loads(AUDIT.read_text(encoding="utf-8"))
+    payload.update(
+        compiled_profile_sha256="a" * 64,
+        admission_state="experimental_full",
+        blockers=[],
+        available=True,
+    )
+    for gate in payload["gates"]:
+        gate.update(status="passed", evidence="verified")
+    JaiminiReleaseAudit.model_validate(payload)
+
+    for gate_id in tuple(gate["gate_id"] for gate in payload["gates"]):
+        for status in ("missing", "failed"):
+            candidate = json.loads(json.dumps(payload))
+            gate = next(item for item in candidate["gates"] if item["gate_id"] == gate_id)
+            gate.update(status=status, evidence=None if status == "missing" else "failure")
+            with pytest.raises(ValueError, match="incomplete required gates"):
+                JaiminiReleaseAudit.model_validate(candidate)
 
 
 def _request(mode: str, locale: str) -> dict[str, object]:

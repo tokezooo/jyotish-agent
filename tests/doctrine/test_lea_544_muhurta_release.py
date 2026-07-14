@@ -4,6 +4,7 @@ import json
 import time
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from jyotish_agent.api import app
@@ -17,6 +18,31 @@ from jyotish_agent.mcp_server import build_server
 ROOT = Path(__file__).parents[2]
 AUDIT = ROOT / "docs/evidence/doctrine/muhurta-release.json"
 PACKAGED_AUDIT = ROOT / "src/jyotish_agent/data/doctrine/muhurta-release.json"
+
+
+def test_available_audit_requires_every_required_gate_to_pass() -> None:
+    payload = json.loads(AUDIT.read_text(encoding="utf-8"))
+    payload.update(admission_state="private_experimental", available=True)
+    required = {
+        "source_manifest",
+        "profile_identity",
+        "private_baseline_profile",
+        "profile_rule_fixture_suite",
+        "private_runtime_e2e",
+        "independent_held_out_evaluation",
+    }
+    for gate in payload["gates"]:
+        if gate["gate_id"] in required:
+            gate.update(status="passed", evidence="verified")
+    MuhurtaReleaseAudit.model_validate(payload)
+
+    for gate_id in sorted(required):
+        for status in ("missing", "failed"):
+            candidate = json.loads(json.dumps(payload))
+            gate = next(item for item in candidate["gates"] if item["gate_id"] == gate_id)
+            gate.update(status=status, evidence=None if status == "missing" else "failure")
+            with pytest.raises(ValueError, match="incomplete required gates"):
+                MuhurtaReleaseAudit.model_validate(candidate)
 
 
 def _request(mode: str = "full", locale: str = "en", **updates) -> dict[str, object]:

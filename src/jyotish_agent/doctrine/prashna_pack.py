@@ -19,6 +19,7 @@ from pydantic import Field, field_validator, model_validator
 
 from ..prashna_models import PrashnaAspectDoctrineProfile, PrashnaAspectGeometryResult
 from ..research_store import canonical_json
+from .evaluation import AdmissionEvaluator
 from .models import FrozenModel
 from .sources import SourceId, SourceManifest, SourceVerificationReport
 
@@ -947,7 +948,7 @@ class PrashnaRenderedReport(FrozenModel):
     uncertainty: str
     timing: str | None
     next_clarification: str | None
-    disclosure: Literal["experimental_full"] = "experimental_full"
+    disclosure: Literal["not_evaluated"] = "not_evaluated"
     evidence_appendix: tuple[str, ...] | None
     reason_code: str | None
 
@@ -1190,6 +1191,20 @@ class PrashnaReleaseAudit(FrozenModel):
             raise ValueError("release availability must follow admission state")
         if self.available and (self.compiled_profile_sha256 is None or self.blockers):
             raise ValueError("available release requires a profile and no blockers")
+        AdmissionEvaluator.assert_required_gates(
+            gates=self.gates,
+            required_gate_ids=(
+                "source_manifest",
+                "radicality_and_anchor_suite",
+                "taxonomy_ru_en",
+                "geometry_property_suite",
+                "outcome_graph_and_privacy",
+                "tajika_source_admission",
+                "published_outcome_cases",
+                "held_out_questions",
+            ),
+            available=self.available,
+        )
         if (
             self.compiled_profile_sha256 is None
             and self.admission_state != "blocked_sources"

@@ -84,6 +84,32 @@ class AdmissionReport(FrozenModel):
 
 class AdmissionEvaluator:
     @staticmethod
+    def assert_required_gates(
+        *,
+        gates: tuple[object, ...],
+        required_gate_ids: tuple[str, ...],
+        available: bool,
+    ) -> None:
+        """Reject an available release unless every required gate passed."""
+
+        if not available:
+            return
+        by_id = {
+            str(getattr(gate, "gate_id")): str(getattr(gate, "status"))
+            for gate in gates
+        }
+        incomplete = [
+            gate_id
+            for gate_id in required_gate_ids
+            if by_id.get(gate_id) != "passed"
+        ]
+        if incomplete:
+            raise ValueError(
+                "available release has incomplete required gates: "
+                + ", ".join(incomplete)
+            )
+
+    @staticmethod
     def evaluate(
         *,
         profile_id: str,

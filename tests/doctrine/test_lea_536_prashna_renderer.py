@@ -101,7 +101,7 @@ def test_ru_en_quick_full_deep_are_validated_graph_only_and_non_categorical() ->
             assert report.status == "completed"
             assert report.graph_sha256 == graph.graph_sha256
             assert report.evidence_appendix is None
-            assert report.disclosure == "experimental_full"
+            assert report.disclosure == "not_evaluated"
             assert "guarantee" not in report.model_dump_json().casefold()
             assert "гарантир" not in report.model_dump_json().casefold()
 

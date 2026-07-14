@@ -4,6 +4,7 @@ import json
 import time
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from jyotish_agent.api import app
@@ -15,6 +16,38 @@ from jyotish_agent.mcp_server import build_server
 
 ROOT = Path(__file__).parents[2]
 AUDIT = ROOT / "docs/evidence/doctrine/prashna-release.json"
+
+
+def test_available_audit_requires_every_required_gate_to_pass() -> None:
+    payload = json.loads(AUDIT.read_text(encoding="utf-8"))
+    payload.update(
+        compiled_profile_sha256="b" * 64,
+        admission_state="experimental_full",
+        blockers=[],
+        available=True,
+    )
+    required = {
+        "source_manifest",
+        "radicality_and_anchor_suite",
+        "taxonomy_ru_en",
+        "geometry_property_suite",
+        "outcome_graph_and_privacy",
+        "tajika_source_admission",
+        "published_outcome_cases",
+        "held_out_questions",
+    }
+    for gate in payload["gates"]:
+        if gate["gate_id"] in required:
+            gate.update(status="passed", evidence="verified")
+    PrashnaReleaseAudit.model_validate(payload)
+
+    for gate_id in sorted(required):
+        for status in ("missing", "failed"):
+            candidate = json.loads(json.dumps(payload))
+            gate = next(item for item in candidate["gates"] if item["gate_id"] == gate_id)
+            gate.update(status=status, evidence=None if status == "missing" else "failure")
+            with pytest.raises(ValueError, match="incomplete required gates"):
+                PrashnaReleaseAudit.model_validate(candidate)
 
 
 def _request(mode: str, locale: str) -> dict[str, object]:
