@@ -12,7 +12,11 @@ from jyotish_agent.doctrine.evaluation import (
 
 def _gates(status: str = "passed") -> tuple[GateResult, ...]:
     return tuple(
-        GateResult(gate_id=gate, status=status, evidence=f"evidence:{gate}" if status == "passed" else None)
+        GateResult(
+            gate_id=gate,
+            status=status,
+            evidence=f"evidence:{gate}" if status == "passed" else None,
+        )
         for gate in REQUIRED_AUTOMATED_GATES
     )
 
@@ -44,15 +48,23 @@ def _evaluate(gates, decisions=()):
 
 def test_missing_or_failed_gate_cannot_be_reported_as_experimental_full() -> None:
     gates = list(_gates())
-    gates[-1] = GateResult(gate_id="deep_conversational_e2e", status="missing", evidence=None)
+    gates[-1] = GateResult(
+        gate_id="deep_conversational_e2e", status="missing", evidence=None
+    )
     report = _evaluate(tuple(gates))
     assert report.admission_state == "automated_verified"
     assert report.eligible_for_experimental_full is False
     assert report.promotion_blockers == ("deep_conversational_e2e:missing",)
-    assert report.gate_summary == {"passed": len(REQUIRED_AUTOMATED_GATES) - 1, "failed": 0, "missing": 1}
+    assert report.gate_summary == {
+        "passed": len(REQUIRED_AUTOMATED_GATES) - 1,
+        "failed": 0,
+        "missing": 1,
+    }
 
     failed = list(_gates())
-    failed[0] = GateResult(gate_id=failed[0].gate_id, status="failed", evidence="test failure")
+    failed[0] = GateResult(
+        gate_id=failed[0].gate_id, status="failed", evidence="test failure"
+    )
     assert _evaluate(tuple(failed)).admission_state == "automated_verified"
 
 
@@ -64,37 +76,69 @@ def test_all_automated_gates_promote_without_external_reviewer() -> None:
     assert report.promotion_blockers == ()
 
 
-def test_reviewer_states_are_partial_reviewed_or_rejected_per_rule_and_profile() -> None:
+def test_reviewer_states_are_partial_reviewed_or_rejected_per_rule_and_profile() -> (
+    None
+):
     partial = _evaluate(
         _gates(),
         (
-            ReviewerDecision(subject_type="rule", subject_id="rule.one", status="approved", note="checked"),
-            ReviewerDecision(subject_type="rule", subject_id="rule.two", status="pending", note=None),
+            ReviewerDecision(
+                subject_type="rule",
+                subject_id="rule.one",
+                status="approved",
+                note="checked",
+            ),
+            ReviewerDecision(
+                subject_type="rule", subject_id="rule.two", status="pending", note=None
+            ),
         ),
     )
     assert partial.admission_state == "partially_reviewed"
 
     reviewed = _evaluate(
         _gates(),
-        (ReviewerDecision(subject_type="profile", subject_id="shared_doctrine_v1", status="approved", note="approved"),),
+        (
+            ReviewerDecision(
+                subject_type="profile",
+                subject_id="shared_doctrine_v1",
+                status="approved",
+                note="approved",
+            ),
+        ),
     )
     assert reviewed.admission_state == "reviewed"
 
     rejected = _evaluate(
         _gates(),
-        (ReviewerDecision(subject_type="rule", subject_id="rule.bad", status="rejected", note="material error"),),
+        (
+            ReviewerDecision(
+                subject_type="rule",
+                subject_id="rule.bad",
+                status="rejected",
+                note="material error",
+            ),
+        ),
     )
     assert rejected.admission_state == "rejected"
     assert rejected.rejected_rule_ids == ("rule.bad",)
 
 
-def test_ledger_preserves_historical_revision_and_filters_rejected_rules_for_new_runs() -> None:
+def test_ledger_preserves_historical_revision_and_filters_rejected_rules_for_new_runs() -> (
+    None
+):
     ledger = EvaluationLedger()
     old = ledger.append(_evaluate(_gates()))
     rejected = ledger.append(
         _evaluate(
             _gates(),
-            (ReviewerDecision(subject_type="rule", subject_id="rule.bad", status="rejected", note="bad"),),
+            (
+                ReviewerDecision(
+                    subject_type="rule",
+                    subject_id="rule.bad",
+                    status="rejected",
+                    note="bad",
+                ),
+            ),
         )
     )
     assert ledger.reports == (old, rejected)

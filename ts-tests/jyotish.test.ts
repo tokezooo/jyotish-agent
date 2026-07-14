@@ -6,6 +6,7 @@ import { Value } from "typebox/value";
 import {
   AnswerContractV2Schema,
   BirthProfileSchema,
+  JaiminiFullRequestSchema,
   FAIL_CLOSED_TEXT,
   RESEARCH_MIRROR_TYPE,
   ResearchRuntime,
@@ -127,6 +128,59 @@ describe("BirthProfileSchema (drift guard vs Pydantic)", () => {
       Value.Check(BirthProfileSchema, { ...valid, birth_time_confidence: "guess" }),
     ).toBe(false);
     expect(Value.Check(BirthProfileSchema, { ...valid, extra: "x" })).toBe(false);
+  });
+});
+
+describe("JaiminiFullRequestSchema", () => {
+  const request = {
+    profile: "default",
+    question: "Bounded career analysis",
+    mode: "full",
+    locale: "en",
+    topics: ["career"],
+    include_evidence: false,
+  };
+
+  test("accepts bounded modes and reserves evidence for inspection", () => {
+    expect(Value.Check(JaiminiFullRequestSchema, request)).toBe(true);
+    expect(
+      Value.Check(JaiminiFullRequestSchema, { ...request, include_evidence: true }),
+    ).toBe(false);
+    expect(
+      Value.Check(JaiminiFullRequestSchema, {
+        ...request,
+        mode: "inspection",
+        include_evidence: true,
+      }),
+    ).toBe(true);
+  });
+
+  test("registered tool calls the governed endpoint without rewriting blockers", async () => {
+    const tools = new Map<string, any>();
+    const fakePi = {
+      registerTool(tool: any) { tools.set(tool.name, tool); },
+      on() {},
+      appendEntry() {},
+    };
+    registerJyotishExtension(fakePi as any);
+    const tool = tools.get("jyotish_jaimini_full");
+    expect(tool).toBeDefined();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock(async (input: string | URL | Request) => {
+      expect(String(input)).toContain("/v2/doctrine/jaimini/full");
+      return new Response(JSON.stringify({
+        surface: "experimental_full",
+        status: "unavailable",
+        blockers: ["compiled_profile: missing"],
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as any;
+    try {
+      const result = await tool.execute("tc_full", request, new AbortController().signal);
+      expect(result.content[0].text).toContain("compiled_profile: missing");
+      expect(result.details.status).toBe("unavailable");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 });
 

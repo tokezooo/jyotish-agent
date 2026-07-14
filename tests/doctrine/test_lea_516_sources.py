@@ -75,9 +75,7 @@ def test_source_record_rejects_incomplete_or_unsafe_fields(
 
 def test_source_record_rejects_inconsistent_ocr_contract() -> None:
     with pytest.raises(ValidationError, match="ocr_status"):
-        SourceRecord.model_validate(
-            _record(ocr_required=False, ocr_status="required")
-        )
+        SourceRecord.model_validate(_record(ocr_required=False, ocr_status="required"))
     with pytest.raises(ValidationError, match="ocr_required"):
         SourceRecord.model_validate(
             _record(ocr_required=True, ocr_status="not_required")
@@ -170,13 +168,17 @@ def test_manifest_identity_is_order_independent_and_changes_with_metadata() -> N
 
 def test_tracked_examples_cover_required_domains_and_school_roles() -> None:
     manifest = load_source_manifest(EXAMPLES)
-    assert {(source.domain.value, source.school_role.value) for source in manifest.sources} >= {
+    assert {
+        (source.domain.value, source.school_role.value) for source in manifest.sources
+    } >= {
         ("jaimini", "baseline"),
         ("jaimini", "overlay"),
         ("prashna", "baseline"),
         ("muhurta", "baseline"),
     }
-    assert all(source.local_file.parts[0] == source.domain.value for source in manifest.sources)
+    assert all(
+        source.local_file.parts[0] == source.domain.value for source in manifest.sources
+    )
 
 
 def test_private_source_root_is_ignored_and_no_pdf_is_packaged() -> None:

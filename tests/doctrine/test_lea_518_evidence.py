@@ -38,9 +38,7 @@ def _manifest(**updates: object) -> SourceManifest:
         "ocr_status": "not_required",
     }
     source.update(updates)
-    return SourceManifest.model_validate(
-        {"schema_version": "1.0", "sources": [source]}
-    )
+    return SourceManifest.model_validate({"schema_version": "1.0", "sources": [source]})
 
 
 def _draft(manifest: SourceManifest, **updates: object) -> FragmentDraft:
@@ -80,7 +78,9 @@ def test_append_is_idempotent_but_content_mutation_creates_immutable_revision() 
     assert first.permitted_excerpt == "Career indications require contextual reading."
     assert store.resolve(FragmentRef.from_fragment(first)) == first
     assert store.resolve(FragmentRef.from_fragment(changed)) == changed
-    supersession = [item for item in store.relations if item.relation_type == "supersedes"]
+    supersession = [
+        item for item in store.relations if item.relation_type == "supersedes"
+    ]
     assert len(supersession) == 1
     assert supersession[0].source.revision == 2
     assert supersession[0].target.revision == 1
@@ -100,7 +100,9 @@ def test_every_fragment_binds_to_current_manifest_and_known_source() -> None:
     assert raised.value.code == "SOURCE_MANIFEST_SUBSTITUTED"
 
     with pytest.raises(EvidenceFailure) as unknown:
-        store.append(_draft(manifest).model_copy(update={"source_id": "unknown_source"}))
+        store.append(
+            _draft(manifest).model_copy(update={"source_id": "unknown_source"})
+        )
     assert unknown.value.code == "SOURCE_UNKNOWN"
 
 
@@ -156,7 +158,9 @@ def test_conflicting_commentaries_coexist_without_hidden_merging() -> None:
     assert any(item.relation_type == "contradicts" for item in store.relations)
 
 
-def test_public_lookup_is_bounded_and_never_returns_paths_hashes_ids_or_full_text() -> None:
+def test_public_lookup_is_bounded_and_never_returns_paths_hashes_ids_or_full_text() -> (
+    None
+):
     manifest = _manifest()
     store = EvidenceStore(manifest)
     admitted = store.append(_draft(manifest))
@@ -186,7 +190,9 @@ def test_public_lookup_is_bounded_and_never_returns_paths_hashes_ids_or_full_tex
         store.lookup("career", limit=101, projection="public")
 
 
-def test_inspection_projection_and_resolution_detect_stale_or_substituted_refs() -> None:
+def test_inspection_projection_and_resolution_detect_stale_or_substituted_refs() -> (
+    None
+):
     manifest = _manifest()
     store = EvidenceStore(manifest)
     first = store.append(_draft(manifest))

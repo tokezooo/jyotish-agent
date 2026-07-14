@@ -26,7 +26,9 @@ def test_inventory_covers_every_existing_jaimini_fact_rule_family() -> None:
     existing = json.loads(SOURCE_MAP_PATH.read_text(encoding="utf-8"))
     expected_rule_ids = {rule["rule_id"] for rule in existing["rules"]}
 
-    assert {candidate.rule_id for candidate in inventory.candidates} == expected_rule_ids
+    assert {
+        candidate.rule_id for candidate in inventory.candidates
+    } == expected_rule_ids
     assert all(candidate.fact_families for candidate in inventory.candidates)
     assert all(candidate.source_id for candidate in inventory.candidates)
 
@@ -35,8 +37,13 @@ def test_baseline_inventory_has_no_hidden_overlay_or_unsupported_admission() -> 
     inventory = _inventory()
 
     assert inventory.school == "nilakantha_baseline"
-    assert all(candidate.school == inventory.school for candidate in inventory.candidates)
-    assert all(candidate.status != JaiminiRuleStatus.ADMITTED for candidate in inventory.candidates)
+    assert all(
+        candidate.school == inventory.school for candidate in inventory.candidates
+    )
+    assert all(
+        candidate.status != JaiminiRuleStatus.ADMITTED
+        for candidate in inventory.candidates
+    )
     rendered = INVENTORY_PATH.read_text(encoding="utf-8").casefold()
     assert "sanjay_rath" not in rendered
     assert "kn_rao" not in rendered
@@ -65,8 +72,7 @@ def test_unanchored_candidates_are_quarantined_with_explicit_discrepancies() -> 
 
     assert unanchored
     assert all(
-        item.status == JaiminiRuleStatus.QUARANTINED_MISSING_ANCHOR
-        and item.discrepancy
+        item.status == JaiminiRuleStatus.QUARANTINED_MISSING_ANCHOR and item.discrepancy
         for item in unanchored
     )
     discrepancy_audit = json.loads(DISCREPANCIES_PATH.read_text(encoding="utf-8"))
@@ -85,4 +91,3 @@ def test_inventory_identity_is_deterministic_and_order_independent() -> None:
     reordered = JaiminiRuleInventory.model_validate(payload)
 
     assert inventory.inventory_sha256 == reordered.inventory_sha256
-

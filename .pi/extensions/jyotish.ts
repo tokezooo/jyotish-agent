@@ -90,6 +90,36 @@ const ResearchBirthProfileSchema = Type.Object(
   }, NO_EXTRA,
 );
 
+const JaiminiFullCommon = {
+  profile: Type.Optional(StringEnum(["default", "inline"] as const)),
+  inline_profile: Type.Optional(ResearchBirthProfileSchema),
+  question: Type.String({ minLength: 1, maxLength: 2_000 }),
+  locale: StringEnum(["ru", "en"] as const),
+  topics: Type.Array(
+    StringEnum(["self", "career", "relationships", "timing"] as const),
+    { minItems: 1, maxItems: 4, uniqueItems: true },
+  ),
+};
+
+export const JaiminiFullRequestSchema = Type.Union([
+  Type.Object(
+    {
+      ...JaiminiFullCommon,
+      mode: StringEnum(["quick", "full", "deep"] as const),
+      include_evidence: Type.Optional(Type.Literal(false)),
+    },
+    NO_EXTRA,
+  ),
+  Type.Object(
+    {
+      ...JaiminiFullCommon,
+      mode: Type.Literal("inspection"),
+      include_evidence: Type.Optional(Type.Boolean()),
+    },
+    NO_EXTRA,
+  ),
+]);
+
 const ConfigSchema = Type.Object(
   {
     ayanamsa: Type.Optional(
@@ -1452,6 +1482,36 @@ export default function (pi: ExtensionAPI) {
       );
       if (!ok) {
         return { content: [{ type: "text", text: formatProblem(status, body) }], details: {} };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(body, null, 2) }],
+        details: body as Record<string, unknown>,
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "jyotish_jaimini_full",
+    label: "Full Jaimini (governed)",
+    description:
+      "Request the source-bound Full Jaimini experimental surface. The endpoint " +
+      "returns explicit admission blockers and no interpretation until the release audit permits it.",
+    promptGuidelines: [
+      "If status is unavailable, report the blockers and do not invent Jaimini interpretation.",
+      "Use inspection mode only when the user asks for evidence details.",
+    ],
+    parameters: JaiminiFullRequestSchema,
+    async execute(_toolCallId, params, signal) {
+      const { ok, status, body } = await postJson(
+        "/v2/doctrine/jaimini/full",
+        params,
+        signal,
+      );
+      if (!ok) {
+        return {
+          content: [{ type: "text", text: formatProblem(status, body) }],
+          details: {},
+        };
       }
       return {
         content: [{ type: "text", text: JSON.stringify(body, null, 2) }],

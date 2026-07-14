@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import hashlib
 
-from jyotish_agent.doctrine.dsl import DoctrineCompiler, ProfileDefinition, RuleDefinition
+from jyotish_agent.doctrine.dsl import (
+    DoctrineCompiler,
+    ProfileDefinition,
+    RuleDefinition,
+)
 from jyotish_agent.doctrine.evidence import EvidenceStore, FragmentDraft, FragmentRef
 from jyotish_agent.doctrine.graph import DoctrineGraphBuilder, SignedFactProjection
 from jyotish_agent.doctrine.renderer import (
     CandidateReport,
     ConstrainedRenderer,
-    StructuredClaim,
 )
 from jyotish_agent.doctrine.sources import SourceManifest
 
@@ -161,7 +164,9 @@ def test_firewall_rejects_unsupported_text_school_confidence_and_forged_refs() -
     } <= codes
 
 
-def test_firewall_rejects_prohibited_prompt_injection_and_private_data_patterns() -> None:
+def test_firewall_rejects_prohibited_prompt_injection_and_private_data_patterns() -> (
+    None
+):
     renderer, graph = _renderer_and_graph()
     claim = renderer.candidate_from_graph(graph).claims[0]
     dangerous = claim.model_copy(
@@ -216,9 +221,7 @@ def test_graph_and_claim_identity_substitution_fail_validation() -> None:
     candidate = renderer.candidate_from_graph(graph)
     substituted = CandidateReport(
         graph_sha256="f" * 64,
-        claims=(
-            candidate.claims[0].model_copy(update={"graph_sha256": "f" * 64}),
-        ),
+        claims=(candidate.claims[0].model_copy(update={"graph_sha256": "f" * 64}),),
     )
     result = renderer.validate(substituted, graph)
     assert {item.code for item in result.violations} >= {

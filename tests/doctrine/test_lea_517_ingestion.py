@@ -46,7 +46,9 @@ class FakeOcr:
     tool_name = "fake-tesseract"
     tool_version = "5.4.0"
 
-    def recognize(self, image: bytes, *, languages: tuple[str, ...], psm: int) -> OcrResult:
+    def recognize(
+        self, image: bytes, *, languages: tuple[str, ...], psm: int
+    ) -> OcrResult:
         assert image == b"page:2"
         assert languages == ("sa", "en")
         assert psm == 6
@@ -82,7 +84,9 @@ def _source(file_bytes: bytes, **updates: object) -> SourceRecord:
     return SourceRecord.model_validate(payload)
 
 
-def _write_source(tmp_path: Path, content: bytes = b"fixture-pdf") -> tuple[Path, SourceRecord]:
+def _write_source(
+    tmp_path: Path, content: bytes = b"fixture-pdf"
+) -> tuple[Path, SourceRecord]:
     root = tmp_path / "private_sources"
     source = _source(content)
     path = root / source.local_file
@@ -133,7 +137,10 @@ def test_mixed_text_and_ocr_ingestion_is_byte_stable_and_round_trips_coordinates
     assert first.pages[1].admission_status == "quarantined_low_confidence"
     assert first.pages[1].confidence == 0.72
     assert first.activation_allowed is False
-    assert [(anchor.kind, anchor.label, anchor.start, anchor.end) for anchor in first.pages[0].anchors] == [
+    assert [
+        (anchor.kind, anchor.label, anchor.start, anchor.end)
+        for anchor in first.pages[0].anchors
+    ] == [
         ("heading", "अध्याय एक", 0, 9),
         ("sutra", "1.1", 10, 19),
     ]

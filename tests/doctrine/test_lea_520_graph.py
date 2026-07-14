@@ -147,7 +147,9 @@ def _facts(**updates: object) -> SignedFactProjection:
     )
 
 
-def test_same_inputs_are_order_independent_and_every_conclusion_has_complete_edges() -> None:
+def test_same_inputs_are_order_independent_and_every_conclusion_has_complete_edges() -> (
+    None
+):
     store, compiled, _ = _fixture()
     builder = DoctrineGraphBuilder(store)
     first = builder.build(compiled, _facts(), prohibited_topics=("medical",))
@@ -166,7 +168,12 @@ def test_same_inputs_are_order_independent_and_every_conclusion_has_complete_edg
         edge_types = {
             edge.relation for edge in first.edges if edge.source_id == node.node_id
         }
-        assert {"activated_by", "supported_by_fact", "supported_by_source", "scoped_to"} <= edge_types
+        assert {
+            "activated_by",
+            "supported_by_fact",
+            "supported_by_source",
+            "scoped_to",
+        } <= edge_types
 
 
 def test_dependency_activation_and_absent_facts_never_create_stale_citations() -> None:

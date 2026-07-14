@@ -198,7 +198,9 @@ def test_compiler_output_is_deterministic_hashable_and_matches_typed_premises() 
     assert not compiled_first.matches({"jaimini.karakas.AmK.planet": "Venus"})
 
 
-def test_compiler_rejects_missing_dependencies_cycles_and_confidence_escalation() -> None:
+def test_compiler_rejects_missing_dependencies_cycles_and_confidence_escalation() -> (
+    None
+):
     store, reference = _store()
     compiler = DoctrineCompiler(store)
 
@@ -236,9 +238,7 @@ def test_compiler_rejects_missing_dependencies_cycles_and_confidence_escalation(
         confidence_ceiling=0.80,
     )
     with pytest.raises(CompilationFailure) as escalation:
-        compiler.compile(
-            _profile(), [foundation, inflated], fact_catalog=FACTS
-        )
+        compiler.compile(_profile(), [foundation, inflated], fact_catalog=FACTS)
     assert escalation.value.code == "RULE_CONFIDENCE_ESCALATION"
 
 
@@ -304,9 +304,10 @@ def test_overlay_requires_explicit_matching_baseline_and_never_mutates_it() -> N
         (baseline.profile.profile_id, baseline.compiled_profile_sha256),
         (overlay_profile.profile_id, overlay.own_layer_sha256),
     )
-    assert baseline.rules == compiler.compile(
-        _profile(), [_rule(reference)], fact_catalog=FACTS
-    ).rules
+    assert (
+        baseline.rules
+        == compiler.compile(_profile(), [_rule(reference)], fact_catalog=FACTS).rules
+    )
     wrong_hash = overlay_profile.model_copy(update={"base_profile_sha256": "f" * 64})
     with pytest.raises(CompilationFailure) as substituted:
         compiler.compile(

@@ -96,7 +96,9 @@ def test_structural_career_analysis_never_blends_timing_periods() -> None:
     analysis = analyze_jaimini_topic(_graph(), JaiminiTopic.CAREER)
 
     assert "timing.separate" not in analysis.activated_rule_ids
-    assert not any(signal.path.startswith("jaimini.chara_dasha") for signal in analysis.signals)
+    assert not any(
+        signal.path.startswith("jaimini.chara_dasha") for signal in analysis.signals
+    )
 
 
 def test_ru_en_career_reports_are_bounded_and_match_golden_contracts() -> None:
@@ -109,7 +111,9 @@ def test_ru_en_career_reports_are_bounded_and_match_golden_contracts() -> None:
             )
         )
         assert all(phrase in report for phrase in golden["required_phrases"])
-        assert all(phrase not in report.casefold() for phrase in golden["forbidden_phrases"])
+        assert all(
+            phrase not in report.casefold() for phrase in golden["forbidden_phrases"]
+        )
         assert "nilakantha_baseline" in report
 
 
@@ -141,4 +145,3 @@ def test_fact_substitution_removes_the_dependent_career_signal() -> None:
     unavailable = analyze_jaimini_topic(substituted, JaiminiTopic.CAREER)
     assert unavailable.available is False
     assert unavailable.activated_rule_ids == ()
-

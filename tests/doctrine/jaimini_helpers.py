@@ -3,7 +3,11 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Iterable
 
-from jyotish_agent.doctrine.dsl import DoctrineCompiler, ProfileDefinition, RuleDefinition
+from jyotish_agent.doctrine.dsl import (
+    DoctrineCompiler,
+    ProfileDefinition,
+    RuleDefinition,
+)
 from jyotish_agent.doctrine.evidence import EvidenceStore, FragmentDraft, FragmentRef
 from jyotish_agent.doctrine.graph import (
     AnalysisGraph,
@@ -115,4 +119,3 @@ def build_jaimini_graph(
             "guaranteed_marriage",
         ),
     )
-

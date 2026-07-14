@@ -91,9 +91,7 @@ def test_approximate_time_suppresses_time_sensitive_self_signals() -> None:
     )
 
     assert {signal.path for signal in analysis.signals} == {"jaimini.karakas.7.AK"}
-    assert set(analysis.suppressed_fact_paths) == set(FACTS) - {
-        "jaimini.karakas.7.AK"
-    }
+    assert set(analysis.suppressed_fact_paths) == set(FACTS) - {"jaimini.karakas.7.AK"}
     assert "BIRTH_TIME_APPROXIMATE" in analysis.unavailable_reasons
 
 

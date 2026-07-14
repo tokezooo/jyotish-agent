@@ -131,9 +131,7 @@ def test_approximate_time_keeps_only_stable_dk_and_suppresses_geometry() -> None
     )
 
     assert {signal.path for signal in analysis.signals} == {"jaimini.karakas.7.DK"}
-    assert set(analysis.suppressed_fact_paths) == set(FACTS) - {
-        "jaimini.karakas.7.DK"
-    }
+    assert set(analysis.suppressed_fact_paths) == set(FACTS) - {"jaimini.karakas.7.DK"}
 
 
 def test_relationship_report_is_symbolic_and_blocks_high_stakes_categories() -> None:
@@ -160,4 +158,3 @@ def test_relationship_report_is_symbolic_and_blocks_high_stakes_categories() -> 
         "longevity",
         "death",
     }
-

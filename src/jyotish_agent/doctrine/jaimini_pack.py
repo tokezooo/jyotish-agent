@@ -45,12 +45,16 @@ class JaiminiCorpusRequirementRecord(FrozenModel):
         if not self.source_ids and self.acquisition_blocker is None:
             raise ValueError("missing requirements need an acquisition blocker")
         if self.source_ids and self.acquisition_blocker is not None:
-            raise ValueError("acquired requirements cannot retain an acquisition blocker")
+            raise ValueError(
+                "acquired requirements cannot retain an acquisition blocker"
+            )
         if (
             self.requirement != JaiminiCorpusRequirement.PUBLISHED_WORKED_CHARTS
             and self.worked_chart_count
         ):
-            raise ValueError("worked_chart_count belongs only to the worked-chart requirement")
+            raise ValueError(
+                "worked_chart_count belongs only to the worked-chart requirement"
+            )
         return self
 
 
@@ -199,7 +203,9 @@ class JaiminiRuleCandidate(FrozenModel):
             raise ValueError("anchored or admitted candidates require an exact anchor")
         if self.status == JaiminiRuleStatus.QUARANTINED_MISSING_ANCHOR:
             if self.anchor is not None or self.discrepancy is None:
-                raise ValueError("missing-anchor quarantine requires only a discrepancy")
+                raise ValueError(
+                    "missing-anchor quarantine requires only a discrepancy"
+                )
         if self.status == JaiminiRuleStatus.QUARANTINED_CONFLICT and (
             self.anchor is None or self.discrepancy is None
         ):
@@ -270,9 +276,7 @@ class JaiminiTopicAnalysis(FrozenModel):
 _TOPIC_LABELS: dict[JaiminiTopic, frozenset[str]] = {
     JaiminiTopic.SELF: frozenset({"self", "dharma", "education", "capability"}),
     JaiminiTopic.CAREER: frozenset({"career", "status", "activity"}),
-    JaiminiTopic.RELATIONSHIPS: frozenset(
-        {"relationships", "family", "legacy"}
-    ),
+    JaiminiTopic.RELATIONSHIPS: frozenset({"relationships", "family", "legacy"}),
     JaiminiTopic.TIMING: frozenset({"timing"}),
 }
 
@@ -374,9 +378,7 @@ def analyze_jaimini_topic(
         ),
         conflicts=tuple(sorted(conflict_pairs)),
         suppressed_fact_paths=tuple(sorted(suppressed)),
-        prohibited_topics=tuple(
-            sorted(node.topic for node in graph.prohibition_nodes)
-        ),
+        prohibited_topics=tuple(sorted(node.topic for node in graph.prohibition_nodes)),
         unavailable_reasons=tuple(reasons),
     )
 
@@ -407,16 +409,12 @@ def render_jaimini_topic_report(
         lines.append(f"Status: {'available' if analysis.available else 'unavailable'}")
         signal_phrase = "Source-bound symbolic signal"
         conflict_label = "Conflicting admitted rules"
-        disclaimer = (
-            "This is a symbolic, source-bound interpretation, not a guaranteed event forecast."
-        )
+        disclaimer = "This is a symbolic, source-bound interpretation, not a guaranteed event forecast."
     else:
         lines.append(f"Статус: {'доступно' if analysis.available else 'недоступно'}")
         signal_phrase = "Подтверждённый источником символический сигнал"
         conflict_label = "Конфликтующие допущенные правила"
-        disclaimer = (
-            "Это символическая интерпретация с опорой на источники, а не гарантированный прогноз события."
-        )
+        disclaimer = "Это символическая интерпретация с опорой на источники, а не гарантированный прогноз события."
 
     if analysis.school_ids:
         lines.append("School: " + ", ".join(analysis.school_ids))
@@ -568,7 +566,9 @@ def link_chara_dasha_timing(
                 confidence=confidence_by_period[index],
                 rule_ids=tuple(sorted(rule_ids_by_period[index])),
                 fact_paths=tuple(sorted(period["fact_paths"])),
-                source_commitments=tuple(sorted(commitments_by_period.get(index, set()))),
+                source_commitments=tuple(
+                    sorted(commitments_by_period.get(index, set()))
+                ),
             )
         except (TypeError, ValueError) as exc:
             raise JaiminiTimingFailure(
@@ -718,3 +718,51 @@ def compare_jaimini_overlays(
         overlay_signals=overlay.signals,
         divergences=divergences,
     )
+
+
+class JaiminiReleaseGate(FrozenModel):
+    gate_id: str = Field(min_length=1)
+    status: Literal["passed", "failed", "missing"]
+    evidence: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _gate_evidence(self) -> "JaiminiReleaseGate":
+        if self.status == "passed" and self.evidence is None:
+            raise ValueError("passed release gate requires evidence")
+        if self.status == "missing" and self.evidence is not None:
+            raise ValueError("missing release gate cannot claim evidence")
+        return self
+
+
+class JaiminiReleaseAudit(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    release_id: Literal["full_jaimini_v1"]
+    corpus_manifest_sha256: Sha256
+    rule_inventory_sha256: Sha256
+    compiled_profile_sha256: Sha256 | None
+    admission_state: Literal[
+        "blocked_sources", "automated_verified", "experimental_full", "reviewed"
+    ]
+    gates: tuple[JaiminiReleaseGate, ...]
+    blockers: tuple[str, ...]
+    external_review_missing: bool
+    available: bool
+
+    @model_validator(mode="after")
+    def _honest_release_state(self) -> "JaiminiReleaseAudit":
+        ids = [gate.gate_id for gate in self.gates]
+        if len(ids) != len(set(ids)):
+            raise ValueError("release gate IDs must be unique")
+        expected_available = self.admission_state in {"experimental_full", "reviewed"}
+        if self.available != expected_available:
+            raise ValueError("release availability must follow admission state")
+        if self.available and (self.compiled_profile_sha256 is None or self.blockers):
+            raise ValueError(
+                "available release requires a compiled profile and no blockers"
+            )
+        if (
+            self.compiled_profile_sha256 is None
+            and self.admission_state != "blocked_sources"
+        ):
+            raise ValueError("missing compiled profile is a source-blocked release")
+        return self

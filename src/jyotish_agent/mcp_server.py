@@ -19,6 +19,8 @@ from .mcp_models import (
     FinalizedResearch,
     FinalizeResearchInput,
     InspectResearchInput,
+    JaiminiFullMcpInput,
+    JaiminiFullReleaseResult,
     JaiminiMcpInput,
     MuhurtaMcpInput,
     PrashnaMcpInput,
@@ -72,6 +74,22 @@ class _JaiminiWireArguments(ArgModelBase):
         }
 
 
+class _JaiminiFullPublishedArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    request: JaiminiFullMcpInput
+
+
+class _JaiminiFullWireArguments(ArgModelBase):
+    request: Any = None
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+
+    def model_dump_one_level(self) -> dict[str, Any]:
+        return {
+            "request": self.request,
+            "outer_arguments": dict(self.model_extra or {}),
+        }
+
+
 class _MuhurtaPublishedArguments(BaseModel):
     model_config = ConfigDict(extra="forbid")
     request: MuhurtaMcpInput
@@ -82,7 +100,10 @@ class _MuhurtaWireArguments(ArgModelBase):
     model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
 
     def model_dump_one_level(self) -> dict[str, Any]:
-        return {"request": self.request, "outer_arguments": dict(self.model_extra or {})}
+        return {
+            "request": self.request,
+            "outer_arguments": dict(self.model_extra or {}),
+        }
 
 
 SERVER_INSTRUCTIONS = """Normal conversation is the default. Use quick, stateless tools for focused personal questions and follow-ups. Create a ResearchRun only for broad multi-factor analysis or when the user explicitly asks for deep research. Влад is the default profile; use an inline profile only when the user clearly identifies another person and supplies their birth data. For deep research, the final visible answer must equal finalize_research.markdown exactly; never expand or rewrite it. Keep evidence IDs, claim graphs, confidence machinery, hashes, and run-state details out of normal visible answers. Explain Jyotish as symbolic interpretation, not guaranteed prediction.
@@ -92,6 +113,8 @@ Routing:
 - calculate and search_sources are stateless and do not create ResearchRuns.
 - jaimini is stateless and returns signed computed facts; do not invent interpretation
   when interpretation_status is unavailable, and never infer an approximate range.
+- jaimini_full is an additive governed interpretation surface. Respect its admission
+  status; when unavailable, report blockers and use jaimini facts without inventing prose.
 - prashna seals one explicit/captured question moment and supports only bounded work/project
   facts; reuse its opaque anchor token for clarification and never invent doctrine. While
   source review is pending, report literal computed facts/statuses only: do not infer a
@@ -174,6 +197,32 @@ def build_server(facade: JyotishMcpFacade | None = None) -> FastMCP:
     jaimini_tool.fn_metadata.arg_model = _JaiminiWireArguments
 
     @server.tool(
+        name="jaimini_full",
+        description=(
+            "Request the governed Full Jaimini experimental surface in quick, full, deep, "
+            "or inspection mode. It fails closed with explicit acquisition/admission "
+            "blockers until the source-bound profile is eligible."
+        ),
+        annotations=READ_ONLY,
+        structured_output=True,
+    )
+    def jaimini_full(
+        request: Any = None,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> JaiminiFullReleaseResult:
+        return runtime.jaimini_full_payload(request, outer_arguments=outer_arguments)
+
+    jaimini_full_tool = server._tool_manager.get_tool("jaimini_full")
+    assert jaimini_full_tool is not None
+    jaimini_full_tool.parameters = {
+        "type": "object",
+        "properties": {"request": JaiminiFullMcpInput.model_json_schema()},
+        "required": ["request"],
+        "additionalProperties": False,
+    }
+    jaimini_full_tool.fn_metadata.arg_model = _JaiminiFullWireArguments
+
+    @server.tool(
         name="prashna",
         description=(
             "Compute signed time-chart facts for one low-risk work/project status question. "
@@ -214,8 +263,12 @@ def build_server(facade: JyotishMcpFacade | None = None) -> FastMCP:
         annotations=READ_ONLY,
         structured_output=True,
     )
-    def muhurta(request: Any = None, outer_arguments: dict[str, Any] | None = None) -> MuhurtaResultModel:
-        return MuhurtaResultModel(root=runtime.muhurta_payload(request, outer_arguments=outer_arguments))
+    def muhurta(
+        request: Any = None, outer_arguments: dict[str, Any] | None = None
+    ) -> MuhurtaResultModel:
+        return MuhurtaResultModel(
+            root=runtime.muhurta_payload(request, outer_arguments=outer_arguments)
+        )
 
     muhurta_tool = server._tool_manager.get_tool("muhurta")
     assert muhurta_tool is not None

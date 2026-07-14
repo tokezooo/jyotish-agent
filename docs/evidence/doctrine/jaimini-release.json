@@ -1,0 +1,71 @@
+{
+  "schema_version": "1.0",
+  "release_id": "full_jaimini_v1",
+  "corpus_manifest_sha256": "f7da1f4badda556e5cd772f0687a05936d1d522eb779dcf88f16a07ef4c9603e",
+  "rule_inventory_sha256": "e52d07b2849ad054f6612d6215a5e886c699c6d785f9996af97a5ee409ff8496",
+  "compiled_profile_sha256": null,
+  "admission_state": "blocked_sources",
+  "gates": [
+    {
+      "gate_id": "rule_fixtures",
+      "status": "passed",
+      "evidence": "LEA-525 through LEA-529 focused suites: 24 passed"
+    },
+    {
+      "gate_id": "hand_worked_cases",
+      "status": "missing",
+      "evidence": null
+    },
+    {
+      "gate_id": "school_conflict_cases",
+      "status": "passed",
+      "evidence": "Explicit conflict and hidden-blending tests"
+    },
+    {
+      "gate_id": "metamorphic_tests",
+      "status": "passed",
+      "evidence": "Fact and graph substitution tests"
+    },
+    {
+      "gate_id": "held_out_cases",
+      "status": "missing",
+      "evidence": null
+    },
+    {
+      "gate_id": "conversational_e2e_ru",
+      "status": "passed",
+      "evidence": "Bounded RU projection contract"
+    },
+    {
+      "gate_id": "conversational_e2e_en",
+      "status": "passed",
+      "evidence": "Bounded EN projection contract"
+    },
+    {
+      "gate_id": "privacy_adversarial",
+      "status": "passed",
+      "evidence": "Secret and private-path reflection tests"
+    },
+    {
+      "gate_id": "payload_performance",
+      "status": "passed",
+      "evidence": "Bounded deterministic release-gate test"
+    },
+    {
+      "gate_id": "deep_conversational_e2e",
+      "status": "missing",
+      "evidence": null
+    }
+  ],
+  "blockers": [
+    "compiled_profile: no source-admitted production profile exists",
+    "nilakantha_subodhini_translation: licensed local bytes missing",
+    "practical_chara_dasha: licensed local source missing",
+    "published_worked_charts: 20 traceable cases missing",
+    "sanjay_rath_overlay: licensed local bytes missing",
+    "kn_rao_overlay: selected licensed local source missing",
+    "specialist_review: no production rule/profile review"
+  ],
+  "external_review_missing": true,
+  "available": false
+}

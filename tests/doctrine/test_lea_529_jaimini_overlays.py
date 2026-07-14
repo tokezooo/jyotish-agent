@@ -41,8 +41,12 @@ def _analysis(school: str, rule_id: str):
     return analyze_jaimini_topic(graph, JaiminiTopic.SELF)
 
 
-def test_overlay_registry_names_sources_and_keeps_unacquired_profiles_disabled() -> None:
-    registry = JaiminiOverlayRegistry.model_validate_json(REGISTRY.read_text(encoding="utf-8"))
+def test_overlay_registry_names_sources_and_keeps_unacquired_profiles_disabled() -> (
+    None
+):
+    registry = JaiminiOverlayRegistry.model_validate_json(
+        REGISTRY.read_text(encoding="utf-8")
+    )
 
     assert {item.overlay_id for item in registry.overlays} == {
         "sanjay_rath",
@@ -105,4 +109,3 @@ def test_registry_file_contains_no_rules_or_copyrighted_text() -> None:
     payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
     assert all("rules" not in item for item in payload["overlays"])
     assert all("text" not in item for item in payload["overlays"])
-

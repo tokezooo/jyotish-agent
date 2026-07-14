@@ -89,9 +89,7 @@ def test_chara_dasha_requires_an_available_natal_topic_and_preserves_lineage() -
 def test_approximate_birth_time_marks_period_boundaries_unstable() -> None:
     graph = _graph()
     natal = analyze_jaimini_topic(graph, JaiminiTopic.CAREER)
-    timing = link_chara_dasha_timing(
-        graph, natal, birth_time_confidence="approximate"
-    )
+    timing = link_chara_dasha_timing(graph, natal, birth_time_confidence="approximate")
 
     assert timing.windows[0].boundary_stability == "unstable"
     assert "BIRTH_TIME_APPROXIMATE" in timing.limitations
@@ -134,4 +132,3 @@ def test_timing_report_is_bounded_and_never_promises_an_event_date() -> None:
         assert "гарантирован" not in report.casefold()
         assert "source:" not in report
         assert len(report) < 4_000
-
