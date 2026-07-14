@@ -230,14 +230,19 @@ def test_explicit_local_start_becomes_a_candidate_boundary() -> None:
     assert any(window.start.timetz().replace(tzinfo=None) == dt.time(9, 30) for window in result.windows)
 
 
-def test_spring_forward_daily_periods_have_unique_semantic_identities() -> None:
+@pytest.mark.parametrize("civil_date", (dt.date(2026, 3, 8), dt.date(2026, 11, 1)))
+def test_dst_periods_have_unique_positive_semantic_intervals(civil_date: dt.date) -> None:
     result = _run_muhurta_boundary_day(
-        BirthProfile("event", (2026, 3, 8), (0, 0, 0), 40.7128, -74.0060, 0),
-        dt.date(2026, 3, 8),
+        BirthProfile("event", (civil_date.year, civil_date.month, civil_date.day), (0, 0, 0), 40.7128, -74.0060, 0),
+        civil_date,
         "America/New_York",
     )
-    lagna_identities = [item.identity for item in result.day.values if item.kind.startswith("lagna_")]
-    assert len(lagna_identities) == len(set(lagna_identities))
+    identities = [(item.kind, item.identity) for item in result.day.values]
+    assert len(identities) == len(set(identities))
+    assert all(
+        item.end_utc is None or item.end_utc > item.start_utc
+        for item in result.day.values
+    )
 
 
 def test_dst_crossing_preserves_calendar_ready_zone_offsets() -> None:

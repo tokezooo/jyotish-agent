@@ -257,6 +257,8 @@ def _canonicalize_muhurta_estimates(
                 clusters.append([item])
             else:
                 clusters[-1].append(item)
+        candidates: list[tuple[int, _MuhurtaBoundaryEstimate]] = []
+        interval_identity = any(item.end_utc is not None for item in ordered)
         for cluster in clusters:
             starts = sorted(round(item.start_utc.astimezone(UTC).timestamp()) for item in cluster)
             start = datetime.fromtimestamp(starts[(len(starts) - 1) // 2], tz=UTC)
@@ -267,7 +269,24 @@ def _canonicalize_muhurta_estimates(
             if ends and len(ends) != len(cluster):
                 raise EngineOutputError("mixed point/interval estimates share one transition identity")
             end = datetime.fromtimestamp(ends[(len(ends) - 1) // 2], tz=UTC) if ends else None
-            canonical.append(_MuhurtaBoundaryEstimate(key[0], key[1], start, end))
+            if end is not None and end <= start:
+                continue
+            candidates.append((len(cluster), _MuhurtaBoundaryEstimate(key[0], key[1], start, end)))
+        if not candidates:
+            if interval_identity:
+                # A fixed-offset engine evaluation can collapse a period across
+                # a civil-time jump. It is not a physical interval and must not
+                # become a partition boundary.
+                continue
+            raise EngineOutputError("Muhurta transition identity has no canonical estimate")
+        # A semantic transition/period identity occurs at most once per civil
+        # day. Prefer the estimate cluster with the most independent probes;
+        # stable chronological order resolves equal-support engine variants.
+        _, selected = sorted(
+            candidates,
+            key=lambda pair: (-pair[0], pair[1].start_utc.astimezone(UTC)),
+        )[0]
+        canonical.append(selected)
     return tuple(sorted(canonical, key=lambda item: (item.start_utc, item.kind, item.identity)))
 
 
