@@ -18,6 +18,7 @@ import re
 from enum import Enum
 
 from .names import PLANETS, SIGNS
+from .rule_profiles import jaimini_source_admission_evidence
 from .signing import get_cached_domain_artifact, verify_domain_artifact
 
 _DIVISIONAL_KEY = re.compile(r"^d\d+$")
@@ -234,6 +235,8 @@ def iter_jaimini_fact_atoms(facts: list[dict]) -> dict[str, str]:
             and path.startswith("jaimini.")
             and isinstance(value, (str, int, float, bool))
         ):
+            if path in atoms:
+                raise ValueError(f"DUPLICATE_JAIMINI_FACT_ID:{path}")
             atoms[path] = "true" if value is True else "false" if value is False else str(value)
     return atoms
 
@@ -243,6 +246,7 @@ def validate_jaimini_answer(
     artifact_token: str,
     *,
     interpretation_requested: bool = False,
+    summary: str | None = None,
 ) -> list[str]:
     """Check citations against a server-held artifact and enforce its source gate."""
     artifact = get_cached_domain_artifact(artifact_token)
@@ -250,10 +254,16 @@ def validate_jaimini_answer(
         return ["ARTIFACT_NOT_FOUND"]
     if not verify_domain_artifact(artifact):
         return ["ARTIFACT_INVALID"]
-    if interpretation_requested and (
-        artifact.get("provenance", {}).get("source_review_status") != "approved"
-    ):
-        return ["INTERPRETATION_SOURCE_UNAVAILABLE"]
+    if interpretation_requested or summary is not None:
+        admission = jaimini_source_admission_evidence()
+        if not admission["verified"]:
+            return ["INTERPRETATION_SOURCE_UNAVAILABLE"]
+        if artifact.get("source_admission_sha256") != admission["sha256"]:
+            return ["SOURCE_ADMISSION_MISMATCH"]
+        # No governed analysis graph / canonical renderer is admitted yet.  Even a
+        # fully verified future source pack cannot turn caller-authored prose into
+        # validated interpretation merely by citing computed facts.
+        return ["INTERPRETATION_RENDERER_UNAVAILABLE"]
     atoms = iter_jaimini_fact_atoms(artifact.get("facts", []))
     violations: list[str] = []
     for ref in facts_used:

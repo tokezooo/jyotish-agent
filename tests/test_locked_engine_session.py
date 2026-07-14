@@ -83,6 +83,9 @@ def test_session_snapshot_is_immutable_normalized_d1_d9_without_raw_charts():
             snapshot.d1[0].sign_index = 1
         assert snapshot.config.charts == ("D1",)
         assert snapshot.config.modules == ()
+        assert snapshot.sun_longitude_at_sunrise is not None
+        assert snapshot.minutes_since_sunrise is not None
+        assert snapshot.ephemeris_mode in {"moshier", "swiss"}
         with pytest.raises(AttributeError):
             snapshot.config.charts.append("D10")
         return snapshot
@@ -104,6 +107,18 @@ def test_session_snapshot_is_immutable_normalized_d1_d9_without_raw_charts():
     assert not hasattr(result.snapshot, "raw_charts")
     assert result.snapshot.config.charts == ("D1",)
     assert result.snapshot.config.modules == ()
+
+
+def test_unavailable_sunrise_primitive_is_captured_without_raw_engine_error(monkeypatch):
+    def unavailable(*_args, **_kwargs):
+        raise RuntimeError("private engine detail")
+
+    monkeypatch.setattr(facade, "_special_lagna_primitive", unavailable, raising=False)
+    result = _run_engine_session(
+        _PROFILE, _REFERENCE, domain_callback=lambda snapshot: snapshot
+    )
+    assert result.domain.sun_longitude_at_sunrise is None
+    assert result.domain.minutes_since_sunrise is None
 
 
 def test_same_thread_session_reentry_fails_promptly_without_reentrant_lock(monkeypatch):

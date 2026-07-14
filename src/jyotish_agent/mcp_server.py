@@ -6,7 +6,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from .mcp_facade import JyotishMcpFacade, facade_from_environment
-from .jaimini_models import JaiminiCompletedResult
+from .jaimini_models import JaiminiResultModel
 from .mcp_models import (
     CalculateInput,
     CalculateResult,
@@ -87,14 +87,14 @@ def build_server(facade: JyotishMcpFacade | None = None) -> FastMCP:
         name="jaimini",
         description=(
             "Compute bounded signed Jaimini Core facts for an exact birth time or an "
-            "explicit 5-minute-step approximate range. Interpretation remains unavailable "
-            "unless the governed Jaimini source map is fully admitted."
+            "explicit 5-minute-step approximate range. Interpretation remains unavailable; "
+            "a verified source pack and governed analysis renderer are both required."
         ),
         annotations=READ_ONLY,
         structured_output=True,
     )
-    def jaimini(request: JaiminiMcpInput) -> JaiminiCompletedResult:
-        return runtime.jaimini(request)
+    def jaimini(request: JaiminiMcpInput) -> JaiminiResultModel:
+        return JaiminiResultModel(root=runtime.jaimini(request))
 
     @server.tool(
         name="search_sources",

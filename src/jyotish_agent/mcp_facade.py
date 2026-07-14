@@ -13,9 +13,9 @@ from .jaimini import JaiminiFacade
 from .jaimini_models import (
     ApproximateJaiminiBirthInput,
     ExactJaiminiBirthInput,
-    JaiminiCompletedResult,
     JaiminiInput,
     JaiminiPlace,
+    JaiminiResult,
 )
 from .mcp_models import (
     CalculateInput,
@@ -240,7 +240,7 @@ class JyotishMcpFacade:
             provenance=calculated["provenance"],
         )
 
-    def jaimini(self, value: JaiminiMcpInput) -> JaiminiCompletedResult:
+    def jaimini(self, value: JaiminiMcpInput) -> JaiminiResult:
         """Compute stateless Jaimini facts from a selected private/inline profile."""
         profile = self._select_profile(value)
         timezone = profile.place.timezone
@@ -251,6 +251,12 @@ class JyotishMcpFacade:
             latitude=profile.place.latitude,
             longitude=profile.place.longitude,
             timezone=timezone.zone_id,
+            fold=timezone.fold,
+            asserted_offset_hours=(
+                timezone.asserted_offset_hours
+                if isinstance(timezone, IanaWithAssertedOffset)
+                else None
+            ),
         )
         if value.birth.confidence == "exact":
             if str(profile.birth_time_confidence.value) != "exact":

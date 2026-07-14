@@ -63,6 +63,8 @@ def test_server_metadata_and_tool_contract(tmp_path: Path):
     assert by_name["jaimini"].annotations.readOnlyHint is True
     assert by_name["jaimini"].annotations.idempotentHint is True
     assert by_name["jaimini"].outputSchema is not None
+    assert by_name["jaimini"].outputSchema["discriminator"]["propertyName"] == "status"
+    assert "governed analysis renderer" in by_name["jaimini"].description
     assert by_name["research"].annotations.readOnlyHint is False
     assert by_name["research"].annotations.idempotentHint is False
     assert by_name["finalize_research"].annotations.destructiveHint is False

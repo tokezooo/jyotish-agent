@@ -58,7 +58,18 @@ def _result_common(
             "rule_profile_sha256": "a" * 64,
             "source_map_sha256": "b" * 64,
             "source_review_status": source_review_status,
+            "source_admission_sha256": "c" * 64,
+            "ephemeris_mode": "moshier",
+            "tzdb_fingerprint": "sha256:" + "d" * 64,
         },
+    }
+
+
+def _artifact_fields() -> dict:
+    return {
+        "artifact_id": "jya_" + "e" * 24,
+        "artifact_sha256": "f" * 64,
+        "artifact_token": "1" * 64,
     }
 
 
@@ -160,6 +171,7 @@ def test_result_union_has_four_discriminated_privacy_safe_statuses():
             "anchor_summary": "exact birth anchor",
             "sections": [{"section_id": "karakas", "facts": []}],
             "truncation": {"truncated": False, "total_count": 0, "returned_count": 0},
+            **_artifact_fields(),
         }
     )
     assert completed.status == "completed"
@@ -174,6 +186,18 @@ def test_result_union_has_four_discriminated_privacy_safe_statuses():
         )
         assert result.status == status
 
+
+def test_completed_result_requires_signed_artifact_fields():
+    payload = {
+        **_result_common(),
+        "status": "completed",
+        "profile_name": "synthetic-example",
+        "anchor_summary": "exact birth anchor",
+        "sections": [],
+        "truncation": {"truncated": False, "total_count": 0, "returned_count": 0},
+    }
+    with pytest.raises(ValidationError, match="artifact"):
+        TypeAdapter(JaiminiResult).validate_python(payload)
 
 @pytest.mark.parametrize("status,next_action", [("unavailable", "inspect_source_status"), ("needs_input", "provide_birth_range"), ("incomplete", "retry_calculation")])
 def test_non_completed_results_cannot_claim_available_interpretation(status, next_action):
@@ -196,6 +220,7 @@ def test_completed_result_requires_approved_sources_for_available_interpretation
         "anchor_summary": "exact birth anchor",
         "sections": [],
         "truncation": {"truncated": False, "total_count": 0, "returned_count": 0},
+        **_artifact_fields(),
     }
     with pytest.raises(ValidationError, match="approved"):
         TypeAdapter(JaiminiResult).validate_python(

@@ -36,32 +36,63 @@ def jaimini_source_map_sha256() -> str:
 
 def jaimini_source_admission_verified() -> bool:
     """Return true only when every approved mapping resolves in governed corpus data."""
+    return bool(jaimini_source_admission_evidence()["verified"])
+
+
+def jaimini_source_admission_evidence() -> dict:
+    """Return a canonical, hash-bound projection of governed Jaimini rule sources."""
     source_map = load_jaimini_source_map()
-    if (
+    gate_metadata_valid = (
         source_map.interpretation_status != "available"
         or source_map.review.status != "approved"
         or not source_map.review.reviewer
         or not source_map.review.reviewer_role
-    ):
-        return False
-    admitted: dict[str, str] = {}
+    ) is False
+    admitted: dict[str, dict[str, str]] = {}
     for source in load_builtin_manifest()["sources"]:
         if source.get("review", {}).get("status") != "approved":
             continue
         if not source.get("rights_note") or not source.get("provenance_url"):
             continue
-        admitted.update(
-            {
-                fragment["fragment_id"]: fragment["checksum"]
-                for fragment in source.get("fragments", [])
+        source_review = source.get("review", {})
+        for fragment in source.get("fragments", []):
+            admitted[fragment["fragment_id"]] = {
+                "fragment_sha256": fragment["checksum"],
+                "source_version_id": source["source_version_id"],
+                "manifest_checksum": source["manifest_checksum"],
+                "rights_note_sha256": hashlib.sha256(
+                    source["rights_note"].encode("utf-8")
+                ).hexdigest(),
+                "provenance_url": source["provenance_url"],
+                "source_reviewer": source_review.get("reviewer", ""),
             }
-        )
-    return bool(source_map.rules) and all(
+    verified = gate_metadata_valid and bool(source_map.rules) and all(
         rule.source_status == "approved"
         and rule.fragment_id in admitted
-        and admitted[rule.fragment_id] == rule.fragment_sha256
+        and admitted[rule.fragment_id]["fragment_sha256"] == rule.fragment_sha256
         for rule in source_map.rules
     )
+    rule_sources = (
+        {
+            rule.rule_id: {
+                "fragment_id": rule.fragment_id,
+                "fragment_sha256": rule.fragment_sha256,
+                **admitted[rule.fragment_id],
+            }
+            for rule in source_map.rules
+        }
+        if verified
+        else {}
+    )
+    payload = {
+        "verified": verified,
+        "source_map_sha256": jaimini_source_map_sha256(),
+        "rule_sources": rule_sources,
+    }
+    payload["sha256"] = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    return payload
 
 
 def load_jaimini_rule_profile() -> JaiminiRuleProfile:

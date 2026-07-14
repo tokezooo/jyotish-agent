@@ -73,6 +73,9 @@ class _EngineSnapshot:
     config: _EngineConfigSnapshot
     d1: tuple[_EnginePosition, ...]
     d9: tuple[_EnginePosition, ...]
+    sun_longitude_at_sunrise: float | None
+    minutes_since_sunrise: float | None
+    ephemeris_mode: str
 
 
 _DomainT = TypeVar("_DomainT")
@@ -105,6 +108,19 @@ def _immutable_positions(chart) -> tuple[_EnginePosition, ...]:
             degrees=_round_deg(pos[1]),
         )
         for body, pos in chart
+    )
+
+
+def _special_lagna_primitive(drik, jd, place, profile: BirthProfile) -> tuple[float | None, float | None]:
+    """Capture sunrise-anchored inputs; caller owns the configured engine lock."""
+    birth_hour = profile.time[0] + profile.time[1] / 60 + profile.time[2] / 3600
+    sunrise = drik.sunrise(jd, place)
+    if not sunrise or birth_hour < float(sunrise[0]):
+        return None, None
+    sunrise_jd_utc = float(sunrise[2]) - profile.timezone / 24
+    return (
+        _round_deg(drik.solar_longitude(sunrise_jd_utc)),
+        round((birth_hour - float(sunrise[0])) * 60, 6),
     )
 
 
@@ -685,6 +701,20 @@ def _run_engine_session(
                 )
                 for name, factor in kernel_charts.items()
             }
+            # Jaimini special-lagna primitive, captured under the same configured
+            # engine lock as D1/D9.  For a pre-sunrise birth the frozen profile's
+            # "minutes since sunrise" anchor is not satisfied; surface unavailable
+            # rather than silently switching to the previous civil date.
+            try:
+                (
+                    sun_longitude_at_sunrise,
+                    minutes_since_sunrise,
+                ) = _special_lagna_primitive(drik, jd, place, profile)
+            except Exception:
+                # Optional domain primitive: the Jaimini facade converts absence
+                # into a typed privacy-safe incomplete result.
+                sun_longitude_at_sunrise = None
+                minutes_since_sunrise = None
             panchanga = _panchanga(jd, place)
             vimshottari = _vimshottari_current(ref_jd, jd, place)
             module_facts: dict[str, dict] = {}
@@ -731,6 +761,9 @@ def _run_engine_session(
                 ),
                 d1=_immutable_positions(raw_charts["D1"]),
                 d9=_immutable_positions(raw_charts["D9"]),
+                sun_longitude_at_sunrise=sun_longitude_at_sunrise,
+                minutes_since_sunrise=minutes_since_sunrise,
+                ephemeris_mode=ephemeris_mode(),
             )
             # Last action under the lock: no callback-side config mutation can alter
             # engine-dependent values already captured for the natal response.

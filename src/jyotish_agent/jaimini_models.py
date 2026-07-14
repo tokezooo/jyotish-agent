@@ -15,6 +15,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    RootModel,
     computed_field,
     field_validator,
     model_validator,
@@ -47,6 +48,8 @@ class JaiminiPlace(_StrictModel):
         description="IANA timezone identifier; fixed or inferred offsets are not accepted",
         examples=["Asia/Kolkata"],
     )
+    fold: Literal[0, 1] | None = None
+    asserted_offset_hours: float | None = Field(default=None, ge=-12, le=14)
 
     @field_validator("timezone")
     @classmethod
@@ -166,11 +169,12 @@ class JaiminiProvenance(_FrozenStrictModel):
     rule_profile_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     source_map_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     source_review_status: ReviewStatus
+    source_admission_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     source_reviewer: str | None = None
     source_reviewer_role: str | None = None
     engine_version: str | None = None
-    ephemeris: str | None = None
-    tzdb_version: str | None = None
+    ephemeris_mode: Literal["moshier", "swiss"]
+    tzdb_fingerprint: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
 
 
 class _JaiminiResultBase(_StrictModel):
@@ -200,9 +204,10 @@ class JaiminiCompletedResult(_JaiminiResultBase):
     sections: tuple[JaiminiSection, ...] = Field(max_length=12)
     truncation: JaiminiTruncation
     interpretation: tuple[str, ...] | None = None
-    artifact_id: str | None = Field(default=None, pattern=r"^jya_[0-9a-f]{24}$")
-    artifact_sha256: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    artifact_token: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    trace: tuple[JaiminiFact, ...] | None = Field(default=None, max_length=256)
+    artifact_id: str = Field(pattern=r"^jya_[0-9a-f]{24}$")
+    artifact_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    artifact_token: str = Field(pattern=r"^[0-9a-f]{64}$")
 
     @model_validator(mode="after")
     def interpretation_matches_status(self) -> "JaiminiCompletedResult":
@@ -223,7 +228,9 @@ class JaiminiUnavailableResult(_JaiminiResultBase):
 
 class JaiminiIncompleteResult(_JaiminiResultBase):
     status: Literal["incomplete"]
-    next_action: Literal["retry_calculation", "narrow_request"]
+    next_action: Literal[
+        "retry_calculation", "narrow_request", "adjudicate_karaka_tie"
+    ]
 
 
 JaiminiResult = Annotated[
@@ -233,6 +240,10 @@ JaiminiResult = Annotated[
     | JaiminiIncompleteResult,
     Field(discriminator="status"),
 ]
+
+
+class JaiminiResultModel(RootModel[JaiminiResult]):
+    """Concrete MCP-serializable root model preserving the result discriminator."""
 
 
 class KarakaRules(_FrozenStrictModel):
