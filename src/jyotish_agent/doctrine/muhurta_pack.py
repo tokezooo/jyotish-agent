@@ -7,7 +7,9 @@ observed outcome claim.
 
 from __future__ import annotations
 
+import json
 from enum import StrEnum
+from importlib import resources
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -189,3 +191,136 @@ def render_muhurta_corpus_coverage(
     """Return a deterministic projection without source paths or source text."""
 
     return report.model_dump(mode="json")
+
+
+class MuhurtaActivityProfile(StrEnum):
+    FOCUSED_WORK = "focused_work"
+    STUDY_LEARNING = "study_learning"
+    CREATIVE_PRODUCTION = "creative_production"
+    PRODUCT_LAUNCH_COMMUNICATION = "product_launch_communication"
+    LOW_RISK_TRAVEL_PLANNING = "low_risk_travel_planning"
+    GENERAL_PRIVATE_TASK = "general_private_task"
+
+
+class MuhurtaProfileDefinition(FrozenModel):
+    profile: MuhurtaActivityProfile
+    aliases_en: tuple[str, ...] = Field(min_length=1)
+    aliases_ru: tuple[str, ...] = Field(min_length=1)
+    required_rule_families: tuple[str, ...] = Field(min_length=1)
+    doctrine_status: Literal["available", "unavailable_pending_source_admission"]
+    admitted_rule_ids: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _availability_is_honest(self) -> "MuhurtaProfileDefinition":
+        if self.doctrine_status == "available" and not self.admitted_rule_ids:
+            raise ValueError("available profile requires admitted rules")
+        if (
+            self.doctrine_status == "unavailable_pending_source_admission"
+            and self.admitted_rule_ids
+        ):
+            raise ValueError("unavailable profile cannot carry admitted rules")
+        for aliases in (self.aliases_en, self.aliases_ru):
+            if len(set(aliases)) != len(aliases):
+                raise ValueError("profile aliases must be unique")
+        return self
+
+
+class MuhurtaProfileCatalog(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    profiles: tuple[MuhurtaProfileDefinition, ...] = Field(min_length=6)
+    high_stakes_aliases_en: tuple[str, ...] = Field(min_length=1)
+    high_stakes_aliases_ru: tuple[str, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _complete(self) -> "MuhurtaProfileCatalog":
+        declared = [item.profile for item in self.profiles]
+        if len(declared) != len(set(declared)) or set(declared) != set(
+            MuhurtaActivityProfile
+        ):
+            raise ValueError("profile catalog must declare every activity exactly once")
+        for locale in ("en", "ru"):
+            aliases = [
+                alias
+                for item in self.profiles
+                for alias in getattr(item, f"aliases_{locale}")
+            ]
+            if len(aliases) != len(set(aliases)):
+                raise ValueError(f"{locale} aliases must not overlap between profiles")
+        return self
+
+
+class MuhurtaActivityRoute(FrozenModel):
+    status: Literal["supported", "needs_input", "unsupported_high_stakes"]
+    profile: MuhurtaActivityProfile | None = None
+    reason_code: str | None = None
+    legacy_profile_id: Literal["muhurta_focused_work_v1"] | None = None
+
+    @model_validator(mode="after")
+    def _coherent_route(self) -> "MuhurtaActivityRoute":
+        if self.status == "supported" and self.profile is None:
+            raise ValueError("supported route requires a profile")
+        if self.status != "supported" and self.profile is not None:
+            raise ValueError("non-supported route cannot select a profile")
+        return self
+
+
+def load_muhurta_profile_catalog() -> MuhurtaProfileCatalog:
+    payload = resources.files("jyotish_agent").joinpath(
+        "data/doctrine/muhurta-profiles.json"
+    ).read_text(encoding="utf-8")
+    return MuhurtaProfileCatalog.model_validate(json.loads(payload))
+
+
+def _normalize_activity(value: str) -> str:
+    return " ".join(
+        "".join(character if character.isalnum() else " " for character in value.casefold()).split()
+    )
+
+
+def _alias_present(normalized: str, alias: str) -> bool:
+    normalized_alias = _normalize_activity(alias)
+    return normalized == normalized_alias or f" {normalized_alias} " in f" {normalized} "
+
+
+def route_muhurta_activity(
+    activity: str, *, locale: Literal["ru", "en"]
+) -> MuhurtaActivityRoute:
+    """Route only explicit, bounded aliases; broad intent never widens scope."""
+
+    catalog = load_muhurta_profile_catalog()
+    normalized = _normalize_activity(activity)
+    high_stakes = getattr(catalog, f"high_stakes_aliases_{locale}")
+    if any(_alias_present(normalized, alias) for alias in high_stakes):
+        return MuhurtaActivityRoute(
+            status="unsupported_high_stakes",
+            reason_code="HIGH_STAKES_ACTIVITY",
+        )
+
+    matches = [
+        item.profile
+        for item in catalog.profiles
+        if any(
+            _alias_present(normalized, alias)
+            for alias in getattr(item, f"aliases_{locale}")
+        )
+    ]
+    if len(matches) > 1:
+        return MuhurtaActivityRoute(
+            status="needs_input",
+            reason_code="COMPOSITE_ACTIVITY_UNSUPPORTED",
+        )
+    if not matches:
+        return MuhurtaActivityRoute(
+            status="needs_input",
+            reason_code="ACTIVITY_PROFILE_REQUIRED",
+        )
+    profile = matches[0]
+    return MuhurtaActivityRoute(
+        status="supported",
+        profile=profile,
+        legacy_profile_id=(
+            "muhurta_focused_work_v1"
+            if profile == MuhurtaActivityProfile.FOCUSED_WORK
+            else None
+        ),
+    )

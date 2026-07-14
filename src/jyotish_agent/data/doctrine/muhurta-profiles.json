@@ -1,0 +1,61 @@
+{
+  "schema_version": "1.0",
+  "profiles": [
+    {
+      "profile": "focused_work",
+      "aliases_en": ["focused work", "deep work", "focused_work_session_v1"],
+      "aliases_ru": ["фокусная работа", "глубокая работа"],
+      "required_rule_families": ["common_eligibility", "focused_work_preference"],
+      "doctrine_status": "unavailable_pending_source_admission",
+      "admitted_rule_ids": []
+    },
+    {
+      "profile": "study_learning",
+      "aliases_en": ["study session", "study", "learning"],
+      "aliases_ru": ["учеба", "обучение", "занятие"],
+      "required_rule_families": ["common_eligibility", "education_preference"],
+      "doctrine_status": "unavailable_pending_source_admission",
+      "admitted_rule_ids": []
+    },
+    {
+      "profile": "creative_production",
+      "aliases_en": ["creative production", "creative work"],
+      "aliases_ru": ["творческая работа", "создание контента"],
+      "required_rule_families": ["common_eligibility", "creative_preference"],
+      "doctrine_status": "unavailable_pending_source_admission",
+      "admitted_rule_ids": []
+    },
+    {
+      "profile": "product_launch_communication",
+      "aliases_en": ["product launch communication", "product launch", "important communication"],
+      "aliases_ru": ["запуск продукта", "важная коммуникация", "публикация продукта"],
+      "required_rule_families": ["common_eligibility", "launch_communication_preference"],
+      "doctrine_status": "unavailable_pending_source_admission",
+      "admitted_rule_ids": []
+    },
+    {
+      "profile": "low_risk_travel_planning",
+      "aliases_en": ["low risk travel planning", "travel planning"],
+      "aliases_ru": ["планирование поездки", "план поездки"],
+      "required_rule_families": ["common_eligibility", "travel_planning_preference"],
+      "doctrine_status": "unavailable_pending_source_admission",
+      "admitted_rule_ids": []
+    },
+    {
+      "profile": "general_private_task",
+      "aliases_en": ["general private task", "private task"],
+      "aliases_ru": ["личная задача", "частная задача"],
+      "required_rule_families": ["common_eligibility"],
+      "doctrine_status": "unavailable_pending_source_admission",
+      "admitted_rule_ids": []
+    }
+  ],
+  "high_stakes_aliases_en": [
+    "marriage", "wedding", "medical", "surgery", "legal filing", "court filing",
+    "investment", "trade", "fertility", "conception", "dangerous", "expedition"
+  ],
+  "high_stakes_aliases_ru": [
+    "свадьба", "брак", "операция", "лечение", "судебная подача", "иск",
+    "инвестиция", "сделка", "зачатие", "фертильность", "опасная", "экспедиция"
+  ]
+}
