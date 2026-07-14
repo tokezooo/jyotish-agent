@@ -9,6 +9,8 @@ baseline.
 from __future__ import annotations
 
 import datetime as dt
+import re
+import unicodedata
 from enum import StrEnum
 from typing import Literal
 
@@ -370,3 +372,268 @@ def evaluate_prashna_radicality(
         reason_codes=(),
         **common,
     )
+
+
+class PrashnaQuestionProfile(StrEnum):
+    WORK_PROJECT_STATUS = "work_project_status"
+    COMMUNICATION_CONTACT = "communication_contact"
+    LOST_OBJECT = "lost_object"
+    GENERAL_LOW_RISK_OUTCOME = "general_low_risk_outcome"
+
+
+class _QuestionProfileBinding(FrozenModel):
+    profile: PrashnaQuestionProfile
+    primary_house: int = Field(ge=1, le=12)
+    secondary_houses: tuple[int, ...]
+    significators: tuple[str, ...]
+    source_refs: tuple[str, ...]
+
+
+class PrashnaQuestionRoute(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    status: Literal["supported", "unsupported", "composite", "high_stakes", "ambiguous"]
+    profile: PrashnaQuestionProfile | None = None
+    primary_house: int | None = Field(default=None, ge=1, le=12)
+    secondary_houses: tuple[int, ...] = ()
+    significators: tuple[str, ...] = ()
+    required_fact_paths: tuple[str, ...] = ()
+    source_refs: tuple[str, ...] = ()
+    guidance_code: Literal[
+        "PROCEED",
+        "ASK_ONE_MATERIAL_QUESTION",
+        "CONSULT_QUALIFIED_PROFESSIONAL",
+        "NAME_A_SUPPORTED_LOW_RISK_TOPIC",
+        "TOPIC_NOT_SUPPORTED",
+    ]
+
+    @model_validator(mode="after")
+    def _supported_route_is_complete(self) -> "PrashnaQuestionRoute":
+        details = (
+            self.profile,
+            self.primary_house,
+            self.secondary_houses,
+            self.significators,
+            self.required_fact_paths,
+            self.source_refs,
+        )
+        if self.status == "supported" and (
+            self.guidance_code != "PROCEED" or any(not item for item in details)
+        ):
+            raise ValueError("supported routes require complete source-bound details")
+        if self.status != "supported" and any(item for item in details):
+            raise ValueError("rejected routes cannot expose doctrine significators")
+        return self
+
+
+_QUESTION_BINDINGS = {
+    PrashnaQuestionProfile.WORK_PROJECT_STATUS: _QuestionProfileBinding(
+        profile=PrashnaQuestionProfile.WORK_PROJECT_STATUS,
+        primary_house=10,
+        secondary_houses=(1, 6, 11),
+        significators=("lagna_lord", "primary_house_lord", "moon"),
+        source_refs=(
+            "daivajna_vallabha_2003_scan:pdf:4:sha256:"
+            "e881c291388fd5e02f8717c5902380ef8ad2b68985572caa6eeaa4eba4d41759",
+        ),
+    ),
+    PrashnaQuestionProfile.COMMUNICATION_CONTACT: _QuestionProfileBinding(
+        profile=PrashnaQuestionProfile.COMMUNICATION_CONTACT,
+        primary_house=7,
+        secondary_houses=(3, 11),
+        significators=("lagna_lord", "primary_house_lord", "moon"),
+        source_refs=(
+            "daivajna_vallabha_2003_scan:pdf:3:sha256:"
+            "52855cdb9c26b1cb15c795f471a9c12d33bbe5b1d6071a2a42b3f8e8b0e9c894",
+        ),
+    ),
+    PrashnaQuestionProfile.LOST_OBJECT: _QuestionProfileBinding(
+        profile=PrashnaQuestionProfile.LOST_OBJECT,
+        primary_house=1,
+        secondary_houses=(2, 4, 7, 11),
+        significators=("lagna_lord", "primary_house_lord", "moon"),
+        source_refs=(
+            "daivajna_vallabha_2003_scan:pdf:14:sha256:"
+            "08a051f2c5bda4e0583fd7311690a1faaf64237d4b1cddfb90b8953cb42fbe05",
+            "daivajna_vallabha_2003_scan:pdf:15:sha256:"
+            "1891ca12a62377cb054a077f2b52a1a1ab0b1a3aaef07933e80a390c2eda2551",
+        ),
+    ),
+    PrashnaQuestionProfile.GENERAL_LOW_RISK_OUTCOME: _QuestionProfileBinding(
+        profile=PrashnaQuestionProfile.GENERAL_LOW_RISK_OUTCOME,
+        primary_house=1,
+        secondary_houses=(4, 7, 10, 11),
+        significators=("lagna_lord", "primary_house_lord", "moon"),
+        source_refs=(
+            "daivajna_vallabha_2003_scan:pdf:4:sha256:"
+            "e881c291388fd5e02f8717c5902380ef8ad2b68985572caa6eeaa4eba4d41759",
+        ),
+    ),
+}
+
+_WORK_MARKERS = (
+    "work",
+    "project",
+    "job",
+    "career",
+    "business",
+    "startup",
+    "работ",
+    "проект",
+    "карьер",
+    "бизнес",
+    "стартап",
+)
+_CONTACT_MARKERS = (
+    "contact",
+    "message",
+    "email",
+    "reply",
+    "call me",
+    "reach me",
+    "свяж",
+    "сообщен",
+    "письм",
+    "ответит",
+    "позвон",
+)
+_LOST_MARKERS = (
+    "lost",
+    "missing object",
+    "missing item",
+    "where are my",
+    "where is my",
+    "потерян",
+    "пропал",
+    "пропала",
+    "где мои",
+    "где моя",
+    "где мой",
+)
+_GENERAL_MARKERS = (
+    "low risk",
+    "non critical outcome",
+    "work out",
+    "безрисков",
+    "низкорисков",
+    "получится ли",
+)
+_HIGH_STAKES_MARKERS = (
+    "medical",
+    "health",
+    "surgery",
+    "cancer",
+    "pregnan",
+    "death",
+    "die",
+    "harm",
+    "lawsuit",
+    "court",
+    "legal",
+    "invest",
+    "stock",
+    "crypto",
+    "loan",
+    "dangerous",
+    "здоров",
+    "операц",
+    "рак",
+    "беремен",
+    "смерт",
+    "умр",
+    "вред",
+    "суд",
+    "юрид",
+    "инвест",
+    "крипт",
+    "кредит",
+    "опасн",
+)
+
+
+def _normalized_route_text(value: str) -> str:
+    normalized = unicodedata.normalize("NFKC", value).casefold().replace("ё", "е")
+    return " ".join(re.sub(r"[^\w]+", " ", normalized).split())
+
+
+def _has_marker(value: str, markers: tuple[str, ...]) -> bool:
+    return any(marker in value for marker in markers)
+
+
+def classify_prashna_question(question: str) -> PrashnaQuestionRoute:
+    """Route exactly one safe material topic without returning its private wording."""
+
+    normalized = _normalized_route_text(question)
+    if _has_marker(normalized, _HIGH_STAKES_MARKERS):
+        return PrashnaQuestionRoute(
+            status="high_stakes", guidance_code="CONSULT_QUALIFIED_PROFESSIONAL"
+        )
+    detected: list[PrashnaQuestionProfile] = []
+    explicitly_low_risk = _has_marker(
+        normalized, ("low risk", "безрисков", "низкорисков")
+    )
+    if explicitly_low_risk:
+        detected.append(PrashnaQuestionProfile.GENERAL_LOW_RISK_OUTCOME)
+    else:
+        for profile, markers in (
+            (PrashnaQuestionProfile.WORK_PROJECT_STATUS, _WORK_MARKERS),
+            (PrashnaQuestionProfile.COMMUNICATION_CONTACT, _CONTACT_MARKERS),
+            (PrashnaQuestionProfile.LOST_OBJECT, _LOST_MARKERS),
+        ):
+            if _has_marker(normalized, markers):
+                detected.append(profile)
+    if len(detected) > 1:
+        return PrashnaQuestionRoute(
+            status="composite", guidance_code="ASK_ONE_MATERIAL_QUESTION"
+        )
+    if not detected and _has_marker(normalized, _GENERAL_MARKERS):
+        detected.append(PrashnaQuestionProfile.GENERAL_LOW_RISK_OUTCOME)
+    if not detected:
+        generic_future = bool(
+            re.search(r"\b(will|happen|будет|случится|получится)\b", normalized)
+        )
+        return PrashnaQuestionRoute(
+            status="ambiguous" if generic_future else "unsupported",
+            guidance_code=(
+                "NAME_A_SUPPORTED_LOW_RISK_TOPIC"
+                if generic_future
+                else "TOPIC_NOT_SUPPORTED"
+            ),
+        )
+
+    binding = _QUESTION_BINDINGS[detected[0]]
+    houses = (binding.primary_house, *binding.secondary_houses)
+    required = {
+        "prashna.lagna.sign",
+        "prashna.moon.sign",
+        "prashna.topic.primary_house",
+        "prashna.planetary.longitudes",
+        *(f"prashna.house.{house}.lord" for house in houses),
+    }
+    return PrashnaQuestionRoute(
+        status="supported",
+        profile=binding.profile,
+        primary_house=binding.primary_house,
+        secondary_houses=binding.secondary_houses,
+        significators=binding.significators,
+        required_fact_paths=tuple(sorted(required)),
+        source_refs=binding.source_refs,
+        guidance_code="PROCEED",
+    )
+
+
+def validate_prashna_significator_claim(
+    route: PrashnaQuestionRoute,
+    *,
+    claimed_primary_house: int,
+    claimed_significators: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Reject a renderer that changes the selected house or significators."""
+
+    if route.status != "supported":
+        return ("ROUTE_NOT_SUPPORTED",)
+    failures: list[str] = []
+    if claimed_primary_house != route.primary_house:
+        failures.append("PRIMARY_HOUSE_SUBSTITUTED")
+    if claimed_significators != route.significators:
+        failures.append("SIGNIFICATORS_SUBSTITUTED")
+    return tuple(failures)
