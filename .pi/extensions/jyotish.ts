@@ -165,6 +165,73 @@ export const PrashnaFullRequestSchema = Type.Union([
   ),
 ]);
 
+const MuhurtaFullCommon = {
+  activity: Type.String({ minLength: 1, maxLength: 80 }),
+  place: Type.Object(
+    {
+      name: Type.String({ minLength: 1, maxLength: 200 }),
+      latitude: Type.Number({ minimum: -90, maximum: 90 }),
+      longitude: Type.Number({ minimum: -180, maximum: 180 }),
+      zone_id: Type.String({ minLength: 1, maxLength: 100 }),
+    },
+    NO_EXTRA,
+  ),
+  start: Type.String({ minLength: 1, maxLength: 100 }),
+  end: Type.Optional(Type.String({ minLength: 1, maxLength: 100 })),
+  start_fold: Type.Optional(Type.Union([Type.Literal(0), Type.Literal(1)])),
+  end_fold: Type.Optional(Type.Union([Type.Literal(0), Type.Literal(1)])),
+  duration_minutes: Type.Integer({ minimum: 15, maximum: 480 }),
+  hard_constraints: Type.Optional(
+    Type.Object(
+      {
+        require_daylight: Type.Optional(Type.Boolean()),
+        local_time_start: Type.Optional(Type.String()),
+        local_time_end: Type.Optional(Type.String()),
+        excluded_weekdays: Type.Optional(
+          Type.Array(Type.Integer({ minimum: 0, maximum: 6 }), {
+            maxItems: 7,
+            uniqueItems: true,
+          }),
+        ),
+      },
+      NO_EXTRA,
+    ),
+  ),
+  preferences: Type.Optional(
+    Type.Object(
+      {
+        preferred_local_time_start: Type.Optional(Type.String()),
+        preferred_local_time_end: Type.Optional(Type.String()),
+        prefer_daylight: Type.Optional(Type.Boolean()),
+      },
+      NO_EXTRA,
+    ),
+  ),
+  rule_profile: Type.Optional(Type.Literal("muhurta_focused_work_v1")),
+  result_limit: Type.Optional(Type.Integer({ minimum: 1, maximum: 20 })),
+  near_miss_limit: Type.Optional(Type.Integer({ minimum: 0, maximum: 20 })),
+  locale: StringEnum(["ru", "en"] as const),
+};
+
+export const MuhurtaFullRequestSchema = Type.Union([
+  Type.Object(
+    {
+      ...MuhurtaFullCommon,
+      mode: StringEnum(["quick", "full", "deep"] as const),
+      include_evidence: Type.Optional(Type.Literal(false)),
+    },
+    NO_EXTRA,
+  ),
+  Type.Object(
+    {
+      ...MuhurtaFullCommon,
+      mode: Type.Literal("inspection"),
+      include_evidence: Type.Optional(Type.Boolean()),
+    },
+    NO_EXTRA,
+  ),
+]);
+
 const ConfigSchema = Type.Object(
   {
     ayanamsa: Type.Optional(
@@ -1581,6 +1648,37 @@ export default function (pi: ExtensionAPI) {
     async execute(_toolCallId, params, signal) {
       const { ok, status, body } = await postJson(
         "/v2/doctrine/prashna/full",
+        params,
+        signal,
+      );
+      if (!ok) {
+        return {
+          content: [{ type: "text", text: formatProblem(status, body) }],
+          details: {},
+        };
+      }
+      return {
+        content: [{ type: "text", text: JSON.stringify(body, null, 2) }],
+        details: body as Record<string, unknown>,
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "jyotish_muhurta_full",
+    label: "Expanded Muhurta (private experimental)",
+    description:
+      "Search the immutable source-bound private Muhurta baseline for bounded " +
+      "low-risk activities. It ranks calendar-ready windows and never books an event.",
+    promptGuidelines: [
+      "Never use this tool for marriage, medical, legal, investment, fertility, or dangerous activities.",
+      "Treat ranking as a bounded comparison, never as a guaranteed outcome.",
+      "Use inspection mode only when the user asks for UTC, fold, or evidence details.",
+    ],
+    parameters: MuhurtaFullRequestSchema,
+    async execute(_toolCallId, params, signal) {
+      const { ok, status, body } = await postJson(
+        "/v2/doctrine/muhurta/full",
         params,
         signal,
       );

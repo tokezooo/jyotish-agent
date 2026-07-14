@@ -22,6 +22,8 @@ from .mcp_models import (
     JaiminiFullMcpInput,
     JaiminiFullReleaseResult,
     JaiminiMcpInput,
+    MuhurtaFullMcpInput,
+    MuhurtaFullReleaseResult,
     MuhurtaMcpInput,
     PrashnaFullMcpInput,
     PrashnaFullReleaseResult,
@@ -124,6 +126,22 @@ class _MuhurtaWireArguments(ArgModelBase):
         }
 
 
+class _MuhurtaFullPublishedArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    request: MuhurtaFullMcpInput
+
+
+class _MuhurtaFullWireArguments(ArgModelBase):
+    request: Any = None
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+
+    def model_dump_one_level(self) -> dict[str, Any]:
+        return {
+            "request": self.request,
+            "outer_arguments": dict(self.model_extra or {}),
+        }
+
+
 SERVER_INSTRUCTIONS = """Normal conversation is the default. Use quick, stateless tools for focused personal questions and follow-ups. Create a ResearchRun only for broad multi-factor analysis or when the user explicitly asks for deep research. Влад is the default profile; use an inline profile only when the user clearly identifies another person and supplies their birth data. For deep research, the final visible answer must equal finalize_research.markdown exactly; never expand or rewrite it. Keep evidence IDs, claim graphs, confidence machinery, hashes, and run-state details out of normal visible answers. Explain Jyotish as symbolic interpretation, not guaranteed prediction.
 
 Routing:
@@ -138,6 +156,8 @@ Routing:
   source review is pending, report literal computed facts/statuses only: do not infer a
   practical obstacle, theme, advice, or area to watch from planets, houses, signs, or lords.
 - prashna_full is the additive governed interpretation surface. Respect its release audit;
+- muhurta_full is the private source-bound experimental surface. It ranks only the
+  immutable classical baseline and never books or persists an event;
   when unavailable, report blockers and do not convert computed facts into a judgement.
 - muhurta searches calculated event boundaries for general/private focused-work sessions;
   ranking and interpretation remain unavailable until their governed source pack is admitted.
@@ -320,6 +340,32 @@ def build_server(facade: JyotishMcpFacade | None = None) -> FastMCP:
     assert muhurta_tool is not None
     muhurta_tool.parameters = _MuhurtaPublishedArguments.model_json_schema()
     muhurta_tool.fn_metadata.arg_model = _MuhurtaWireArguments
+
+    @server.tool(
+        name="muhurta_full",
+        description=(
+            "Search the private source-bound Expanded Muhurta baseline in quick, full, "
+            "deep, or inspection mode. It supports only bounded low-risk activities, "
+            "blocks high-stakes elections, and never books or persists an event."
+        ),
+        annotations=READ_ONLY,
+        structured_output=True,
+    )
+    def muhurta_full(
+        request: Any = None,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> MuhurtaFullReleaseResult:
+        return runtime.muhurta_full_payload(request, outer_arguments=outer_arguments)
+
+    muhurta_full_tool = server._tool_manager.get_tool("muhurta_full")
+    assert muhurta_full_tool is not None
+    muhurta_full_tool.parameters = {
+        "type": "object",
+        "properties": {"request": MuhurtaFullMcpInput.model_json_schema()},
+        "required": ["request"],
+        "additionalProperties": False,
+    }
+    muhurta_full_tool.fn_metadata.arg_model = _MuhurtaFullWireArguments
 
     @server.tool(
         name="search_sources",

@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "profile_id": "classical_baseline_v1",
+  "admission_scope": "private_experimental",
+  "baseline_immutable": true,
+  "external_review_missing": true,
+  "rules": [
+    {
+      "rule_id": "muhurta.interval.yamaganda",
+      "classification": "hard",
+      "boundary_kind": "yamaganda",
+      "source_id": "kalaprakasika_1982",
+      "source_pdf_pages": [208],
+      "source_printed_pages": [176],
+      "applicable_profiles": ["creative_production", "focused_work", "general_private_task", "low_risk_travel_planning", "product_launch_communication", "study_learning"]
+    },
+    {
+      "rule_id": "muhurta.interval.rahu_kala",
+      "classification": "hard",
+      "boundary_kind": "rahu_kala",
+      "source_id": "kalaprakasika_1982",
+      "source_pdf_pages": [208],
+      "source_printed_pages": [176],
+      "applicable_profiles": ["creative_production", "focused_work", "general_private_task", "low_risk_travel_planning", "product_launch_communication", "study_learning"]
+    }
+  ]
+}

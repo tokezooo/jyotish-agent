@@ -55,6 +55,7 @@ def test_server_metadata_and_tool_contract(tmp_path: Path):
         "prashna",
         "prashna_full",
         "muhurta",
+        "muhurta_full",
         "search_sources",
         "research",
         "finalize_research",

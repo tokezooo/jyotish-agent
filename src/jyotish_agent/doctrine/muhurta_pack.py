@@ -963,3 +963,111 @@ def validate_muhurta_visible_report(report: MuhurtaRenderedReport) -> list[str]:
     if report.visible_text_sha256 != _visible_report_hash(report):
         return ["VISIBLE_REPORT_MISMATCH"]
     return []
+
+
+class MuhurtaAdmittedBoundaryRule(FrozenModel):
+    rule_id: str = Field(pattern=r"^muhurta\.[A-Za-z0-9_.-]+$")
+    classification: Literal["hard", "soft"]
+    boundary_kind: str = Field(pattern=r"^[a-z][a-z0-9_]+$")
+    source_id: SourceId
+    source_pdf_pages: tuple[int, ...] = Field(min_length=1)
+    source_printed_pages: tuple[int, ...] = Field(min_length=1)
+    applicable_profiles: tuple[MuhurtaActivityProfile, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _paired_source_pages(self) -> "MuhurtaAdmittedBoundaryRule":
+        if len(self.source_pdf_pages) != len(self.source_printed_pages):
+            raise ValueError("admitted rule PDF/printed anchors must pair")
+        return self
+
+
+class MuhurtaAdmittedRulePack(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    profile_id: Literal["classical_baseline_v1"]
+    admission_scope: Literal["private_experimental"]
+    baseline_immutable: Literal[True]
+    external_review_missing: Literal[True]
+    rules: tuple[MuhurtaAdmittedBoundaryRule, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _unique_complete_pack(self) -> "MuhurtaAdmittedRulePack":
+        ids = [item.rule_id for item in self.rules]
+        kinds = [item.boundary_kind for item in self.rules]
+        if len(ids) != len(set(ids)) or len(kinds) != len(set(kinds)):
+            raise ValueError("admitted rule IDs and boundary kinds must be unique")
+        covered = {profile for item in self.rules for profile in item.applicable_profiles}
+        if covered != set(MuhurtaActivityProfile):
+            raise ValueError("private baseline must cover every safe profile")
+        return self
+
+
+def load_muhurta_admitted_rule_pack() -> MuhurtaAdmittedRulePack:
+    payload = resources.files("jyotish_agent").joinpath(
+        "data/doctrine/muhurta-admitted-rules-v1.json"
+    ).read_text(encoding="utf-8")
+    return MuhurtaAdmittedRulePack.model_validate(json.loads(payload))
+
+
+class MuhurtaReleaseGate(FrozenModel):
+    gate_id: str = Field(min_length=1)
+    status: Literal["passed", "missing", "optional_missing"]
+    evidence: str | None = Field(default=None, min_length=1)
+
+    @model_validator(mode="after")
+    def _honest_gate(self) -> "MuhurtaReleaseGate":
+        if self.status == "passed" and self.evidence is None:
+            raise ValueError("passed gate requires evidence")
+        if self.status != "passed" and self.evidence is not None:
+            raise ValueError("non-passed gate cannot claim completed evidence")
+        return self
+
+
+class DoctrineDomainReleaseMetric(FrozenModel):
+    domain: Literal["jaimini", "prashna", "muhurta"]
+    automated_held_out_count: int = Field(ge=0)
+    material_error_count: int | None = Field(default=None, ge=0)
+    material_error_rate: float | None = Field(default=None, ge=0.0, le=1.0)
+    concierge_session_count: int = Field(ge=0)
+    value_score: float | None = Field(default=None, ge=0.0, le=5.0)
+
+    @model_validator(mode="after")
+    def _metric_denominators(self) -> "DoctrineDomainReleaseMetric":
+        if self.automated_held_out_count == 0 and (
+            self.material_error_count is not None or self.material_error_rate is not None
+        ):
+            raise ValueError("material error metrics need held-out cases")
+        if self.concierge_session_count == 0 and self.value_score is not None:
+            raise ValueError("value score needs concierge sessions")
+        return self
+
+
+class MuhurtaReleaseAudit(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    release_id: Literal["expanded_muhurta_v1"]
+    corpus_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    compiled_profile_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    admission_state: Literal["private_experimental"]
+    available: Literal[True]
+    public_release_ready: Literal[False]
+    external_review_missing: Literal[True]
+    gates: tuple[MuhurtaReleaseGate, ...] = Field(min_length=1)
+    domain_metrics: tuple[DoctrineDomainReleaseMetric, ...] = Field(min_length=3)
+    completed_evidence: tuple[str, ...] = Field(min_length=1)
+    future_follow_up: tuple[str, ...] = Field(min_length=1)
+    public_release_blockers: tuple[str, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _honest_private_release(self) -> "MuhurtaReleaseAudit":
+        gate_ids = [gate.gate_id for gate in self.gates]
+        if len(gate_ids) != len(set(gate_ids)):
+            raise ValueError("release gate IDs must be unique")
+        domains = [metric.domain for metric in self.domain_metrics]
+        if len(domains) != len(set(domains)) or set(domains) != {
+            "jaimini",
+            "prashna",
+            "muhurta",
+        }:
+            raise ValueError("release audit must report all doctrine domains")
+        if not any(gate.status == "missing" for gate in self.gates):
+            raise ValueError("private release must retain its missing external gates")
+        return self

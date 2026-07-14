@@ -33,6 +33,8 @@ from .mcp_models import (
     JaiminiFullMcpInput,
     JaiminiFullReleaseResult,
     JaiminiMcpInput,
+    MuhurtaFullMcpInput,
+    MuhurtaFullReleaseResult,
     MuhurtaMcpInput,
     PrashnaFullMcpInput,
     PrashnaFullReleaseResult,
@@ -457,6 +459,58 @@ class JyotishMcpFacade:
     def muhurta(self, value: MuhurtaMcpInput) -> MuhurtaResult:
         """Search calculated event boundaries without persistence or side effects."""
         return MuhurtaFacade(clock=self.clock).search(value)
+
+    def muhurta_full(self, value: MuhurtaFullMcpInput) -> MuhurtaFullReleaseResult:
+        """Run the immutable private experimental baseline with no side effects."""
+
+        from .doctrine.muhurta_pack import MuhurtaReleaseAudit
+        from .doctrine.muhurta_release import execute_muhurta_full
+
+        audit = MuhurtaReleaseAudit.model_validate_json(
+            (Path(__file__).parent / "data/doctrine/muhurta-release.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        execution = execute_muhurta_full(
+            value,
+            locale=value.locale,
+            mode=value.mode,
+        )
+        return MuhurtaFullReleaseResult(
+            status=execution.status,
+            request_mode=value.mode,
+            locale=value.locale,
+            profile=execution.profile,
+            admission_state="private_experimental",
+            public_release_blockers=list(audit.public_release_blockers),
+            external_review_missing=audit.external_review_missing,
+            report=(
+                execution.report.model_dump(mode="json")
+                if execution.report is not None
+                else None
+            ),
+            error_code=execution.reason_code,
+        )
+
+    def muhurta_full_payload(
+        self,
+        value: object,
+        *,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> MuhurtaFullReleaseResult:
+        parsed: MuhurtaFullMcpInput | None = None
+        if not outer_arguments and isinstance(value, dict):
+            try:
+                parsed = MuhurtaFullMcpInput.model_validate(value)
+            except ValidationError:
+                pass
+        if parsed is not None:
+            return self.muhurta_full(parsed)
+        return MuhurtaFullReleaseResult(
+            status="needs_input",
+            external_review_missing=True,
+            error_code="INPUT_INVALID",
+        )
 
     def muhurta_payload(
         self,

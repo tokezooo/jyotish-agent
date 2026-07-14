@@ -43,6 +43,8 @@ from .models import (
 from .mcp_models import (
     JaiminiFullMcpInput,
     JaiminiFullReleaseResult,
+    MuhurtaFullMcpInput,
+    MuhurtaFullReleaseResult,
     PrashnaFullMcpInput,
     PrashnaFullReleaseResult,
 )
@@ -598,6 +600,41 @@ async def prashna_full_release(
         blockers=list(audit.blockers),
         external_review_missing=audit.external_review_missing,
         report=None,
+    )
+
+
+@app.post(
+    "/v2/doctrine/muhurta/full",
+    response_model=MuhurtaFullReleaseResult,
+)
+async def muhurta_full_release(
+    req: MuhurtaFullMcpInput,
+) -> MuhurtaFullReleaseResult:
+    """Run the read-only private Expanded Muhurta baseline."""
+
+    from .doctrine.muhurta_pack import MuhurtaReleaseAudit
+    from .doctrine.muhurta_release import execute_muhurta_full
+
+    audit = MuhurtaReleaseAudit.model_validate_json(
+        (Path(__file__).parent / "data/doctrine/muhurta-release.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    execution = execute_muhurta_full(req, locale=req.locale, mode=req.mode)
+    return MuhurtaFullReleaseResult(
+        status=execution.status,
+        request_mode=req.mode,
+        locale=req.locale,
+        profile=execution.profile,
+        admission_state="private_experimental",
+        public_release_blockers=list(audit.public_release_blockers),
+        external_review_missing=audit.external_review_missing,
+        report=(
+            execution.report.model_dump(mode="json")
+            if execution.report is not None
+            else None
+        ),
+        error_code=execution.reason_code,
     )
 
 

@@ -7,6 +7,7 @@ import {
   AnswerContractV2Schema,
   BirthProfileSchema,
   JaiminiFullRequestSchema,
+  MuhurtaFullRequestSchema,
   PrashnaFullRequestSchema,
   FAIL_CLOSED_TEXT,
   RESEARCH_MIRROR_TYPE,
@@ -241,6 +242,68 @@ describe("PrashnaFullRequestSchema", () => {
       const result = await tool.execute("tc_prashna", request, new AbortController().signal);
       expect(result.content[0].text).toContain("compiled_profile: missing");
       expect(result.details.status).toBe("unavailable");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("MuhurtaFullRequestSchema", () => {
+  const request = {
+    activity: "focused work",
+    place: {
+      name: "private",
+      latitude: 55.7558,
+      longitude: 37.6173,
+      zone_id: "Europe/Moscow",
+    },
+    start: "2026-07-15T00:00:00+03:00",
+    end: "2026-07-16T00:00:00+03:00",
+    duration_minutes: 60,
+    hard_constraints: { require_daylight: true },
+    mode: "full",
+    locale: "en",
+    include_evidence: false,
+  };
+
+  test("keeps evidence inspection-only and blocks extra properties", () => {
+    expect(Value.Check(MuhurtaFullRequestSchema, request)).toBe(true);
+    expect(
+      Value.Check(MuhurtaFullRequestSchema, { ...request, include_evidence: true }),
+    ).toBe(false);
+    expect(
+      Value.Check(MuhurtaFullRequestSchema, {
+        ...request,
+        mode: "inspection",
+        include_evidence: true,
+      }),
+    ).toBe(true);
+    expect(Value.Check(MuhurtaFullRequestSchema, { ...request, booking: true })).toBe(false);
+  });
+
+  test("registered tool calls the read-only private endpoint", async () => {
+    const tools = new Map<string, any>();
+    const fakePi = {
+      registerTool(tool: any) { tools.set(tool.name, tool); },
+      on() {},
+      appendEntry() {},
+    };
+    registerJyotishExtension(fakePi as any);
+    const tool = tools.get("jyotish_muhurta_full");
+    expect(tool).toBeDefined();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock(async (input: string | URL | Request) => {
+      expect(String(input)).toContain("/v2/doctrine/muhurta/full");
+      return new Response(JSON.stringify({
+        surface: "experimental_full",
+        status: "completed",
+        report: { booking_performed: false, top_windows: [{ rank: 1 }] },
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    }) as any;
+    try {
+      const result = await tool.execute("tc_muhurta_full", request, new AbortController().signal);
+      expect(result.content[0].text).toContain('"booking_performed": false');
+      expect(result.details.status).toBe("completed");
     } finally {
       globalThis.fetch = originalFetch;
     }

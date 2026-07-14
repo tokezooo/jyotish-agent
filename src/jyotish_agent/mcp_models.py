@@ -195,6 +195,55 @@ class MuhurtaMcpInput(MuhurtaSearchRequest):
     """Additive event-search input; it never selects or persists a natal profile."""
 
 
+class MuhurtaFullMcpInput(MuhurtaSearchRequest):
+    """Private source-bound Muhurta request over the existing event-search contract."""
+
+    mode: Literal["quick", "full", "deep", "inspection"] = "full"
+    locale: Literal["ru", "en"] = "ru"
+    include_evidence: bool = False
+
+    @model_validator(mode="after")
+    def _inspection_owns_evidence(self) -> "MuhurtaFullMcpInput":
+        if self.include_evidence and self.mode != "inspection":
+            raise ValueError("include_evidence is available only in inspection mode")
+        return self
+
+
+class MuhurtaFullReleaseResult(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    surface: Literal["experimental_full"] = "experimental_full"
+    status: Literal["completed", "no_window", "unavailable", "needs_input", "incomplete"]
+    request_mode: Literal["quick", "full", "deep", "inspection"] | None = None
+    locale: Literal["ru", "en"] | None = None
+    profile: Literal[
+        "focused_work",
+        "study_learning",
+        "creative_production",
+        "product_launch_communication",
+        "low_risk_travel_planning",
+        "general_private_task",
+    ] | None = None
+    admission_state: Literal["private_experimental"] | None = None
+    public_release_blockers: list[str] = Field(default_factory=list)
+    external_review_missing: bool
+    report: dict[str, Any] | None = None
+    error_code: str | None = None
+
+    @model_validator(mode="after")
+    def _status_contract(self) -> "MuhurtaFullReleaseResult":
+        if self.status in {"completed", "no_window"}:
+            if (
+                self.admission_state != "private_experimental"
+                or self.profile is None
+                or self.report is None
+                or self.error_code is not None
+            ):
+                raise ValueError("successful private release requires profile and report")
+        elif self.report is not None or self.error_code is None:
+            raise ValueError("non-success release requires a sanitized error")
+        return self
+
+
 class SourceSearchInput(BaseModel):
     model_config = ConfigDict(extra="forbid")
     query: str = Field(min_length=1, max_length=2_000)
