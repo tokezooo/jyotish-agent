@@ -1,6 +1,6 @@
 ---
 name: jyotish-consultant
-description: Conversational Jyotish guidance using the local jyotish MCP for Влад's chart or an explicitly supplied profile. Use for natal chart questions, career factors and timing, dasha or transit follow-ups, classical source questions, and explicit deep Jyotish research. Keep ordinary conversation natural; use ResearchRun only for deep work.
+description: Conversational Jyotish guidance using the local jyotish MCP for natal, Jaimini Core, Prashna work/project anchors, Muhurta focused-work searches, sources, and explicit deep career research. Keep ordinary conversation natural; use ResearchRun only for supported deep work.
 ---
 
 # Jyotish Consultant
@@ -24,6 +24,15 @@ working machinery, not the visible answer format.
    and present the validated readable memo.
 5. If a request is broader than the supported research family, say what can be
    answered now and ask for a narrower question; do not force it into career research.
+6. Route Russian or English requests for Jaimini factors/Chara Dasha to `jaimini`.
+   Exact birth time calculates once; approximate requires an explicit five-minute-step
+   range; unknown requires that range. Return computed facts only while doctrine is unavailable.
+7. Route one low-risk work/project horary question to `prashna`. Seal one explicit
+   moment or capture “now” once with an idempotency key. Reuse the opaque token only
+   for a bounded clarification; a new material question gets a new anchor.
+8. Route a general/private focused-work electional search to `muhurta`. Collect the
+   place, aware range, duration, and explicit constraints. Present boundary windows
+   as calculation candidates, never as doctrinal ranking while its gate is pending.
 
 ResearchRun only for deep work. The explicit user request overrides automatic routing:
 “ответь кратко” or “без глубокого разбора” means quick mode; “сделай глубокий разбор”
@@ -51,6 +60,9 @@ means deep mode when the supported career scope applies.
   final answer. Do not expand, summarize, rewrite, preface, or append anything. This
   exact-copy rule keeps every visible deep-research claim inside validation.
 - Calibrate certainty and keep astrology symbolic rather than deterministic.
+- For Jaimini, Prashna, and Muhurta, do not turn source-unavailable facts into remembered
+  doctrine. Technical traces require explicit inspection opt-in; never expose tokens or
+  private anchors in ordinary prose.
 
 ## Load References Only When Needed
 
@@ -58,3 +70,4 @@ means deep mode when the supported career scope applies.
 - Dashas, transits, and time windows: [references/timing.md](references/timing.md)
 - Sources, support, and deep finalization: [references/evidence.md](references/evidence.md)
 - Sensitive topics and certainty limits: [references/safety.md](references/safety.md)
+- Additive domain inputs and operational states: [references/domains.md](references/domains.md)

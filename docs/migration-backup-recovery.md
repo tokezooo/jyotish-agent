@@ -38,3 +38,7 @@ jyotish store backup-and-purge --backup /private/path/research.sqlite3 \
 It uses SQLite's backup API, verifies `integrity_check`, writes the backup as `0600`,
 and only then removes the database and WAL sidecars. It rejects symlinked configured
 roots, existing backup targets, and missing confirmation.
+
+The additive `jaimini`, `prashna`, and `muhurta` MCP tools create no ResearchRun,
+schema migration, backup object, or authoritative persistent artifact. Their signing
+and capture caches are process-local. Existing backup/recovery procedures are unchanged.

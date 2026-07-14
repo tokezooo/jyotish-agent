@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "transport": "local_python_mcp_stdio",
+  "persistence": "none_for_additive_domains",
+  "privacy_summary": "No private request material, event detail, identity material, or rule trace is retained here.",
+  "common_assertions": [
+    "strict_schema", "signed_artifact", "checker_fail_closed", "deterministic_replay_where_applicable",
+    "payload_under_512_kib", "no_research_run", "no_private_error_echo"
+  ],
+  "cases": [
+    {"id":"j_ru_exact","mode":"jaimini","outcome":"completed_facts_source_pending","evidence":"tests/test_jaimini_mcp.py::test_realistic_ru_en_stdio_exact_and_ten_minute_range"},
+    {"id":"j_en_approximate","mode":"jaimini","outcome":"completed_three_samples_source_pending","evidence":"tests/test_jaimini_mcp.py::test_realistic_ru_en_stdio_exact_and_ten_minute_range"},
+    {"id":"j_tie","mode":"jaimini","outcome":"typed_adjudication","evidence":"tests/test_jaimini_facade.py"},
+    {"id":"j_boundary","mode":"jaimini","outcome":"half_open_period_verified","evidence":"tests/test_jaimini_core.py"},
+    {"id":"j_inspection","mode":"jaimini","outcome":"bounded_trace_signed","evidence":"tests/test_jaimini_facade.py"},
+    {"id":"j_checker","mode":"jaimini","outcome":"unsupported_prose_rejected","evidence":"tests/test_jaimini_artifact.py"},
+    {"id":"p_ru_explicit","mode":"prashna","outcome":"completed_source_pending","evidence":"tests/test_prashna_mcp.py::test_realistic_ru_en_stdio_anchor_reuse_and_mismatch"},
+    {"id":"p_en_capture_retry_clarify","mode":"prashna","outcome":"completed_reused_anchor","evidence":"tests/test_prashna_mcp.py::test_realistic_ru_en_stdio_anchor_reuse_and_mismatch"},
+    {"id":"p_material_mismatch","mode":"prashna","outcome":"anchor_mismatch","evidence":"tests/test_prashna_mcp.py::test_realistic_ru_en_stdio_anchor_reuse_and_mismatch"},
+    {"id":"p_unsupported_high_stakes","mode":"prashna","outcome":"typed_safe_rescue","evidence":"tests/test_prashna_core.py"},
+    {"id":"p_secret_invalid","mode":"prashna","outcome":"input_invalid_no_echo","evidence":"tests/test_prashna_mcp.py::test_realistic_ru_en_stdio_anchor_reuse_and_mismatch"},
+    {"id":"m_ru_one_day","mode":"muhurta","outcome":"completed_boundaries_source_pending","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety"},
+    {"id":"m_en_multi_day","mode":"muhurta","outcome":"completed_boundaries_source_pending","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety"},
+    {"id":"m_no_window","mode":"muhurta","outcome":"successful_empty","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety"},
+    {"id":"m_oversized","mode":"muhurta","outcome":"range_rescue","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety"},
+    {"id":"m_cancel_deadline","mode":"muhurta","outcome":"typed_incomplete","evidence":"tests/test_muhurta_core.py"},
+    {"id":"m_high_stakes","mode":"muhurta","outcome":"typed_safe_rescue","evidence":"tests/test_muhurta_mcp.py::test_real_process_stdio_ru_en_empty_limits_and_safety"}
+  ]
+}

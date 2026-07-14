@@ -9,6 +9,19 @@
 - Remedies, gemstones, and deterministic prediction workflows.
 - Broad yoga/dosha coverage beyond a small verified list.
 - Automatic place/timezone resolver.
+- Qualified source admission and human adjudication for Jaimini, Prashna, and Muhurta.
+- Governed Jaimini doctrine, Prashna judgement, and Muhurta ranking/personalization.
+- 10–20 real/concierge sessions and reviewer material-error/value measurements.
+- Real Codex conversational quick/inspection smokes for RU and EN (local stdio is covered).
+
+## Additive domain release status (2026-07-14)
+
+- [x] Jaimini Core v1 signed geometry/timing and exact/approximate sensitivity.
+- [x] Praśna work/project facts with sealed explicit/capture/replay anchors.
+- [x] Muhūrta general/focused-work boundaries, hard constraints, and near misses.
+- [x] Read-only MCP tools, snapshots, privacy projection, RU/EN docs, benchmark, audit.
+- [ ] Admit governed sources/reviewers before enabling prose or ranking.
+- [ ] Run adjudicated real sessions and real Codex conversational smokes.
 
 ## Next Implementation Tasks
 

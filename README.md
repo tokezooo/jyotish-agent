@@ -57,10 +57,20 @@ Use `/mcp` in Codex CLI to confirm that `jyotish` is enabled. To ask about anoth
 person, state that explicitly and provide their birth date, exact/approximate time,
 place or coordinates, and timezone; this never overwrites Влад's default profile.
 
-Available MCP tools are `get_profile`, `calculate`, `search_sources`, `research`,
-`finalize_research`, and `inspect_research`. They are implementation details: normal
+Available MCP tools are `get_profile`, `calculate`, `jaimini`, `prashna`, `muhurta`,
+`search_sources`, `research`, `finalize_research`, and `inspect_research`. The three
+additive domain tools are stateless/read-only and do not expand API, Pi, or ResearchRun.
+They are implementation details: normal
 answers should be conversational and hide claim graphs, evidence IDs, hashes, and
 state-machine output.
+
+Current domain state is deliberately fail-closed: Jaimini Core facts/timing, Prashna
+work/project time-chart facts and anchor replay, and Muhurta boundary candidates under
+explicit user constraints are available and signed. Governed Jaimini doctrine, Prashna
+judgement, Muhurta eligibility/ranking/personalization, qualified human review, and real
+concierge validation are not shipped. See [domain contracts](docs/domains/), the
+[tool drift snapshot](docs/domain-tool-snapshot-v1.json), [local benchmark](docs/release-benchmark-v1.json),
+and [requirement audit](docs/prashna-muhurta-jaimini-requirement-audit-v1.json).
 
 ## Golden path: governed ResearchRun v2
 
@@ -88,6 +98,9 @@ Operator references:
 - [debugging and error codes](docs/debugging-error-codes.md)
 - [migration, backup, and recovery](docs/migration-backup-recovery.md)
 - [evaluation rubric and frozen 40/20 split](eval/ADJUDICATION.md)
+- [Jaimini Core operational contract](docs/domains/jaimini.en.md)
+- [Prashna operational contract](docs/domains/prashna.en.md)
+- [Muhurta operational contract](docs/domains/muhurta.en.md)
 
 ### Ephemeris (optional)
 
