@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .jaimini_models import AnalysisScope, JaiminiRuleProfileId
 from .prashna_models import PrashnaRequest
+from .muhurta_models import MuhurtaSearchRequest
 from .research_models import ResearchBirthProfileRequest
 
 
@@ -104,6 +105,10 @@ class JaiminiMcpInput(ProfileSelection):
 
 class PrashnaMcpInput(PrashnaRequest):
     """Additive MCP input; intentionally independent from natal profiles."""
+
+
+class MuhurtaMcpInput(MuhurtaSearchRequest):
+    """Additive event-search input; it never selects or persists a natal profile."""
 
 
 class SourceSearchInput(BaseModel):

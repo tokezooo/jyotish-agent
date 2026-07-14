@@ -1,0 +1,14 @@
+{
+  "profile_id": "muhurta_focused_work_v1",
+  "rule_profile_version": "1.0.0",
+  "rule_profile_sha256": "8e52a5ec8714b7f5f50efb74478e80eccc2896a25c804ff47a2c2724e1c6f8ef",
+  "adjudication_fixtures_sha256": "33c55c5538f259711ff92f9e812695224e98566420052bed778d46aabfab80c5",
+  "interpretation_status": "unavailable",
+  "review": {
+    "status": "pending",
+    "reviewer": null,
+    "reviewer_role": null,
+    "reason": "No licensed or public-domain Muhurta rule corpus and no qualified human adjudication are admitted."
+  },
+  "rules": []
+}

@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 import threading
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Callable, Generic, TypeVar
 
 from . import ENGINE_VERSION, names
@@ -92,7 +92,101 @@ class _EngineSessionReentryError(RuntimeError):
     """The current thread tried to enter the non-reentrant engine session twice."""
 
 
+@dataclass(frozen=True)
+class _MuhurtaBoundaryPrimitive:
+    kind: str
+    start_hour: float
+    end_hour: float | None = None
+
+
+@dataclass(frozen=True)
+class _MuhurtaDayPrimitives:
+    civil_date: date
+    values: tuple[_MuhurtaBoundaryPrimitive, ...]
+
+
 _ENGINE_SESSION_LOCAL = threading.local()
+
+
+def _clock_hour(value: object) -> float:
+    """Convert PyJHora's local clock strings, including ``(+1)``, to day hours."""
+    text = str(value)
+    day_offset = 24.0 if "(+1)" in text else 0.0
+    clock = text.split()[0]
+    hour, minute, second = (int(part) for part in clock.split(":"))
+    return day_offset + hour + minute / 60 + second / 3600
+
+
+def _run_muhurta_boundary_batch(
+    profile: BirthProfile,
+    civil_dates: tuple[tuple[date, float], ...],
+    config: CalculationConfig | None = None,
+) -> tuple[_MuhurtaDayPrimitives, ...]:
+    """Collect daily transition primitives in one bounded configured lock session.
+
+    Values are copied into immutable, domain-neutral records; raw engine objects do
+    not escape. The caller performs interval algebra outside the critical section.
+    """
+    config = config or CalculationConfig(charts=("D1",))
+    config.resolved_charts()
+    config.resolved_modules()
+    if getattr(_ENGINE_SESSION_LOCAL, "active", False):
+        raise _EngineSessionReentryError("engine session re-entry is not allowed")
+    _ENGINE_SESSION_LOCAL.active = True
+    try:
+        with ENGINE_LOCK:
+            from jhora import utils
+            from jhora.panchanga import drik
+
+            apply_config(config)
+            days: list[_MuhurtaDayPrimitives] = []
+            for civil_date, utc_offset_hours in civil_dates:
+                # Event searches may cross a DST transition. PyJHora's Place carries
+                # a numeric offset, so construct it per civil day from the IANA zone
+                # resolved by the caller instead of reusing the range-start offset.
+                place = drik.Place(profile.name, profile.latitude, profile.longitude, utc_offset_hours)
+                jd = utils.julian_day_number(
+                    (civil_date.year, civil_date.month, civil_date.day), (0, 0, 0)
+                )
+                values: list[_MuhurtaBoundaryPrimitive] = []
+
+                sunrise, sunset = drik.sunrise(jd, place), drik.sunset(jd, place)
+                values.extend((
+                    _MuhurtaBoundaryPrimitive("sunrise", float(sunrise[0])),
+                    _MuhurtaBoundaryPrimitive("sunset", float(sunset[0])),
+                ))
+                for kind, result, index in (
+                    ("tithi_transition", drik.tithi(jd, place), 2),
+                    ("nakshatra_transition", drik.nakshatra(jd, place), 3),
+                    ("yoga_transition", drik.yogam(jd, place), 2),
+                    ("karana_transition", drik.karana(jd, place), 2),
+                ):
+                    values.append(_MuhurtaBoundaryPrimitive(kind, float(result[index])))
+                for sign, start_hour, end_hour in drik.udhaya_lagna_muhurtha(jd, place):
+                    values.append(_MuhurtaBoundaryPrimitive(f"lagna_{int(sign)}", float(start_hour), float(end_hour)))
+
+                for kind, function in (
+                    ("rahu_kala", drik.raahu_kaalam),
+                    ("yamaganda", drik.yamaganda_kaalam),
+                    ("gulika", drik.gulikai_kaalam),
+                    ("abhijit", drik.abhijit_muhurta),
+                ):
+                    period = function(jd, place)
+                    if period and len(period) >= 2:
+                        values.append(_MuhurtaBoundaryPrimitive(kind, _clock_hour(period[0]), _clock_hour(period[1])))
+                dur = drik.durmuhurtam(jd, place)
+                for index in range(0, len(dur) - 1, 2):
+                    values.append(_MuhurtaBoundaryPrimitive("durmuhurta", _clock_hour(dur[index]), _clock_hour(dur[index + 1])))
+                varjyam = drik.varjyam(jd, place)
+                if varjyam and len(varjyam) >= 2:
+                    values.append(_MuhurtaBoundaryPrimitive("varjyam", float(varjyam[0]), float(varjyam[1])))
+                for period in drik.amrit_kaalam(jd, place) or ():
+                    if period and len(period) >= 2:
+                        values.append(_MuhurtaBoundaryPrimitive("amrita", _clock_hour(period[0]), _clock_hour(period[1])))
+                days.append(_MuhurtaDayPrimitives(civil_date, tuple(values)))
+            return tuple(days)
+    finally:
+        _ENGINE_SESSION_LOCAL.active = False
 
 
 def _round_deg(value: float) -> float:

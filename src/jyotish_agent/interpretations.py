@@ -255,6 +255,64 @@ def iter_prashna_fact_atoms(facts: list[dict]) -> dict[str, str]:
     return atoms
 
 
+def iter_muhurta_fact_atoms(facts: list[dict]) -> dict[str, str]:
+    """Project signed Muhūrta calculations and reject ambiguous duplicate IDs."""
+    atoms: dict[str, str] = {}
+    for fact in facts:
+        if not isinstance(fact, dict):
+            continue
+        path, value = fact.get("fact_id"), fact.get("value")
+        if isinstance(path, str) and path.startswith("muhurta.") and isinstance(value, (str, int, float, bool)):
+            if path in atoms:
+                raise ValueError(f"DUPLICATE_MUHURTA_FACT_ID:{path}")
+            atoms[path] = "true" if value is True else "false" if value is False else str(value)
+    return atoms
+
+
+def validate_muhurta_answer(submission: object) -> list[str]:
+    """Enforce a complete facts-only answer over one signed search/window set."""
+    from pydantic import ValidationError
+
+    from .muhurta_models import MuhurtaAnswerSubmission
+
+    try:
+        value = submission if isinstance(submission, MuhurtaAnswerSubmission) else MuhurtaAnswerSubmission.model_validate(submission)
+    except ValidationError:
+        return ["INVALID_ANSWER_SUBMISSION"]
+    artifact = get_cached_domain_artifact(value.artifact_token)
+    if artifact is None:
+        return ["ARTIFACT_NOT_FOUND"]
+    if not verify_domain_artifact(artifact) or artifact.get("mode") != "muhurta":
+        return ["ARTIFACT_INVALID"]
+    if artifact.get("artifact_id") != value.artifact_id:
+        return ["ARTIFACT_ID_MISMATCH"]
+    if artifact.get("artifact_sha256") != value.artifact_sha256:
+        return ["ARTIFACT_SHA256_MISMATCH"]
+    if artifact.get("search_range_sha256") != value.search_range_sha256:
+        return ["SEARCH_RANGE_MISMATCH"]
+    if tuple(artifact.get("window_ids", ())) != value.window_ids:
+        return ["WINDOW_IDS_MISMATCH"]
+    try:
+        atoms = iter_muhurta_fact_atoms(artifact.get("facts", []))
+    except ValueError as exc:
+        return [str(exc)]
+    seen: set[str] = set()
+    violations: list[str] = []
+    for claim in value.claims:
+        if claim.path in seen:
+            return [f"DUPLICATE_CLAIM:{claim.path}"]
+        seen.add(claim.path)
+        if claim.text != f"{claim.path} = {claim.value}":
+            violations.append(f"UNSUPPORTED_CLAIM_TEXT:{claim.path}")
+        elif claim.path not in atoms:
+            violations.append(f"FACT_NOT_IN_ARTIFACT:{claim.path}")
+        elif not _values_match(claim.value, atoms[claim.path]):
+            violations.append(f"FACT_VALUE_MISMATCH:{claim.path}")
+    if value.visible_text != "\n".join(claim.text for claim in value.claims):
+        return ["UNSUPPORTED_VISIBLE_TEXT"]
+    return violations
+
+
 def validate_prashna_answer(submission: object) -> list[str]:
     """Validate one complete canonical facts-only answer and all replay bindings."""
     from pydantic import ValidationError

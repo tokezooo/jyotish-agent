@@ -52,6 +52,7 @@ def test_server_metadata_and_tool_contract(tmp_path: Path):
         "calculate",
         "jaimini",
         "prashna",
+        "muhurta",
         "search_sources",
         "research",
         "finalize_research",
@@ -67,6 +68,9 @@ def test_server_metadata_and_tool_contract(tmp_path: Path):
     assert by_name["jaimini"].outputSchema["discriminator"]["propertyName"] == "status"
     assert "governed analysis renderer" in by_name["jaimini"].description
     assert by_name["prashna"].annotations.readOnlyHint is True
+    assert by_name["muhurta"].annotations.readOnlyHint is True
+    assert by_name["muhurta"].annotations.idempotentHint is True
+    assert by_name["muhurta"].outputSchema["discriminator"]["propertyName"] == "status"
     assert by_name["prashna"].annotations.idempotentHint is True
     assert by_name["prashna"].outputSchema["discriminator"]["propertyName"] == "status"
     assert by_name["research"].annotations.readOnlyHint is False

@@ -21,6 +21,8 @@ from .jaimini_models import (
 )
 from .prashna import PrashnaFacade
 from .prashna_models import PrashnaResult
+from .muhurta import MuhurtaFacade
+from .muhurta_models import MuhurtaResult
 from .mcp_models import (
     CalculateInput,
     CalculateResult,
@@ -28,6 +30,7 @@ from .mcp_models import (
     FinalizeResearchInput,
     InspectResearchInput,
     JaiminiMcpInput,
+    MuhurtaMcpInput,
     PrashnaMcpInput,
     ProfileInput,
     ProfileResult,
@@ -295,6 +298,51 @@ class JyotishMcpFacade:
     def prashna(self, value: PrashnaMcpInput) -> PrashnaResult:
         """Compute one stateless, sealed question-time Praśna result."""
         return PrashnaFacade(clock=self.clock).calculate(value)
+
+    def muhurta(self, value: MuhurtaMcpInput) -> MuhurtaResult:
+        """Search calculated event boundaries without persistence or side effects."""
+        return MuhurtaFacade(clock=self.clock).search(value)
+
+    def muhurta_payload(
+        self,
+        value: object,
+        *,
+        outer_arguments: dict[str, Any] | None = None,
+    ) -> MuhurtaResult:
+        """Make malformed MCP execution total without reflecting private inputs."""
+        parsed: MuhurtaMcpInput | None = None
+        if not outer_arguments and isinstance(value, dict):
+            try:
+                parsed = MuhurtaMcpInput.model_validate(value)
+            except ValidationError:
+                pass
+        if parsed is not None:
+            return self.muhurta(parsed)
+        import hashlib
+
+        request_id = "muh_" + hashlib.sha256(
+            json.dumps({"request": value, "outer": outer_arguments}, sort_keys=True, separators=(",", ":"), default=str).encode()
+        ).hexdigest()[:24]
+        from .error_registry import error_record
+        from .muhurta_models import MuhurtaNeedsInputResult
+
+        code = "INPUT_INVALID"
+        supported_values = None
+        if isinstance(value, dict):
+            if value.get("rule_profile") not in (None, "muhurta_focused_work_v1"):
+                code = "RULE_PROFILE_UNSUPPORTED"
+                supported_values = ("muhurta_focused_work_v1",)
+            else:
+                try:
+                    start = dt.datetime.fromisoformat(str(value.get("start", "")).replace("Z", "+00:00"))
+                    end = dt.datetime.fromisoformat(str(value.get("end", "")).replace("Z", "+00:00"))
+                    if end - start > dt.timedelta(days=31):
+                        code = "SEARCH_RANGE_TOO_LARGE"
+                except (TypeError, ValueError):
+                    pass
+        record = error_record(code, run_id=None, request_id=request_id, mode="muhurta", stage="input_validation")
+        fields = {key: record[key] for key in ("error_code", "request_id", "mode", "stage", "retryable", "problem", "cause", "fix", "next_action")}
+        return MuhurtaNeedsInputResult(status="needs_input", supported_values=supported_values or ("general", "focused_work_session_v1"), **fields)
 
     def prashna_payload(
         self,

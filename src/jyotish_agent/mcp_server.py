@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict
 from .mcp_facade import JyotishMcpFacade, facade_from_environment
 from .jaimini_models import JaiminiResultModel
 from .prashna_models import PrashnaResultModel
+from .muhurta_models import MuhurtaResultModel
 from .mcp_models import (
     CalculateInput,
     CalculateResult,
@@ -19,6 +20,7 @@ from .mcp_models import (
     FinalizeResearchInput,
     InspectResearchInput,
     JaiminiMcpInput,
+    MuhurtaMcpInput,
     PrashnaMcpInput,
     ProfileInput,
     ProfileResult,
@@ -50,6 +52,19 @@ class _PrashnaWireArguments(ArgModelBase):
         }
 
 
+class _MuhurtaPublishedArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    request: MuhurtaMcpInput
+
+
+class _MuhurtaWireArguments(ArgModelBase):
+    request: Any = None
+    model_config = ConfigDict(extra="allow", arbitrary_types_allowed=True)
+
+    def model_dump_one_level(self) -> dict[str, Any]:
+        return {"request": self.request, "outer_arguments": dict(self.model_extra or {})}
+
+
 SERVER_INSTRUCTIONS = """Normal conversation is the default. Use quick, stateless tools for focused personal questions and follow-ups. Create a ResearchRun only for broad multi-factor analysis or when the user explicitly asks for deep research. Влад is the default profile; use an inline profile only when the user clearly identifies another person and supplies their birth data. For deep research, the final visible answer must equal finalize_research.markdown exactly; never expand or rewrite it. Keep evidence IDs, claim graphs, confidence machinery, hashes, and run-state details out of normal visible answers. Explain Jyotish as symbolic interpretation, not guaranteed prediction.
 
 Routing:
@@ -59,6 +74,8 @@ Routing:
   when interpretation_status is unavailable, and never infer an approximate range.
 - prashna seals one explicit/captured question moment and supports only bounded work/project
   facts; reuse its opaque anchor token for clarification and never invent doctrine.
+- muhurta searches calculated event boundaries for general/private focused-work sessions;
+  ranking and interpretation remain unavailable until their governed source pack is admitted.
 - research creates exactly one authoritative run and returns evidence for synthesis.
 - finalize_research validates and saves a deep memo; inspect_research retrieves it.
 - Do not infer missing birth data for another person and do not overwrite the default profile.
@@ -154,6 +171,24 @@ def build_server(facade: JyotishMcpFacade | None = None) -> FastMCP:
     assert prashna_tool is not None
     prashna_tool.parameters = _PrashnaPublishedArguments.model_json_schema()
     prashna_tool.fn_metadata.arg_model = _PrashnaWireArguments
+
+    @server.tool(
+        name="muhurta",
+        description=(
+            "Search calendar-ready astronomical boundaries for general or private focused-work "
+            "sessions. No booking or persistence occurs. Doctrinal ranking and interpretation "
+            "remain unavailable until a governed source pack is admitted."
+        ),
+        annotations=READ_ONLY,
+        structured_output=True,
+    )
+    def muhurta(request: Any = None, outer_arguments: dict[str, Any] | None = None) -> MuhurtaResultModel:
+        return MuhurtaResultModel(root=runtime.muhurta_payload(request, outer_arguments=outer_arguments))
+
+    muhurta_tool = server._tool_manager.get_tool("muhurta")
+    assert muhurta_tool is not None
+    muhurta_tool.parameters = _MuhurtaPublishedArguments.model_json_schema()
+    muhurta_tool.fn_metadata.arg_model = _MuhurtaWireArguments
 
     @server.tool(
         name="search_sources",
