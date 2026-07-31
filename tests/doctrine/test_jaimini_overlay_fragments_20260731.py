@@ -205,6 +205,11 @@ def test_overlay_ledger_identity_and_school_cannot_be_substituted() -> None:
     with pytest.raises(ValueError, match="cannot blend schools"):
         JaiminiOverlayFragmentLedger.model_validate(payload)
 
+    payload = json.loads(KN_LEDGER_PATH.read_text(encoding="utf-8"))
+    payload.pop("unresolved_sources")
+    with pytest.raises(ValueError, match="unresolved_sources"):
+        JaiminiOverlayFragmentLedger.model_validate(payload)
+
 
 def test_context_validation_rejects_page_offset_substitution() -> None:
     ledger = _ledger()

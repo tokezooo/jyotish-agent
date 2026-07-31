@@ -334,7 +334,7 @@ class JaiminiOverlayFragmentLedger(FrozenModel):
     product_rule_use_allowed: Literal[False]
     fragments: tuple[SourceFragment, ...] = Field(min_length=1)
     bindings: tuple[JaiminiOverlayFragmentBinding, ...] = Field(min_length=1)
-    unresolved_sources: tuple[JaiminiUnresolvedOverlaySource, ...] = ()
+    unresolved_sources: tuple[JaiminiUnresolvedOverlaySource, ...]
 
     @model_validator(mode="after")
     def _coherent_quarantine(self) -> "JaiminiOverlayFragmentLedger":
