@@ -10,18 +10,30 @@ from __future__ import annotations
 
 import datetime as dt
 import hashlib
+import json
 import re
 import unicodedata
 from enum import StrEnum
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, field_validator, model_validator
 
-from ..prashna_models import PrashnaAspectDoctrineProfile, PrashnaAspectGeometryResult
+from ..prashna import calculate_prashna_aspect_geometry
+from ..prashna_models import (
+    PrashnaAspectDoctrineProfile,
+    PrashnaAspectGeometryInput,
+    PrashnaAspectGeometryResult,
+)
 from ..research_store import canonical_json
 from .evaluation import AdmissionEvaluator
 from .models import FrozenModel
-from .sources import SourceId, SourceManifest, SourceVerificationReport
+from .sources import (
+    SourceId,
+    SourceManifest,
+    SourceVerificationReport,
+    load_source_manifest,
+)
 
 
 class PrashnaCorpusRequirement(StrEnum):
@@ -1215,3 +1227,421 @@ class PrashnaReleaseAudit(FrozenModel):
                 "release audit must separate completed and future evidence"
             )
         return self
+
+
+class PrashnaHeldOutCorpusError(ValueError):
+    """The held-out question corpus is malformed, substituted, or unsafe."""
+
+
+_PRASHNA_ROOT = Path(__file__).resolve().parents[3]
+_PRASHNA_HELD_OUT_CORPUS = (
+    _PRASHNA_ROOT / "eval/prashna/questions-held-out-v1.json"
+)
+_PRASHNA_HELD_OUT_MANIFEST = (
+    _PRASHNA_ROOT / "eval/prashna/questions-held-out-v1-checksums.json"
+)
+_PRASHNA_RADICALITY_PROFILE = (
+    _PRASHNA_ROOT / "src/jyotish_agent/data/doctrine/prashna-rules.json"
+)
+_PRASHNA_SOURCE_MANIFEST = (
+    _PRASHNA_ROOT / "src/jyotish_agent/data/doctrine/prashna-sources.json"
+)
+_PRASHNA_HELD_OUT_ID = re.compile(r"^[a-z][a-z0-9_]{2,80}$")
+
+
+def _held_out_json(path: Path, label: str) -> dict[str, object]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PrashnaHeldOutCorpusError(f"invalid {label}") from exc
+    if not isinstance(value, dict):
+        raise PrashnaHeldOutCorpusError(f"invalid {label}")
+    return value
+
+
+def _held_out_keys(
+    value: dict[str, object], expected: set[str], label: str
+) -> None:
+    if set(value) != expected:
+        raise PrashnaHeldOutCorpusError(f"{label} has an invalid schema")
+
+
+def _check_prashna_held_out_checksum(
+    corpus_path: Path, manifest_path: Path
+) -> None:
+    manifest = _held_out_json(manifest_path, "Prashna held-out checksum manifest")
+    _held_out_keys(
+        manifest,
+        {"schema_version", "algorithm", "files"},
+        "Prashna held-out checksum manifest",
+    )
+    files = manifest["files"]
+    if (
+        manifest["schema_version"] != "1.0"
+        or manifest["algorithm"] != "sha256"
+        or not isinstance(files, dict)
+        or set(files) != {corpus_path.name}
+    ):
+        raise PrashnaHeldOutCorpusError("invalid Prashna held-out checksum manifest")
+    expected = files[corpus_path.name]
+    if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise PrashnaHeldOutCorpusError("invalid Prashna held-out checksum manifest")
+    try:
+        actual = hashlib.sha256(corpus_path.read_bytes()).hexdigest()
+    except OSError as exc:
+        raise PrashnaHeldOutCorpusError("invalid Prashna held-out corpus") from exc
+    if actual != expected:
+        raise PrashnaHeldOutCorpusError("Prashna held-out checksum mismatch")
+
+
+def _validate_prashna_held_out_corpus(payload: dict[str, object]) -> None:
+    _held_out_keys(
+        payload,
+        {
+            "schema_version",
+            "corpus_id",
+            "authorship",
+            "used_for_tuning",
+            "public_safe",
+            "source_admission_mode",
+            "corpus_manifest_sha256",
+            "radicality_profile_sha256",
+            "cases",
+        },
+        "Prashna held-out corpus",
+    )
+    source_manifest = load_source_manifest(_PRASHNA_SOURCE_MANIFEST)
+    radicality_sha256 = hashlib.sha256(
+        _PRASHNA_RADICALITY_PROFILE.read_bytes()
+    ).hexdigest()
+    if (
+        payload["schema_version"] != "1.0"
+        or payload["corpus_id"] != "prashna_questions_held_out_v1"
+        or payload["authorship"] != "independently_hand_authored"
+        or payload["used_for_tuning"] is not False
+        or payload["public_safe"] is not True
+        or payload["source_admission_mode"] != "synthetic_test_fixture_only"
+        or payload["corpus_manifest_sha256"] != source_manifest.manifest_sha256
+        or payload["radicality_profile_sha256"] != radicality_sha256
+    ):
+        raise PrashnaHeldOutCorpusError("Prashna held-out provenance is invalid")
+
+    cases = payload["cases"]
+    if not isinstance(cases, list) or len(cases) < 12:
+        raise PrashnaHeldOutCorpusError(
+            "Prashna held-out corpus requires at least twelve questions"
+        )
+    case_ids: list[str] = []
+    locales: set[str] = set()
+    statuses: set[str] = set()
+    profiles: set[str] = set()
+    supported_count = 0
+    valid_statuses = {
+        "supported",
+        "unsupported",
+        "composite",
+        "high_stakes",
+        "ambiguous",
+    }
+    valid_profiles = {profile.value for profile in PrashnaQuestionProfile}
+    valid_guidance = {
+        "PROCEED",
+        "ASK_ONE_MATERIAL_QUESTION",
+        "CONSULT_QUALIFIED_PROFESSIONAL",
+        "NAME_A_SUPPORTED_LOW_RISK_TOPIC",
+        "TOPIC_NOT_SUPPORTED",
+    }
+    for case in cases:
+        if not isinstance(case, dict):
+            raise PrashnaHeldOutCorpusError("Prashna held-out case must be an object")
+        _held_out_keys(
+            case,
+            {
+                "id",
+                "locale",
+                "question",
+                "route_expected",
+                "scenario",
+                "outcome_expected",
+            },
+            "Prashna held-out case",
+        )
+        case_id, locale, question = case["id"], case["locale"], case["question"]
+        if (
+            not isinstance(case_id, str)
+            or not _PRASHNA_HELD_OUT_ID.fullmatch(case_id)
+            or locale not in {"ru", "en"}
+            or not isinstance(question, str)
+            or not 1 <= len(question) <= 500
+            or any(
+                marker in question.casefold()
+                for marker in ("private_sources", ".pdf", "/users/")
+            )
+        ):
+            raise PrashnaHeldOutCorpusError("Prashna held-out case identity is invalid")
+
+        route_expected = case["route_expected"]
+        scenario = case["scenario"]
+        outcome_expected = case["outcome_expected"]
+        if not all(
+            isinstance(value, dict)
+            for value in (route_expected, scenario, outcome_expected)
+        ):
+            raise PrashnaHeldOutCorpusError("Prashna held-out case data is invalid")
+        _held_out_keys(
+            route_expected,
+            {"status", "profile", "guidance_code"},
+            "Prashna held-out route expectation",
+        )
+        route_status = route_expected["status"]
+        route_profile = route_expected["profile"]
+        if (
+            route_status not in valid_statuses
+            or route_expected["guidance_code"] not in valid_guidance
+            or (
+                route_status == "supported"
+                and route_profile not in valid_profiles
+            )
+            or (route_status != "supported" and route_profile is not None)
+        ):
+            raise PrashnaHeldOutCorpusError(
+                "Prashna held-out route expectation is invalid"
+            )
+
+        _held_out_keys(
+            scenario,
+            {"radicality", "geometry", "testimonies", "fact_mode"},
+            "Prashna held-out scenario",
+        )
+        radicality = scenario["radicality"]
+        geometry = scenario["geometry"]
+        testimonies = scenario["testimonies"]
+        if not isinstance(radicality, dict) or not isinstance(geometry, dict):
+            raise PrashnaHeldOutCorpusError("Prashna held-out scenario is invalid")
+        try:
+            PrashnaRadicalityInput.model_validate(radicality)
+            geometry_input = {
+                key: value for key, value in geometry.items() if key != "source_admitted"
+            }
+            PrashnaAspectGeometryInput.model_validate(
+                {
+                    "anchor_sha256": "a" * 64,
+                    "body_a": "lagna_lord",
+                    "body_b": "primary_house_lord",
+                    **geometry_input,
+                }
+            )
+        except ValueError as exc:
+            raise PrashnaHeldOutCorpusError(
+                "Prashna held-out typed scenario is invalid"
+            ) from exc
+        if type(geometry.get("source_admitted")) is not bool:
+            raise PrashnaHeldOutCorpusError(
+                "Prashna held-out geometry admission flag is invalid"
+            )
+        if scenario["fact_mode"] not in {"complete", "missing"}:
+            raise PrashnaHeldOutCorpusError("Prashna held-out fact mode is invalid")
+        if not isinstance(testimonies, list):
+            raise PrashnaHeldOutCorpusError("Prashna held-out testimonies are invalid")
+        for testimony in testimonies:
+            if not isinstance(testimony, dict):
+                raise PrashnaHeldOutCorpusError(
+                    "Prashna held-out testimony is invalid"
+                )
+            _held_out_keys(
+                testimony,
+                {"testimony_id", "polarity", "confidence"},
+                "Prashna held-out testimony",
+            )
+            try:
+                PrashnaTestimony.model_validate(
+                    {
+                        **testimony,
+                        "fact_refs": ("prashna.lagna.sign",),
+                        "source_refs": ("held-out:synthetic-testimony",),
+                    }
+                )
+            except ValueError as exc:
+                raise PrashnaHeldOutCorpusError(
+                    "Prashna held-out testimony is invalid"
+                ) from exc
+
+        _held_out_keys(
+            outcome_expected,
+            {"judgment", "reason_codes", "outcome_allowed"},
+            "Prashna held-out outcome expectation",
+        )
+        if (
+            outcome_expected["judgment"]
+            not in {"favorable", "unfavorable", "mixed", "no_answer", "unavailable"}
+            or not isinstance(outcome_expected["reason_codes"], list)
+            or not all(
+                isinstance(code, str) and code
+                for code in outcome_expected["reason_codes"]
+            )
+            or type(outcome_expected["outcome_allowed"]) is not bool
+        ):
+            raise PrashnaHeldOutCorpusError(
+                "Prashna held-out outcome expectation is invalid"
+            )
+
+        case_ids.append(case_id)
+        locales.add(locale)
+        statuses.add(route_status)
+        if route_profile is not None:
+            profiles.add(route_profile)
+        if route_status == "supported":
+            supported_count += 1
+    if len(case_ids) != len(set(case_ids)):
+        raise PrashnaHeldOutCorpusError("duplicate Prashna held-out case ID")
+    if (
+        locales != {"ru", "en"}
+        or statuses != valid_statuses
+        or profiles != valid_profiles
+        or supported_count < 8
+    ):
+        raise PrashnaHeldOutCorpusError(
+            "Prashna held-out corpus has incomplete route coverage"
+        )
+
+
+def evaluate_prashna_held_out_questions(
+    *,
+    corpus_path: Path = _PRASHNA_HELD_OUT_CORPUS,
+    manifest_path: Path = _PRASHNA_HELD_OUT_MANIFEST,
+    allow_held_out: bool = False,
+) -> dict[str, object]:
+    """Evaluate a sealed question set without promoting synthetic source fixtures."""
+    if not allow_held_out:
+        raise ValueError("Prashna held-out execution requires allow_held_out=True")
+    _check_prashna_held_out_checksum(corpus_path, manifest_path)
+    corpus = _held_out_json(corpus_path, "Prashna held-out corpus")
+    _validate_prashna_held_out_corpus(corpus)
+    radicality_profile = PrashnaRadicalityProfile.model_validate_json(
+        _PRASHNA_RADICALITY_PROFILE.read_text(encoding="utf-8")
+    )
+
+    failures: list[dict[str, object]] = []
+    covered_statuses: set[str] = set()
+    covered_profiles: set[str] = set()
+    supported_count = 0
+    no_answer_count = 0
+    cases = corpus["cases"]
+    assert isinstance(cases, list)
+    for case in cases:
+        assert isinstance(case, dict)
+        route = classify_prashna_question(str(case["question"]))
+        scenario = case["scenario"]
+        assert isinstance(scenario, dict)
+        radicality_payload = scenario["radicality"]
+        geometry_payload = scenario["geometry"]
+        testimonies_payload = scenario["testimonies"]
+        assert isinstance(radicality_payload, dict)
+        assert isinstance(geometry_payload, dict)
+        assert isinstance(testimonies_payload, list)
+
+        radicality = evaluate_prashna_radicality(
+            PrashnaRadicalityInput.model_validate(radicality_payload),
+            radicality_profile,
+        )
+        source_admitted = bool(geometry_payload["source_admitted"])
+        geometry_profile = prashna_aspect_profile(
+            "tajika_nilakanthi_overlay"
+        ).model_copy(
+            update={
+                "source_admitted": source_admitted,
+                "source_refs": (
+                    ("held-out:synthetic-tajika-fixture",)
+                    if source_admitted
+                    else ()
+                ),
+            }
+        )
+        geometry = calculate_prashna_aspect_geometry(
+            PrashnaAspectGeometryInput.model_validate(
+                {
+                    "anchor_sha256": "a" * 64,
+                    "body_a": "lagna_lord",
+                    "body_b": "primary_house_lord",
+                    **{
+                        key: value
+                        for key, value in geometry_payload.items()
+                        if key != "source_admitted"
+                    },
+                }
+            ),
+            geometry_profile,
+        )
+        testimonies = tuple(
+            PrashnaTestimony.model_validate(
+                {
+                    **testimony,
+                    "fact_refs": ("prashna.lagna.sign",),
+                    "source_refs": ("held-out:synthetic-testimony",),
+                }
+            )
+            for testimony in testimonies_payload
+        )
+        available_fact_paths = (
+            route.required_fact_paths
+            if scenario["fact_mode"] == "complete"
+            else ("prashna.lagna.sign",)
+        )
+        outcome = evaluate_prashna_outcome(
+            radicality,
+            route,
+            geometry,
+            testimonies=testimonies,
+            available_fact_paths=available_fact_paths,
+        )
+
+        observed = {
+            "route": {
+                "status": route.status,
+                "profile": route.profile.value if route.profile is not None else None,
+                "guidance_code": route.guidance_code,
+            },
+            "outcome": {
+                "judgment": outcome.judgment,
+                "reason_codes": list(outcome.reason_codes),
+                "outcome_allowed": outcome.outcome_allowed,
+            },
+        }
+        expected = {
+            "route": case["route_expected"],
+            "outcome": case["outcome_expected"],
+        }
+        if observed != expected:
+            failures.append(
+                {
+                    "case_id": case["id"],
+                    "expected": expected,
+                    "observed": observed,
+                }
+            )
+        covered_statuses.add(route.status)
+        if route.profile is not None:
+            covered_profiles.add(route.profile.value)
+        if case["route_expected"]["status"] == "supported":
+            supported_count += 1
+            if outcome.judgment == "no_answer":
+                no_answer_count += 1
+
+    question_count = len(cases)
+    failed_count = len(failures)
+    return {
+        "corpus_id": corpus["corpus_id"],
+        "corpus_sha256": hashlib.sha256(corpus_path.read_bytes()).hexdigest(),
+        "corpus_manifest_sha256": corpus["corpus_manifest_sha256"],
+        "radicality_profile_sha256": corpus["radicality_profile_sha256"],
+        "source_admission_mode": corpus["source_admission_mode"],
+        "status": "failed" if failures else "passed",
+        "question_count": question_count,
+        "passed_count": question_count - failed_count,
+        "failed_count": failed_count,
+        "material_error_rate": round(failed_count / question_count, 6),
+        "no_answer_rate": round(no_answer_count / supported_count, 6),
+        "covered_route_statuses": sorted(covered_statuses),
+        "covered_profiles": sorted(covered_profiles),
+        "failures": failures,
+    }

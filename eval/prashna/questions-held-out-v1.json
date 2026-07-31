@@ -1,0 +1,168 @@
+{
+  "schema_version": "1.0",
+  "corpus_id": "prashna_questions_held_out_v1",
+  "authorship": "independently_hand_authored",
+  "used_for_tuning": false,
+  "public_safe": true,
+  "source_admission_mode": "synthetic_test_fixture_only",
+  "corpus_manifest_sha256": "6a38ff34650f7619b49dbc74359e809a25f077e8defe555ab2a9793a47c29b93",
+  "radicality_profile_sha256": "4f77da632b0f3e67ebb9a234a757a3130eeff62ee56ded1f9caf596ef3bdbf6c",
+  "cases": [
+    {
+      "id": "pq_work_en_favorable",
+      "locale": "en",
+      "question": "What is blocking this work project?",
+      "route_expected": {"status": "supported", "profile": "work_project_status", "guidance_code": "PROCEED"},
+      "scenario": {
+        "radicality": {"anchor_state": "sealed", "question_relation": "new_anchor", "topic_state": "single_safe", "question_form": "proper", "intent_state": "sincere", "sources_admitted": true},
+        "geometry": {"source_admitted": true, "longitude_a": 10.0, "longitude_b": 68.0, "speed_a": 0.5, "speed_b": 1.0, "aspect_degrees": 60.0},
+        "testimonies": [{"testimony_id": "support", "polarity": "assistance", "confidence": 0.4}],
+        "fact_mode": "complete"
+      },
+      "outcome_expected": {"judgment": "favorable", "reason_codes": [], "outcome_allowed": true}
+    },
+    {
+      "id": "pq_work_ru_unfavorable",
+      "locale": "ru",
+      "question": "Что мешает этому рабочему проекту?",
+      "route_expected": {"status": "supported", "profile": "work_project_status", "guidance_code": "PROCEED"},
+      "scenario": {
+        "radicality": {"anchor_state": "sealed", "question_relation": "new_anchor", "topic_state": "single_safe", "question_form": "proper", "intent_state": "sincere", "sources_admitted": true},
+        "geometry": {"source_admitted": true, "longitude_a": 10.0, "longitude_b": 68.0, "speed_a": 0.5, "speed_b": 1.0, "aspect_degrees": 60.0},
+        "testimonies": [{"testimony_id": "obstacle", "polarity": "obstacle", "confidence": 0.5}],
+        "fact_mode": "complete"
+      },
+      "outcome_expected": {"judgment": "unfavorable", "reason_codes": [], "outcome_allowed": true}
+    },
+    {
+      "id": "pq_contact_en_mixed",
+      "locale": "en",
+      "question": "Will this person reply to my ordinary message?",
+      "route_expected": {"status": "supported", "profile": "communication_contact", "guidance_code": "PROCEED"},
+      "scenario": {
+        "radicality": {"anchor_state": "sealed", "question_relation": "new_anchor", "topic_state": "single_safe", "question_form": "proper", "intent_state": "sincere", "sources_admitted": true},
+        "geometry": {"source_admitted": true, "longitude_a": 10.0, "longitude_b": 68.0, "speed_a": 0.5, "speed_b": 1.0, "aspect_degrees": 60.0},
+        "testimonies": [{"testimony_id": "support", "polarity": "assistance", "confidence": 0.4}, {"testimony_id": "obstacle", "polarity": "obstacle", "confidence": 0.55}],
+        "fact_mode": "complete"
+      },
+      "outcome_expected": {"judgment": "mixed", "reason_codes": [], "outcome_allowed": true}
+    },
+    {
+      "id": "pq_contact_ru_no_answer",
+      "locale": "ru",
+      "question": "Свяжется ли человек со мной по обычному сообщению?",
+      "route_expected": {"status": "supported", "profile": "communication_contact", "guidance_code": "PROCEED"},
+      "scenario": {
+        "radicality": {"anchor_state": "sealed", "question_relation": "new_anchor", "topic_state": "single_safe", "question_form": "proper", "intent_state": "sincere", "sources_admitted": true},
+        "geometry": {"source_admitted": true, "longitude_a": 10.0, "longitude_b": 68.0, "speed_a": 0.5, "speed_b": 1.0, "aspect_degrees": 60.0},
+        "testimonies": [],
+        "fact_mode": "complete"
+      },
+      "outcome_expected": {"judgment": "no_answer", "reason_codes": ["TESTIMONY_MISSING"], "outcome_allowed": false}
+    },
+    {
+      "id": "pq_lost_en_favorable",
+      "locale": "en",
+      "question": "Where is my lost notebook?",
+      "route_expected": {"status": "supported", "profile": "lost_object", "guidance_code": "PROCEED"},
+      "scenario": {
+        "radicality": {"anchor_state": "sealed", "question_relation": "new_anchor", "topic_state": "single_safe", "question_form": "proper", "intent_state": "sincere", "sources_admitted": true},
+        "geometry": {"source_admitted": true, "longitude_a": 10.0, "longitude_b": 70.0, "speed_a": 0.5, "speed_b": 1.0, "aspect_degrees": 60.0},
+        "testimonies": [{"testimony_id": "support", "polarity": "assistance", "confidence": 0.3}],
+        "fact_mode": "complete"
+      },
+      "outcome_expected": {"judgment": "favorable", "reason_codes": [], "outcome_allowed": true}
+    },
+    {
+      "id": "pq_lost_ru_missing_facts",
+      "locale": "ru",
+      "question": "Где моя потерянная тетрадь?",
+      "route_expected": {"status": "supported", "profile": "lost_object", "guidance_code": "PROCEED"},
+      "scenario": {
+        "radicality": {"anchor_state": "sealed", "question_relation": "new_anchor", "topic_state": "single_safe", "question_form": "proper", "intent_state": "sincere", "sources_admitted": true},
+        "geometry": {"source_admitted": true, "longitude_a": 10.0, "longitude_b": 68.0, "speed_a": 0.5, "speed_b": 1.0, "aspect_degrees": 60.0},
+        "testimonies": [{"testimony_id": "support", "polarity": "assistance", "confidence": 0.5}],
+        "fact_mode": "missing"
+      },
+      "outcome_expected": {"judgment": "unavailable", "reason_codes": ["REQUIRED_FACTS_MISSING"], "outcome_allowed": false}
+    },
+    {
+      "id": "pq_general_en_source_missing",
+      "locale": "en",
+      "question": "Will this low-risk plan work out?",
+      "route_expected": {"status": "supported", "profile": "general_low_risk_outcome", "guidance_code": "PROCEED"},
+      "scenario": {
+        "radicality": {"anchor_state": "sealed", "question_relation": "new_anchor", "topic_state": "single_safe", "question_form": "proper", "intent_state": "sincere", "sources_admitted": true},
+        "geometry": {"source_admitted": false, "longitude_a": 10.0, "longitude_b": 68.0, "speed_a": 0.5, "speed_b": 1.0, "aspect_degrees": 60.0},
+        "testimonies": [{"testimony_id": "support", "polarity": "assistance", "confidence": 0.5}],
+        "fact_mode": "complete"
+      },
+      "outcome_expected": {"judgment": "unavailable", "reason_codes": ["GEOMETRY_UNAVAILABLE"], "outcome_allowed": false}
+    },
+    {
+      "id": "pq_general_ru_stale_anchor",
+      "locale": "ru",
+      "question": "Получится ли этот безрисковый план?",
+      "route_expected": {"status": "supported", "profile": "general_low_risk_outcome", "guidance_code": "PROCEED"},
+      "scenario": {
+        "radicality": {"anchor_state": "stale", "question_relation": "new_anchor", "topic_state": "single_safe", "question_form": "proper", "intent_state": "sincere", "sources_admitted": true},
+        "geometry": {"source_admitted": true, "longitude_a": 10.0, "longitude_b": 68.0, "speed_a": 0.5, "speed_b": 1.0, "aspect_degrees": 60.0},
+        "testimonies": [{"testimony_id": "support", "polarity": "assistance", "confidence": 0.5}],
+        "fact_mode": "complete"
+      },
+      "outcome_expected": {"judgment": "unavailable", "reason_codes": ["RADICALITY_BLOCKED"], "outcome_allowed": false}
+    },
+    {
+      "id": "pq_composite_en",
+      "locale": "en",
+      "question": "Will my project work and where are my keys?",
+      "route_expected": {"status": "composite", "profile": null, "guidance_code": "ASK_ONE_MATERIAL_QUESTION"},
+      "scenario": {
+        "radicality": {"anchor_state": "sealed", "question_relation": "new_anchor", "topic_state": "single_safe", "question_form": "proper", "intent_state": "sincere", "sources_admitted": true},
+        "geometry": {"source_admitted": true, "longitude_a": 10.0, "longitude_b": 68.0, "speed_a": 0.5, "speed_b": 1.0, "aspect_degrees": 60.0},
+        "testimonies": [{"testimony_id": "support", "polarity": "assistance", "confidence": 0.5}],
+        "fact_mode": "complete"
+      },
+      "outcome_expected": {"judgment": "unavailable", "reason_codes": ["QUESTION_PROFILE_NOT_SUPPORTED"], "outcome_allowed": false}
+    },
+    {
+      "id": "pq_high_stakes_en",
+      "locale": "en",
+      "question": "Will this surgery succeed?",
+      "route_expected": {"status": "high_stakes", "profile": null, "guidance_code": "CONSULT_QUALIFIED_PROFESSIONAL"},
+      "scenario": {
+        "radicality": {"anchor_state": "sealed", "question_relation": "new_anchor", "topic_state": "single_safe", "question_form": "proper", "intent_state": "sincere", "sources_admitted": true},
+        "geometry": {"source_admitted": true, "longitude_a": 10.0, "longitude_b": 68.0, "speed_a": 0.5, "speed_b": 1.0, "aspect_degrees": 60.0},
+        "testimonies": [{"testimony_id": "support", "polarity": "assistance", "confidence": 0.5}],
+        "fact_mode": "complete"
+      },
+      "outcome_expected": {"judgment": "unavailable", "reason_codes": ["QUESTION_PROFILE_NOT_SUPPORTED"], "outcome_allowed": false}
+    },
+    {
+      "id": "pq_ambiguous_en",
+      "locale": "en",
+      "question": "Will it happen?",
+      "route_expected": {"status": "ambiguous", "profile": null, "guidance_code": "NAME_A_SUPPORTED_LOW_RISK_TOPIC"},
+      "scenario": {
+        "radicality": {"anchor_state": "sealed", "question_relation": "new_anchor", "topic_state": "single_safe", "question_form": "proper", "intent_state": "sincere", "sources_admitted": true},
+        "geometry": {"source_admitted": true, "longitude_a": 10.0, "longitude_b": 68.0, "speed_a": 0.5, "speed_b": 1.0, "aspect_degrees": 60.0},
+        "testimonies": [{"testimony_id": "support", "polarity": "assistance", "confidence": 0.5}],
+        "fact_mode": "complete"
+      },
+      "outcome_expected": {"judgment": "unavailable", "reason_codes": ["QUESTION_PROFILE_NOT_SUPPORTED"], "outcome_allowed": false}
+    },
+    {
+      "id": "pq_unsupported_en",
+      "locale": "en",
+      "question": "What color should I paint the wall?",
+      "route_expected": {"status": "unsupported", "profile": null, "guidance_code": "TOPIC_NOT_SUPPORTED"},
+      "scenario": {
+        "radicality": {"anchor_state": "sealed", "question_relation": "new_anchor", "topic_state": "single_safe", "question_form": "proper", "intent_state": "sincere", "sources_admitted": true},
+        "geometry": {"source_admitted": true, "longitude_a": 10.0, "longitude_b": 68.0, "speed_a": 0.5, "speed_b": 1.0, "aspect_degrees": 60.0},
+        "testimonies": [{"testimony_id": "support", "polarity": "assistance", "confidence": 0.5}],
+        "fact_mode": "complete"
+      },
+      "outcome_expected": {"judgment": "unavailable", "reason_codes": ["QUESTION_PROFILE_NOT_SUPPORTED"], "outcome_allowed": false}
+    }
+  ]
+}
