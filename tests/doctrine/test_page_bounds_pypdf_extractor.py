@@ -53,7 +53,7 @@ def _write_pdf(
         writer.write(handle)
 
 
-def _write_form_pdf(path: Path) -> None:
+def _write_form_pdf(path: Path, *, page_prefix: bytes = b"") -> None:
     pypdf = pytest.importorskip("pypdf")
     from pypdf.generic import (
         ArrayObject,
@@ -100,7 +100,7 @@ def _write_form_pdf(path: Path) -> None:
         }
     )
     content = DecodedStreamObject()
-    content.set_data(b"q 1 0 0 1 25 50 cm /Fm1 Do Q")
+    content.set_data(page_prefix + b"q 1 0 0 1 25 50 cm /Fm1 Do Q")
     page[NameObject("/Contents")] = writer._add_object(content)
     with path.open("wb") as handle:
         writer.write(handle)
@@ -322,6 +322,63 @@ def test_page_bounds_extractor_tracks_td_leading_for_shorthand_text(
     assert "VISIBLE" in default and "SIBLING" in default
     assert bounded.strip() == "VISIBLE"
     assert "SIBLING" not in bounded
+
+
+def test_page_bounds_extractor_excludes_text_raised_above_crop(tmp_path: Path) -> None:
+    path = tmp_path / "positive-text-rise.pdf"
+    _write_pdf(
+        path,
+        (b"BT /F1 12 Tf 20 Ts 1 0 0 1 25 85 Tm (RISEN-OUT) Tj ET",),
+        crop_bounds=(10, 10, 90, 90),
+    )
+
+    with pytest.raises(IngestionFailure) as raised:
+        PageBoundsPyPdfExtractor().extract(path)
+
+    assert raised.value.code == "PDF_TEXT_OUT_OF_BOUNDS"
+
+
+def test_page_bounds_extractor_includes_text_lowered_into_crop(tmp_path: Path) -> None:
+    path = tmp_path / "negative-text-rise.pdf"
+    _write_pdf(
+        path,
+        (b"BT /F1 12 Tf -20 Ts 1 0 0 1 25 95 Tm (LOWERED-IN) Tj ET",),
+        crop_bounds=(10, 10, 90, 90),
+    )
+
+    bounded = PageBoundsPyPdfExtractor().extract(path)[0].text
+
+    assert bounded.strip() == "LOWERED-IN"
+
+
+def test_page_bounds_extractor_restores_text_rise_across_graphics_state(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "saved-text-rise.pdf"
+    _write_pdf(
+        path,
+        (
+            b"BT /F1 12 Tf 20 Ts q -20 Ts Q "
+            b"1 0 0 1 25 85 Tm (RESTORED-RISEN-OUT) Tj ET",
+        ),
+        crop_bounds=(10, 10, 90, 90),
+    )
+
+    with pytest.raises(IngestionFailure) as raised:
+        PageBoundsPyPdfExtractor().extract(path)
+
+    assert raised.value.code == "PDF_TEXT_OUT_OF_BOUNDS"
+
+
+def test_page_bounds_extractor_resets_parent_text_rise_for_form(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "form-text-rise.pdf"
+    _write_form_pdf(path, page_prefix=b"BT 20 Ts ET ")
+
+    bounded = PageBoundsPyPdfExtractor().extract(path)[0].text
+
+    assert bounded.strip() == "FORM-TEXT"
 
 
 def test_page_bounds_extractor_preserves_default_separate_text_objects(

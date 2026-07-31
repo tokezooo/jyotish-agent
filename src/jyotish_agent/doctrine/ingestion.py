@@ -265,7 +265,8 @@ class PageBoundsPyPdfExtractor:
                 form_markers: list[bool] = []
                 font_sizes: list[float] = [12.0]
                 text_leading: list[float] = [0.0]
-                graphics_states: list[list[tuple[float, float]]] = [[]]
+                text_rise: list[float] = [0.0]
+                graphics_states: list[list[tuple[float, float, float]]] = [[]]
 
                 def visit_operand_before(
                     operator: bytes,
@@ -276,7 +277,7 @@ class PageBoundsPyPdfExtractor:
                 ) -> None:
                     if operator == b"q":
                         graphics_states[-1].append(
-                            (font_sizes[-1], text_leading[-1])
+                            (font_sizes[-1], text_leading[-1], text_rise[-1])
                         )
                         return
                     if operator == b"Tf" and len(operands) >= 2:
@@ -300,6 +301,12 @@ class PageBoundsPyPdfExtractor:
                             )
                         except (IndexError, TypeError, ValueError):
                             text_leading[-1] = 0.0
+                        return
+                    if operator == b"Ts" and operands:
+                        try:
+                            text_rise[-1] = float(operands[0])
+                        except (TypeError, ValueError):
+                            text_rise[-1] = 0.0
                         return
                     if operator == b"Do":
                         marker = False
@@ -330,6 +337,7 @@ class PageBoundsPyPdfExtractor:
                                 )
                                 font_sizes.append(12.0)
                                 text_leading.append(0.0)
+                                text_rise.append(0.0)
                                 graphics_states.append([])
                                 marker = True
                         except Exception:
@@ -347,6 +355,10 @@ class PageBoundsPyPdfExtractor:
                         mutable_tm[4] -= text_leading[-1] * mutable_tm[2]
                         mutable_tm[5] -= text_leading[-1] * mutable_tm[3]
                         show_tm = tuple(mutable_tm)
+                    mutable_tm = list(show_tm)
+                    mutable_tm[4] += text_rise[-1] * mutable_tm[2]
+                    mutable_tm[5] += text_rise[-1] * mutable_tm[3]
+                    show_tm = tuple(mutable_tm)
                     visible = _origin_within_bounds(
                         _transform_pdf_text_origin(tm=show_tm, cm=effective_cm),
                         _bounds,
@@ -362,7 +374,7 @@ class PageBoundsPyPdfExtractor:
                 ) -> None:
                     if operator == b"Q":
                         if graphics_states[-1]:
-                            font_sizes[-1], text_leading[-1] = (
+                            font_sizes[-1], text_leading[-1], text_rise[-1] = (
                                 graphics_states[-1].pop()
                             )
                         return
@@ -372,6 +384,7 @@ class PageBoundsPyPdfExtractor:
                             form_resources.pop()
                             font_sizes.pop()
                             text_leading.pop()
+                            text_rise.pop()
                             graphics_states.pop()
 
                 canonical_visible_text = page.extract_text(
