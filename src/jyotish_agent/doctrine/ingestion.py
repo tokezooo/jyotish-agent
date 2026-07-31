@@ -8,6 +8,7 @@ import io
 import re
 import subprocess
 import unicodedata
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -147,6 +148,113 @@ class PyPdfExtractor:
         if not pages:
             raise IngestionFailure("PDF_CORRUPT", "The PDF contains no pages.")
         return pages
+
+
+PdfBounds = tuple[float, float, float, float]
+
+
+def _transform_pdf_text_origin(
+    *, tm: Sequence[float], cm: Sequence[float]
+) -> tuple[float, float]:
+    """Return the text origin after applying the current transformation matrix."""
+
+    return (
+        float(tm[4]) * float(cm[0])
+        + float(tm[5]) * float(cm[2])
+        + float(cm[4]),
+        float(tm[4]) * float(cm[1])
+        + float(tm[5]) * float(cm[3])
+        + float(cm[5]),
+    )
+
+
+def _origin_within_bounds(
+    origin: tuple[float, float], bounds: PdfBounds
+) -> bool:
+    """Use closed lower and open upper edges for deterministic crop ownership."""
+
+    x, y = origin
+    left, bottom, right, top = bounds
+    return left <= x < right and bottom <= y < top
+
+
+class PageBoundsPyPdfExtractor:
+    """Embedded-text adapter filtering chunks by visible page bounds.
+
+    This is intentionally separate from :class:`PyPdfExtractor`: default pypdf
+    extraction is part of existing page commitments and must remain byte-stable.
+    """
+
+    tool_name = "pypdf-page-bounds"
+
+    def __init__(self) -> None:
+        try:
+            import pypdf
+        except ImportError as exc:  # pragma: no cover - dependency is locked
+            raise IngestionFailure(
+                "PDF_TOOL_UNAVAILABLE", "The configured PDF extractor is unavailable."
+            ) from exc
+        self._pypdf = pypdf
+        self.tool_version = pypdf.__version__
+
+    @staticmethod
+    def _visible_bounds(page: object) -> PdfBounds:
+        media = page.mediabox  # type: ignore[attr-defined]
+        crop = page.cropbox  # type: ignore[attr-defined]
+        bounds = (
+            max(float(media.left), float(crop.left)),
+            max(float(media.bottom), float(crop.bottom)),
+            min(float(media.right), float(crop.right)),
+            min(float(media.top), float(crop.top)),
+        )
+        if bounds[0] >= bounds[2] or bounds[1] >= bounds[3]:
+            raise IngestionFailure(
+                "PDF_BOUNDS_INVALID", "The PDF page has invalid visible bounds."
+            )
+        return bounds
+
+    def extract(self, path: Path) -> tuple[ExtractedPage, ...]:
+        try:
+            reader = self._pypdf.PdfReader(path, strict=True)
+            if reader.is_encrypted:
+                raise IngestionFailure(
+                    "PDF_ENCRYPTED", "Encrypted PDF sources require a decrypted local copy."
+                )
+            pages: list[ExtractedPage] = []
+            for index, page in enumerate(reader.pages, start=1):
+                bounds = self._visible_bounds(page)
+                visible_chunks: list[str] = []
+
+                def visit_text(
+                    text: str,
+                    cm: Sequence[float],
+                    tm: Sequence[float],
+                    _font: object,
+                    _font_size: float,
+                    _bounds: PdfBounds = bounds,
+                    _visible_chunks: list[str] = visible_chunks,
+                ) -> None:
+                    origin = _transform_pdf_text_origin(tm=tm, cm=cm)
+                    if _origin_within_bounds(origin, _bounds):
+                        _visible_chunks.append(text)
+
+                embedded_text = page.extract_text(visitor_text=visit_text) or ""
+                visible_text = "".join(visible_chunks)
+                if embedded_text.strip() and not visible_text.strip():
+                    raise IngestionFailure(
+                        "PDF_TEXT_OUT_OF_BOUNDS",
+                        "Embedded PDF text exists but none lies within visible page bounds.",
+                    )
+                pages.append(ExtractedPage(page_number=index, text=visible_text))
+        except IngestionFailure:
+            raise
+        except Exception as exc:
+            raise IngestionFailure(
+                "PDF_CORRUPT", "The PDF could not be parsed as a supported document."
+            ) from exc
+        if not pages:
+            raise IngestionFailure("PDF_CORRUPT", "The PDF contains no pages.")
+        return tuple(pages)
 
 
 class PdftoppmRenderer:
