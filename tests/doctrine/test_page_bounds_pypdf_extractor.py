@@ -53,7 +53,15 @@ def _write_pdf(
         writer.write(handle)
 
 
-def _write_form_pdf(path: Path, *, page_prefix: bytes = b"") -> None:
+def _write_form_pdf(
+    path: Path,
+    *,
+    page_prefix: bytes = b"",
+    form_content: bytes = b"BT /F1 12 Tf (FORM-TEXT) Tj ET",
+    placement: tuple[float, float] = (25, 50),
+    page_suffix: bytes = b"",
+    crop_bounds: tuple[float, float, float, float] | None = None,
+) -> None:
     pypdf = pytest.importorskip("pypdf")
     from pypdf.generic import (
         ArrayObject,
@@ -61,6 +69,7 @@ def _write_form_pdf(path: Path, *, page_prefix: bytes = b"") -> None:
         DictionaryObject,
         FloatObject,
         NameObject,
+        RectangleObject,
     )
 
     writer = pypdf.PdfWriter()
@@ -73,7 +82,7 @@ def _write_form_pdf(path: Path, *, page_prefix: bytes = b"") -> None:
     )
     font_ref = writer._add_object(font)
     form = DecodedStreamObject()
-    form.set_data(b"BT /F1 12 Tf (FORM-TEXT) Tj ET")
+    form.set_data(form_content)
     form.update(
         {
             NameObject("/Type"): NameObject("/XObject"),
@@ -92,21 +101,34 @@ def _write_form_pdf(path: Path, *, page_prefix: bytes = b"") -> None:
     )
     form_ref = writer._add_object(form)
     page = writer.add_blank_page(width=100, height=100)
+    if crop_bounds is not None:
+        page.cropbox = RectangleObject(crop_bounds)
     page[NameObject("/Resources")] = DictionaryObject(
         {
+            NameObject("/Font"): DictionaryObject(
+                {NameObject("/F1"): font_ref}
+            ),
             NameObject("/XObject"): DictionaryObject(
                 {NameObject("/Fm1"): form_ref}
             )
         }
     )
     content = DecodedStreamObject()
-    content.set_data(page_prefix + b"q 1 0 0 1 25 50 cm /Fm1 Do Q")
+    x, y = placement
+    invocation = f"q 1 0 0 1 {x:g} {y:g} cm /Fm1 Do Q".encode()
+    content.set_data(page_prefix + invocation + page_suffix)
     page[NameObject("/Contents")] = writer._add_object(content)
     with path.open("wb") as handle:
         writer.write(handle)
 
 
-def _write_nested_form_pdf(path: Path) -> None:
+def _write_nested_form_pdf(
+    path: Path,
+    *,
+    page_prefix: bytes = b"",
+    placements: tuple[tuple[float, float], ...] = ((25, 50), (125, 50)),
+    crop_bounds: tuple[float, float, float, float] | None = None,
+) -> None:
     pypdf = pytest.importorskip("pypdf")
     from pypdf.generic import (
         ArrayObject,
@@ -114,6 +136,7 @@ def _write_nested_form_pdf(path: Path) -> None:
         DictionaryObject,
         FloatObject,
         NameObject,
+        RectangleObject,
     )
 
     writer = pypdf.PdfWriter()
@@ -164,6 +187,8 @@ def _write_nested_form_pdf(path: Path) -> None:
     )
     outer_ref = writer._add_object(outer)
     page = writer.add_blank_page(width=100, height=100)
+    if crop_bounds is not None:
+        page.cropbox = RectangleObject(crop_bounds)
     page[NameObject("/Resources")] = DictionaryObject(
         {
             NameObject("/XObject"): DictionaryObject(
@@ -172,10 +197,11 @@ def _write_nested_form_pdf(path: Path) -> None:
         }
     )
     content = DecodedStreamObject()
-    content.set_data(
-        b"q 1 0 0 1 25 50 cm /Outer Do Q "
-        b"q 1 0 0 1 125 50 cm /Outer Do Q"
+    invocations = b" ".join(
+        f"q 1 0 0 1 {x:g} {y:g} cm /Outer Do Q".encode()
+        for x, y in placements
     )
+    content.set_data(page_prefix + invocations)
     page[NameObject("/Contents")] = writer._add_object(content)
     with path.open("wb") as handle:
         writer.write(handle)
@@ -370,15 +396,90 @@ def test_page_bounds_extractor_restores_text_rise_across_graphics_state(
     assert raised.value.code == "PDF_TEXT_OUT_OF_BOUNDS"
 
 
-def test_page_bounds_extractor_resets_parent_text_rise_for_form(
+def test_page_bounds_extractor_inherits_positive_parent_text_rise_in_form(
     tmp_path: Path,
 ) -> None:
-    path = tmp_path / "form-text-rise.pdf"
-    _write_form_pdf(path, page_prefix=b"BT 20 Ts ET ")
+    path = tmp_path / "form-positive-text-rise.pdf"
+    _write_form_pdf(
+        path,
+        page_prefix=b"BT /F1 12 Tf 20 Ts ET ",
+        placement=(25, 85),
+        crop_bounds=(10, 10, 90, 90),
+    )
+
+    with pytest.raises(IngestionFailure) as raised:
+        PageBoundsPyPdfExtractor().extract(path)
+
+    assert raised.value.code == "PDF_TEXT_OUT_OF_BOUNDS"
+
+
+def test_page_bounds_extractor_inherits_negative_parent_text_rise_in_form(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "form-negative-text-rise.pdf"
+    _write_form_pdf(
+        path,
+        page_prefix=b"BT /F1 12 Tf -20 Ts ET ",
+        placement=(25, 95),
+        crop_bounds=(10, 10, 90, 90),
+    )
 
     bounded = PageBoundsPyPdfExtractor().extract(path)[0].text
 
     assert bounded.strip() == "FORM-TEXT"
+
+
+def test_page_bounds_extractor_inherits_parent_leading_for_form_quote(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "form-parent-leading.pdf"
+    _write_form_pdf(
+        path,
+        page_prefix=b"BT /F1 12 Tf 100 TL ET ",
+        form_content=b"BT /F1 12 Tf (FORM-QUOTE) ' ET",
+        placement=(25, 85),
+        crop_bounds=(10, 10, 90, 90),
+    )
+
+    with pytest.raises(IngestionFailure) as raised:
+        PageBoundsPyPdfExtractor().extract(path)
+
+    assert raised.value.code == "PDF_TEXT_OUT_OF_BOUNDS"
+
+
+def test_page_bounds_extractor_does_not_leak_form_text_state_after_do(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "form-text-state-isolation.pdf"
+    _write_form_pdf(
+        path,
+        form_content=b"BT /F1 12 Tf 20 Ts (FORM-LOCAL) Tj ET",
+        placement=(25, 25),
+        page_suffix=b" BT /F1 12 Tf 1 0 0 1 25 85 Tm (AFTER-FORM) Tj ET",
+        crop_bounds=(10, 10, 90, 90),
+    )
+
+    bounded = PageBoundsPyPdfExtractor().extract(path)[0].text
+
+    assert "FORM-LOCAL" in bounded
+    assert "AFTER-FORM" in bounded
+
+
+def test_page_bounds_extractor_inherits_parent_rise_through_nested_forms(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "nested-form-parent-rise.pdf"
+    _write_nested_form_pdf(
+        path,
+        page_prefix=b"BT 20 Ts ET ",
+        placements=((25, 85),),
+        crop_bounds=(10, 10, 90, 90),
+    )
+
+    with pytest.raises(IngestionFailure) as raised:
+        PageBoundsPyPdfExtractor().extract(path)
+
+    assert raised.value.code == "PDF_TEXT_OUT_OF_BOUNDS"
 
 
 def test_page_bounds_extractor_preserves_default_separate_text_objects(

@@ -335,9 +335,9 @@ class PageBoundsPyPdfExtractor:
                                     if child_resources is not None
                                     else resources
                                 )
-                                font_sizes.append(12.0)
-                                text_leading.append(0.0)
-                                text_rise.append(0.0)
+                                font_sizes.append(font_sizes[-1])
+                                text_leading.append(text_leading[-1])
+                                text_rise.append(text_rise[-1])
                                 graphics_states.append([])
                                 marker = True
                         except Exception:
