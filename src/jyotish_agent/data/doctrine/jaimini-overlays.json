@@ -4,16 +4,19 @@
     {
       "overlay_id": "sanjay_rath",
       "display_name": "Sanjay Rath practical overlay",
-      "source_ids": [],
+      "source_ids": [
+        "jaimini_sanjay_rath_upadesa_sutras_1997",
+        "jaimini_sanjay_rath_narayana_dasa_2004"
+      ],
       "activation_status": "unavailable",
-      "missing_reason": "Licensed local source bytes and reviewed fragments have not been supplied."
+      "missing_reason": "Verified local source bytes are present; fragment-level specialist review and compiled overlay rules are still missing."
     },
     {
       "overlay_id": "kn_rao_practical",
       "display_name": "K. N. Rao selected practical overlay",
-      "source_ids": [],
+      "source_ids": ["jaimini_kn_rao_chara_dasha_vani_scan_2010"],
       "activation_status": "unavailable",
-      "missing_reason": "A selected licensed local source and reviewed fragments have not been supplied."
+      "missing_reason": "Verified local source bytes are present; OCR review, fragment-level specialist review, and compiled overlay rules are still missing."
     }
   ]
 }

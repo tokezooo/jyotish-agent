@@ -1,0 +1,218 @@
+{
+  "schema_version": "1.0",
+  "evidence_id": "telegram_jaimini_bundle_2026_07_15",
+  "archive_sha256": {
+    "jaimini_part1_books_core": "e68f9a0a03cc317bc37c8129c92de64e7a89dda66b95c00e6aed98d90128d897",
+    "jaimini_part2_jathakarajam": "3e96f2f185b88124b89407732b8aa50aef21f7b468d8aa5afe73ad1c50789387",
+    "jaimini_part3_charts_pages": "022d28c1081e3f98d94b956fc26468a476d81db42fc59e5e315a28963bc54f82"
+  },
+  "pdf_count": 7,
+  "procurement_reference_count": 7,
+  "source_evidence": [
+    {
+      "evidence_id": "bundle_pdf_01",
+      "sha256": "5d90851382e8cc292389d020fc11eb98dd9d933f9a98144a89dd4bbbd8eccee1",
+      "disposition": "quarantined_metadata_review",
+      "reason": "Sanskrit commentary scan requires exact title-page bibliography and specialist scope review."
+    },
+    {
+      "evidence_id": "bundle_pdf_02",
+      "sha256": "4156f41c3080a0e0b696aa0cef4143286f76da1c92e61badb93734f3602e72fe",
+      "disposition": "duplicate_existing",
+      "reason": "Visual title-page review identifies the 1943 Vimala commentary edited by Achyutananda Jha."
+    },
+    {
+      "evidence_id": "bundle_pdf_03",
+      "sha256": "24783b6a8e7deff7137f9f01fde223374ab93847fc20fb23ec0b551832df9f53",
+      "disposition": "quarantined_metadata_review",
+      "reason": "Vriddha Karika scan contains Chara Dasha material but lacks reviewed edition metadata and translation."
+    },
+    {
+      "evidence_id": "bundle_pdf_04",
+      "sha256": "f1136510d1248dce7ce715870c29c13fa3c41c4a37bf80c2355099d95c88632e",
+      "disposition": "quarantined_metadata_review",
+      "reason": "Manuscript scan requires bibliographic identification, OCR review, and doctrinal adjudication."
+    },
+    {
+      "evidence_id": "bundle_pdf_05",
+      "sha256": "1835fae193c3dde21b2085f6edb6993b072a3376a4529597fe5704841debd2a5",
+      "disposition": "verified_supplemental",
+      "source_id": "jaimini_jyotish_pradipika_chapter1_medavarapu_2016",
+      "reason": "Embedded Sanskrit and English text plus identifiable author, commentary, and publication context."
+    },
+    {
+      "evidence_id": "bundle_pdf_06",
+      "sha256": "bb6ced3ac52ffab09ca9bb73c382d5dae4a8cc5a57773f02cc6725b57ec2ff8b",
+      "disposition": "verified_supplemental",
+      "source_id": "jaimini_jyotish_pradipika_corrections_medavarapu_2016",
+      "reason": "Embedded Sanskrit and English comparative corrections with identifiable publication context."
+    },
+    {
+      "evidence_id": "bundle_pdf_07",
+      "sha256": "8f3d53220493e9719a7195d8cc501e1a7b08b268c23825ff4d04b10effb6dd8d",
+      "disposition": "quarantined_scope_review",
+      "reason": "The 2007 Telugu Jatakarajamu edition is identified, but its Jaimini scope and usable anchors require translation and specialist review."
+    }
+  ],
+  "duplicate_sources": [
+    {
+      "bundle_evidence_id": "bundle_pdf_02",
+      "existing_source_id": "jaimini_sutras_vimala_achyutananda_jha_1943",
+      "reason": "title-page and byte hash identify Vimala commentary, not Nilakantha Subodhini"
+    }
+  ],
+  "activated_supplemental_source_ids": [
+    "jaimini_jyotish_pradipika_chapter1_medavarapu_2016",
+    "jaimini_jyotish_pradipika_corrections_medavarapu_2016",
+    "jaimini_astro_databank_20_chart_candidates_2026"
+  ],
+  "ingestion_artifacts": [
+    {
+      "source_id": "jaimini_jyotish_pradipika_chapter1_medavarapu_2016",
+      "page_count": 5,
+      "normalized_content_sha256": "33ebb16c6e5f3e648d878afc89b5f8bc20437882ab42bf6d9647b41b6ea69411",
+      "artifact_sha256": "b7aa73836c2971ee38d1058b619991cdfe885e5c2e3d2c7046666ae43327a4d4",
+      "extraction_activation_allowed": true,
+      "doctrine_admitted": false,
+      "specialist_review_required": true
+    },
+    {
+      "source_id": "jaimini_jyotish_pradipika_corrections_medavarapu_2016",
+      "page_count": 3,
+      "normalized_content_sha256": "014d3987d6ca37807df93e7a3155aff99906427b730be2fb85a665530ff384cd",
+      "artifact_sha256": "257f2b962f15345e7cc7cf172ada7d605ddfba0d4b13d365d3c788b733e732f5",
+      "extraction_activation_allowed": true,
+      "doctrine_admitted": false,
+      "specialist_review_required": true
+    }
+  ],
+  "page_commitments": [
+    {
+      "source_id": "jaimini_jyotish_pradipika_chapter1_medavarapu_2016",
+      "page_number": 1,
+      "printed_page": 1,
+      "normalized_sha256": "ce30ffe4fccd43da2cbc36ef5ab668075bebfd7944adf4a017d1cc2bfc65db42"
+    },
+    {
+      "source_id": "jaimini_jyotish_pradipika_chapter1_medavarapu_2016",
+      "page_number": 2,
+      "printed_page": 2,
+      "normalized_sha256": "8cad6904610d761b9b9a407be553db9e1005e266499e75e35056ff10b0ce231a"
+    },
+    {
+      "source_id": "jaimini_jyotish_pradipika_chapter1_medavarapu_2016",
+      "page_number": 3,
+      "printed_page": 3,
+      "normalized_sha256": "1a6e60e7baae57502da77b4ecd059f679df85da3baaf56f3e2449976fd884df6"
+    },
+    {
+      "source_id": "jaimini_jyotish_pradipika_chapter1_medavarapu_2016",
+      "page_number": 4,
+      "printed_page": 4,
+      "normalized_sha256": "eb8bf2760b457a3aac2d62e053981ff7035221d6d296bac221543bdfcc91d612"
+    },
+    {
+      "source_id": "jaimini_jyotish_pradipika_chapter1_medavarapu_2016",
+      "page_number": 5,
+      "printed_page": 5,
+      "normalized_sha256": "b61aa8e8e1ffb531e1743f18f7a9d0ce1676ae65175bf150dddabb5767387c55"
+    },
+    {
+      "source_id": "jaimini_jyotish_pradipika_corrections_medavarapu_2016",
+      "page_number": 1,
+      "printed_page": 1,
+      "normalized_sha256": "d876b18854bf13a61dc024bda66c9e44f8d7f7bbede57d0e84419052f3a6a9fb"
+    },
+    {
+      "source_id": "jaimini_jyotish_pradipika_corrections_medavarapu_2016",
+      "page_number": 2,
+      "printed_page": 2,
+      "normalized_sha256": "107833995ce99befd8817202e32ddbf48fdc59824387e1688b8d67647c9f9f6c"
+    },
+    {
+      "source_id": "jaimini_jyotish_pradipika_corrections_medavarapu_2016",
+      "page_number": 3,
+      "printed_page": 3,
+      "normalized_sha256": "2d2ccab1280850eca39ebefe87f67aad545da66b3cbb989e050a894e75978d4f"
+    }
+  ],
+  "quarantine_ocr": {
+    "source_count": 4,
+    "title_pages_per_source": 4,
+    "languages": ["san", "tel", "eng"],
+    "storage": "local_untracked",
+    "doctrine_admitted": false
+  },
+  "chart_candidates": {
+    "source_id": "jaimini_astro_databank_20_chart_candidates_2026",
+    "supplied_count": 20,
+    "traceable_url_count": 20,
+    "birth_time_present_count": 18,
+    "rodden_rating_counts": {
+      "AA": 7,
+      "A": 4,
+      "B": 2,
+      "C": 2,
+      "DD": 3,
+      "X": 1,
+      "XX": 1
+    },
+    "adjudicated_worked_chart_count": 0,
+    "independent_held_out_result_count": 0,
+    "disposition": "candidate_inputs_only",
+    "reason": "The bundle supplies traceable natal inputs, not published Jaimini worked interpretations or independent expected outcomes."
+  },
+  "procurement_references": [
+    {
+      "evidence_id": "procurement_01",
+      "requirement": "nilakantha_subodhini_translation",
+      "title": "Neelakantha's Subodhini by Guru Rajesh Kotekal",
+      "url": "https://jyotishbooks.wordpress.com/2025/02/05/neelakanthas-subodhini-commentary-on-jaimini-sutras-by-guru-rajesh-kotekal/"
+    },
+    {
+      "evidence_id": "procurement_02",
+      "requirement": "sanjay_rath_overlay",
+      "title": "Jaimini Maharishi's Upadesa Sutra",
+      "url": "https://srath.com/misc/jaimini-maharishis-upadesa-sutra/"
+    },
+    {
+      "evidence_id": "procurement_03",
+      "requirement": "sanjay_rath_overlay",
+      "title": "Jaimini Maharishi's Upadesa Sutras, translated by Sanjay Rath",
+      "url": "https://astroamerica.com/text/upadesa.html"
+    },
+    {
+      "evidence_id": "procurement_04",
+      "requirement": "practical_chara_dasha",
+      "title": "Narayana Dasa by Sanjay Rath",
+      "url": "https://srath.com/misc/naraya%E1%B9%87a-dasa/"
+    },
+    {
+      "evidence_id": "procurement_05",
+      "requirement": "practical_chara_dasha",
+      "title": "Narayana Dasa at Vedic Books",
+      "url": "https://www.vedicbooks.net/narayana-dasa-p-877.html"
+    },
+    {
+      "evidence_id": "procurement_06",
+      "requirement": "kn_rao_overlay",
+      "title": "Predicting Through Jaimini's Chara Dasha by K. N. Rao",
+      "url": "https://www.vedicbooks.net/predicting-through-jaiminis-chara-dasha-p-14433.html"
+    },
+    {
+      "evidence_id": "procurement_07",
+      "requirement": "sanjay_rath_overlay",
+      "title": "Sanjay Rath books catalog",
+      "url": "https://srath.com/misc/books/"
+    }
+  ],
+  "remaining_requirements": [
+    "nilakantha_subodhini_translation",
+    "practical_chara_dasha",
+    "published_worked_charts",
+    "sanjay_rath_overlay",
+    "kn_rao_overlay"
+  ],
+  "admission_effect": "supplemental_only",
+  "release_promoted": false
+}

@@ -1,0 +1,84 @@
+{
+  "schema_version": "1.0",
+  "evidence_id": "jaimini_private_acquisition_2026_07_31",
+  "scope": "Hash-bound private source acquisition and page-anchor review; no doctrine admission or overlay activation implied.",
+  "verified_sources": [
+    {
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "sha256": "5b9600dfd6a7c07664731f8bdb82643364df1e47fd1b9a29be15ddcf2fb79ed1",
+      "pdf_pages": 448,
+      "disposition": "verified_corpus_source"
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "sha256": "a7d9e860d28ee20ed1c420f1c84d6ec850ffb68bf225fb60d77e53f2925a9a66",
+      "pdf_pages": 194,
+      "disposition": "verified_corpus_source_normalized_single_page"
+    },
+    {
+      "source_id": "jaimini_kn_rao_chara_dasha_vani_scan_2010",
+      "sha256": "6e534cba2963209f3cb8898e357e9773d1dee27f6189a6b5b43ef2065739fb36",
+      "pdf_pages": 135,
+      "disposition": "verified_corpus_source_ocr_review_pending"
+    }
+  ],
+  "normalizations": [
+    {
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "operation": "split each two-up landscape spread into left then right printed pages",
+      "input_sha256": "d5b576db6a37795a48a459e1ca4eb08195f44ef9134dbe012dc54aaaa752c21d",
+      "input_page_count": 97,
+      "output_sha256": "a7d9e860d28ee20ed1c420f1c84d6ec850ffb68bf225fb60d77e53f2925a9a66",
+      "output_page_count": 194,
+      "visual_checks": [1, 2, 193, 194]
+    }
+  ],
+  "non_activated_files": [
+    {
+      "sha256": "5950aee477a95c60d4fb4b3b1e1b3bfecb327279cd7ff179631336cd03123259",
+      "pdf_pages": 136,
+      "disposition": "duplicate_alternate_scan",
+      "reason": "Same K. N. Rao work as the activated 135-page scan; retained privately for comparison but excluded from the active manifest."
+    },
+    {
+      "sha256": "f05759d39fa8b19200a51544130fcc1a1f51ffee321e7c8b255fb97b14f4487d",
+      "pdf_pages": 520,
+      "disposition": "supplemental_review_queue",
+      "reason": "The 2009 course volume is identifiable and contains a large chart index, but its OCR and individual chart anchors have not completed review."
+    }
+  ],
+  "worked_chart_review": {
+    "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+    "reviewed_count": 20,
+    "chart_range": "21-40",
+    "disposition": "published_worked_interpretations_only",
+    "independent_held_out_result_count": 0,
+    "doctrine_admitted": false,
+    "product_rule_use_allowed": false,
+    "page_anchors": [
+      {"chart_number": 21, "pdf_page": 141, "printed_page": 128, "normalized_page_sha256": "50cb2824c73d53ea8a0e894895139b05172c2a18ca34ff2fc2949a3511f9d0ec"},
+      {"chart_number": 22, "pdf_page": 142, "printed_page": 129, "normalized_page_sha256": "1003de5513b652752abd77be387202d43cada31b33e2bd736fe05cbf293ce663"},
+      {"chart_number": 23, "pdf_page": 145, "printed_page": 132, "normalized_page_sha256": "b070906d71113316f86778849e61bfad17c1dc28866f21be8335df9ffe7ff0a2"},
+      {"chart_number": 24, "pdf_page": 147, "printed_page": 134, "normalized_page_sha256": "9696f27d2b150a6715c03f12fc39312fdb37c167ad97f50ce884e78174fa9d8d"},
+      {"chart_number": 25, "pdf_page": 149, "printed_page": 136, "normalized_page_sha256": "3ad23ba0181992fe69d30b53e7424c24fa42346e90d97101022536a11fa8d4ea"},
+      {"chart_number": 26, "pdf_page": 150, "printed_page": 137, "normalized_page_sha256": "5603a55bfecbd990e59f7a8e2ea39e7805012d9d87102eab3e2c982280a632d3"},
+      {"chart_number": 27, "pdf_page": 151, "printed_page": 138, "normalized_page_sha256": "532b40f14f69fd394d3f0532f3b5fddc11b1724d499548f1abd2aaed208d7f89"},
+      {"chart_number": 28, "pdf_page": 152, "printed_page": 139, "normalized_page_sha256": "f2c80cdec10688daec24007fcc6cdbbaae88d746808d3d969ea72b7eeb7a78b4"},
+      {"chart_number": 29, "pdf_page": 154, "printed_page": 141, "normalized_page_sha256": "94bb654c17973344bb2202f95f179bc657aef1caafe0617a55c56a4681f89520"},
+      {"chart_number": 30, "pdf_page": 156, "printed_page": 143, "normalized_page_sha256": "181402245c7d5fa605d189d2026834cfed825e7b85d74ac83354de4c0721a98d"},
+      {"chart_number": 31, "pdf_page": 186, "printed_page": 173, "normalized_page_sha256": "2eb1016b6c030a138d6eee80992cbba4ee6902d4e5a87d2be006261c2f4f37f7"},
+      {"chart_number": 32, "pdf_page": 188, "printed_page": 175, "normalized_page_sha256": "5eee4c70633838237866d9ce257c4efc4cff2f8492a36b22904f93b52428974f"},
+      {"chart_number": 33, "pdf_page": 191, "printed_page": 178, "normalized_page_sha256": "dafc622bccda1ab0d1c49f72678052ff28013c6c8306ac61ec335088c64eb239"},
+      {"chart_number": 34, "pdf_page": 192, "printed_page": 179, "normalized_page_sha256": "2b83628e33d653448006898cf3df9073ec0c2ee3771edf028c4a4010b6c0a35c"},
+      {"chart_number": 35, "pdf_page": 193, "printed_page": 180, "normalized_page_sha256": "7b6eff7c7778cefe56f7c4870eeed9e22e31261ec80e318cc4de7a7cab579851"},
+      {"chart_number": 36, "pdf_page": 196, "printed_page": 183, "normalized_page_sha256": "de5b3f963949fd794d338c427f3376e2476961f0bd739220408d68ade07f1278"},
+      {"chart_number": 37, "pdf_page": 198, "printed_page": 185, "normalized_page_sha256": "7ffea29657b7a8ed18a89808621f078e81be61339865c2ab83e5dbded8ecbb64"},
+      {"chart_number": 38, "pdf_page": 207, "printed_page": 194, "normalized_page_sha256": "a4c5241f2ce1ab0bb60a2a6814ecfb13fb329bbbfd6bd82ed14053dbc65de0b1"},
+      {"chart_number": 39, "pdf_page": 208, "printed_page": 195, "normalized_page_sha256": "1c4b8d0c475d65b56b887191800e502f648c75d9bcd3f038eac0c7ebd4615e74"},
+      {"chart_number": 40, "pdf_page": 209, "printed_page": 196, "normalized_page_sha256": "925f0de8b5dba9b9ccab9f0a3a7517ea1b2156ff8175002b422b4e73950ed07d"}
+    ]
+  },
+  "remaining_acquisition_requirements": ["nilakantha_subodhini_translation"],
+  "release_effect": "acquisition_gates_only",
+  "release_promoted": false
+}

@@ -41,7 +41,7 @@ def _analysis(school: str, rule_id: str):
     return analyze_jaimini_topic(graph, JaiminiTopic.SELF)
 
 
-def test_overlay_registry_names_sources_and_keeps_unacquired_profiles_disabled() -> (
+def test_overlay_registry_names_acquired_sources_and_keeps_unreviewed_profiles_disabled() -> (
     None
 ):
     registry = JaiminiOverlayRegistry.model_validate_json(
@@ -53,7 +53,14 @@ def test_overlay_registry_names_sources_and_keeps_unacquired_profiles_disabled()
         "kn_rao_practical",
     }
     assert all(item.activation_status == "unavailable" for item in registry.overlays)
-    assert all(item.source_ids == () for item in registry.overlays)
+    by_id = {item.overlay_id: item for item in registry.overlays}
+    assert by_id["sanjay_rath"].source_ids == (
+        "jaimini_sanjay_rath_upadesa_sutras_1997",
+        "jaimini_sanjay_rath_narayana_dasa_2004",
+    )
+    assert by_id["kn_rao_practical"].source_ids == (
+        "jaimini_kn_rao_chara_dasha_vani_scan_2010",
+    )
 
 
 def test_overlay_requires_explicit_activation_and_preserves_baseline_identity() -> None:
