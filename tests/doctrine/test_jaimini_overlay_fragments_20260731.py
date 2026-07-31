@@ -108,6 +108,26 @@ def test_quarantined_ledger_cannot_activate_or_compile_overlay() -> None:
     assert raised.value.code == "OVERLAY_FRAGMENT_LEDGER_QUARANTINED"
 
 
+def test_fragment_and_binding_identities_fail_closed_on_substitution() -> None:
+    payload = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
+    payload["fragments"][0]["full_text_sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="fragment draft identity"):
+        JaiminiOverlayFragmentLedger.model_validate(payload)
+
+    payload = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
+    payload["bindings"][0]["paraphrase"] = "Substituted claim."
+    with pytest.raises(ValueError, match="binding identity"):
+        JaiminiOverlayFragmentLedger.model_validate(payload)
+
+
+def test_unresolved_source_school_cannot_be_relabelled() -> None:
+    payload = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
+    payload["unresolved_sources"][0]["school"] = "kn_rao_practical"
+
+    with pytest.raises(ValueError, match="school must match"):
+        JaiminiOverlayFragmentLedger.model_validate(payload)
+
+
 def test_tracked_projection_contains_no_source_text_or_private_locator() -> None:
     ledger_payload = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
     audit_payload = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))

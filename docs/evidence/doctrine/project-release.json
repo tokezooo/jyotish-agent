@@ -5,7 +5,7 @@
     {
       "domain": "jaimini",
       "release_id": "full_jaimini_v1",
-      "evidence_sha256": "4d0fa38fc416a55353fd63a396d76c80f423dad9e837344db8e5001fab88a114",
+      "evidence_sha256": "43a0aca70d43d8f20b184b2d13afc219d4e8b6e3681522fe24a0d9cf7ebba582",
       "admission_state": "blocked_sources",
       "available": false,
       "gate_statuses": {
@@ -23,7 +23,7 @@
       "blockers": [
         "compiled_profile: no source-admitted production profile exists",
         "nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
-        "source_review: acquired Jaimini overlay books have not completed fragment-level specialist review or rule compilation",
+        "source_review: Sanjay Rath Upadesa page fragments are hash-bound but quarantined; specialist review and overlay rule compilation remain missing; Narayana crop-aware extraction and K. N. Rao OCR review are unresolved",
         "specialist_review: no production rule/profile review"
       ]
     },
@@ -116,7 +116,7 @@
   "blockers": [
     "jaimini: compiled_profile: no source-admitted production profile exists",
     "jaimini: nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
-    "jaimini: source_review: acquired Jaimini overlay books have not completed fragment-level specialist review or rule compilation",
+    "jaimini: source_review: Sanjay Rath Upadesa page fragments are hash-bound but quarantined; specialist review and overlay rule compilation remain missing; Narayana crop-aware extraction and K. N. Rao OCR review are unresolved",
     "jaimini: specialist_review: no production rule/profile review",
     "prashna: published_outcome_cases: one additional complete traceable case is required",
     "prashna: tajika_source_admission: OCR, translation, and specialist review are incomplete",
@@ -127,5 +127,5 @@
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "fbf9737b12fb8dcb8f74413ca9e7ec7e42381513f487afd83118e7b219da775a"
+  "audit_sha256": "30ffb9826ac66cc6658288a0a89c2ff6cefeb1f367f140c0924effc247f231c4"
 }

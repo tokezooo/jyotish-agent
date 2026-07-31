@@ -303,6 +303,8 @@ class JaiminiUnresolvedOverlaySource(FrozenModel):
 
     @model_validator(mode="after")
     def _privacy_safe_blocker(self) -> "JaiminiUnresolvedOverlaySource":
+        if self.school != self.overlay_id:
+            raise ValueError("unresolved source school must match its named overlay")
         _reject_private_locator(self.blocker)
         return self
 
@@ -366,6 +368,10 @@ class JaiminiOverlayFragmentLedger(FrozenModel):
             for fragment in self.fragments
         ):
             raise ValueError("fragment source manifest identity does not match ledger")
+        if {fragment.source_id for fragment in self.fragments} != {
+            "jaimini_sanjay_rath_upadesa_sutras_1997"
+        }:
+            raise ValueError("this ledger accepts only bounded Upadesa source pages")
         if any(fragment.school != self.school for fragment in self.fragments):
             raise ValueError("overlay fragment ledger cannot blend schools")
         if any(
@@ -375,6 +381,8 @@ class JaiminiOverlayFragmentLedger(FrozenModel):
             for fragment in self.fragments
         ):
             raise ValueError("overlay fragments must be text-free and quarantined")
+        for fragment in self.fragments:
+            _validate_source_fragment_identity(fragment)
         unresolved_ids = [item.source_id for item in self.unresolved_sources]
         if len(unresolved_ids) != len(set(unresolved_ids)):
             raise ValueError("unresolved overlay source IDs must be unique")
@@ -457,6 +465,52 @@ def _reject_private_locator(value: str) -> None:
     lowered = value.casefold()
     if any(marker in lowered for marker in ("private_sources", ".pdf", "/users/")):
         raise ValueError("tracked overlay evidence cannot contain private source locators")
+
+
+def _validate_source_fragment_identity(fragment: SourceFragment) -> None:
+    draft_payload = {
+        "source_id": fragment.source_id,
+        "source_manifest_sha256": fragment.source_manifest_sha256,
+        "page_number": fragment.page_number,
+        "printed_page": fragment.printed_page,
+        "anchor_kind": fragment.anchor_kind,
+        "anchor_label": fragment.anchor_label,
+        "language": fragment.language,
+        "content_role": fragment.content_role,
+        "school": fragment.school,
+        "scope": fragment.scope,
+        "full_text_sha256": fragment.full_text_sha256,
+        "normalized_content_sha256": fragment.normalized_content_sha256,
+        "excerpt_permission": fragment.excerpt_permission,
+        "permitted_excerpt": fragment.permitted_excerpt,
+        "admission_status": fragment.admission_status,
+    }
+    if fragment.draft_sha256 != _hash_jaimini_payload(draft_payload):
+        raise ValueError("source fragment draft identity is not content-addressed")
+    stable_identity = {
+        key: draft_payload[key]
+        for key in (
+            "source_id",
+            "page_number",
+            "anchor_kind",
+            "anchor_label",
+            "language",
+            "content_role",
+            "school",
+            "scope",
+        )
+    }
+    if fragment.fragment_id != f"frag_{_hash_jaimini_payload(stable_identity)[:24]}":
+        raise ValueError("source fragment ID is not content-addressed")
+    revision_payload = {
+        "fragment_id": fragment.fragment_id,
+        "revision": fragment.revision,
+        "draft_sha256": fragment.draft_sha256,
+        "source_file_sha256": fragment.source_file_sha256,
+        **draft_payload,
+    }
+    if fragment.revision_sha256 != _hash_jaimini_payload(revision_payload):
+        raise ValueError("source fragment revision identity is not content-addressed")
 
 
 class JaiminiTopic(StrEnum):
