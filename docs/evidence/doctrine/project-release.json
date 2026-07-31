@@ -88,7 +88,7 @@
     "full_python_suite": {
       "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine $CODEX_PYTHON -m pytest -q",
       "status": "passed",
-      "passed": 880,
+      "passed": 884,
       "failed": 0,
       "skipped": 2
     },
@@ -127,5 +127,5 @@
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "4d3e90ca1d1f9767c73c2c48f3df2edfdd86311cba239a3de7506f6282255992"
+  "audit_sha256": "04fbb3b7fc84e357613af88380b17067e5eccb74bd6b23bd1ecaf119d4ab4540"
 }
