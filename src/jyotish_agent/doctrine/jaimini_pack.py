@@ -321,9 +321,12 @@ class JaiminiOverlayFragmentLedger(FrozenModel):
     """Hash-bound overlay evidence that is structurally unable to activate rules."""
 
     schema_version: Literal["1.0"] = "1.0"
-    ledger_id: Literal["jaimini_sanjay_rath_overlay_fragments_v1"]
-    overlay_id: Literal["sanjay_rath"]
-    school: Literal["sanjay_rath"]
+    ledger_id: Literal[
+        "jaimini_sanjay_rath_overlay_fragments_v1",
+        "jaimini_kn_rao_overlay_fragments_v1",
+    ]
+    overlay_id: Literal["sanjay_rath", "kn_rao_practical"]
+    school: Literal["sanjay_rath", "kn_rao_practical"]
     source_manifest_sha256: Sha256
     baseline_inventory_sha256: Sha256
     activation_status: Literal["unavailable"]
@@ -331,9 +334,7 @@ class JaiminiOverlayFragmentLedger(FrozenModel):
     product_rule_use_allowed: Literal[False]
     fragments: tuple[SourceFragment, ...] = Field(min_length=1)
     bindings: tuple[JaiminiOverlayFragmentBinding, ...] = Field(min_length=1)
-    unresolved_sources: tuple[JaiminiUnresolvedOverlaySource, ...] = Field(
-        min_length=1
-    )
+    unresolved_sources: tuple[JaiminiUnresolvedOverlaySource, ...] = ()
 
     @model_validator(mode="after")
     def _coherent_quarantine(self) -> "JaiminiOverlayFragmentLedger":
@@ -376,12 +377,28 @@ class JaiminiOverlayFragmentLedger(FrozenModel):
             for fragment in self.fragments
         ):
             raise ValueError("fragment source manifest identity does not match ledger")
-        if {fragment.source_id for fragment in self.fragments} != {
-            "jaimini_sanjay_rath_upadesa_sutras_1997",
-            "jaimini_sanjay_rath_narayana_dasa_2004",
-        }:
+        expected_ledger_ids = {
+            "sanjay_rath": "jaimini_sanjay_rath_overlay_fragments_v1",
+            "kn_rao_practical": "jaimini_kn_rao_overlay_fragments_v1",
+        }
+        expected_source_ids = {
+            "sanjay_rath": {
+                "jaimini_sanjay_rath_upadesa_sutras_1997",
+                "jaimini_sanjay_rath_narayana_dasa_2004",
+            },
+            "kn_rao_practical": {
+                "jaimini_kn_rao_chara_dasha_vani_scan_2010"
+            },
+        }
+        if self.ledger_id != expected_ledger_ids[self.overlay_id]:
+            raise ValueError("overlay fragment ledger identity does not match overlay")
+        if self.school != self.overlay_id:
+            raise ValueError("overlay fragment ledger school must match overlay")
+        if {fragment.source_id for fragment in self.fragments} != expected_source_ids[
+            self.overlay_id
+        ]:
             raise ValueError(
-                "this ledger requires exactly the declared Sanjay Rath source pages"
+                "this ledger requires exactly the declared overlay source pages"
             )
         if any(fragment.school != self.school for fragment in self.fragments):
             raise ValueError("overlay fragment ledger cannot blend schools")
@@ -397,6 +414,8 @@ class JaiminiOverlayFragmentLedger(FrozenModel):
         unresolved_ids = [item.source_id for item in self.unresolved_sources]
         if len(unresolved_ids) != len(set(unresolved_ids)):
             raise ValueError("unresolved overlay source IDs must be unique")
+        if any(item.overlay_id != self.overlay_id for item in self.unresolved_sources):
+            raise ValueError("unresolved sources must belong to the ledger overlay")
         return self
 
     @property
@@ -460,13 +479,6 @@ class JaiminiOverlayFragmentLedger(FrozenModel):
             raise ValueError("fragment bindings must remain quarantined")
 
         for fragment in self.fragments:
-            if fragment.source_id not in {
-                "jaimini_sanjay_rath_upadesa_sutras_1997",
-                "jaimini_sanjay_rath_narayana_dasa_2004",
-            }:
-                raise ValueError(
-                    "fragment ledger accepts only declared Sanjay Rath source pages"
-                )
             if fragment.school != self.school:
                 raise ValueError("overlay fragment ledger cannot blend schools")
             source = sources.get(fragment.source_id)

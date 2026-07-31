@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0",
+  "audit_id": "jaimini_kn_rao_ocr_review_v1",
+  "source_id": "jaimini_kn_rao_chara_dasha_vani_scan_2010",
+  "source_file_sha256": "6e534cba2963209f3cb8898e357e9773d1dee27f6189a6b5b43ef2065739fb36",
+  "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+  "ledger_id": "jaimini_kn_rao_overlay_fragments_v1",
+  "ledger_sha256": "1fed0ef923170e97d80374f1d22017755ea08fe1a01e9856f4da1a6a54c10b03",
+  "review_scope": "Bounded technical OCR review only; no doctrine admission or activation.",
+  "embedded_extractor": {
+    "name": "pypdf",
+    "version": "5.9.0"
+  },
+  "independent_ocr": {
+    "renderer": "pdftoppm",
+    "renderer_version": "26.04.0",
+    "name": "tesseract",
+    "version": "5.5.2",
+    "dpi": 120,
+    "psm": 6,
+    "language": "eng"
+  },
+  "reviewed_pages": [
+    {
+      "pdf_page": 32,
+      "printed_page": 33,
+      "embedded_token_count": 248,
+      "independent_token_count": 246,
+      "token_sequence_ratio": 0.9838,
+      "tesseract_confidence": 0.955588,
+      "agent_visual_review": "passed",
+      "disposition": "quarantined_conflict"
+    },
+    {
+      "pdf_page": 35,
+      "printed_page": 36,
+      "embedded_token_count": 291,
+      "independent_token_count": 279,
+      "token_sequence_ratio": 0.9018,
+      "tesseract_confidence": 0.911943,
+      "agent_visual_review": "passed",
+      "disposition": "quarantined_conflict"
+    },
+    {
+      "pdf_page": 39,
+      "printed_page": 40,
+      "embedded_token_count": 377,
+      "independent_token_count": 372,
+      "token_sequence_ratio": 0.8892,
+      "tesseract_confidence": 0.949455,
+      "agent_visual_review": "passed",
+      "disposition": "quarantined_conflict"
+    },
+    {
+      "pdf_page": 40,
+      "printed_page": 41,
+      "embedded_token_count": 319,
+      "independent_token_count": 284,
+      "token_sequence_ratio": 0.806,
+      "tesseract_confidence": 0.828752,
+      "agent_visual_review": "passed",
+      "disposition": "quarantined_conflict"
+    },
+    {
+      "pdf_page": 43,
+      "printed_page": 44,
+      "embedded_token_count": 356,
+      "independent_token_count": 350,
+      "token_sequence_ratio": 0.9575,
+      "tesseract_confidence": 0.923706,
+      "agent_visual_review": "passed",
+      "disposition": "quarantined_conflict"
+    },
+    {
+      "pdf_page": 44,
+      "printed_page": 45,
+      "embedded_token_count": 277,
+      "independent_token_count": 274,
+      "token_sequence_ratio": 0.951,
+      "tesseract_confidence": 0.952304,
+      "agent_visual_review": "passed",
+      "disposition": "quarantined_conflict"
+    }
+  ],
+  "doctrine_admitted": false,
+  "product_rule_use_allowed": false,
+  "specialist_review_missing": true
+}

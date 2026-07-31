@@ -493,13 +493,5 @@
       "discrepancy": "The source continuation adds subdivision direction conditions not represented by the frozen core."
     }
   ],
-  "unresolved_sources": [
-    {
-      "overlay_id": "kn_rao_practical",
-      "school": "kn_rao_practical",
-      "source_id": "jaimini_kn_rao_chara_dasha_vani_scan_2010",
-      "blocker_code": "ocr_review_pending",
-      "blocker": "OCR output requires page-level human review before any fragment can be bound."
-    }
-  ]
+  "unresolved_sources": []
 }

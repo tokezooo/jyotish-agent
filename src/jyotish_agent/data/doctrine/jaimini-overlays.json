@@ -16,7 +16,7 @@
       "display_name": "K. N. Rao selected practical overlay",
       "source_ids": ["jaimini_kn_rao_chara_dasha_vani_scan_2010"],
       "activation_status": "unavailable",
-      "missing_reason": "Verified local source bytes are present; OCR review, fragment-level specialist review, and compiled overlay rules are still missing."
+      "missing_reason": "Reviewed OCR fragments are hash-bound and quarantined; fragment-level specialist review and compiled overlay rules are still missing."
     }
   ]
 }

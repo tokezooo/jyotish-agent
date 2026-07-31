@@ -60,7 +60,7 @@
   "blockers": [
     "compiled_profile: no source-admitted production profile exists",
     "nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
-    "source_review: Sanjay Rath Upadesa and crop-aware Narayana pages 46-48 are hash-bound but quarantined and uncompiled; specialist review and overlay rule compilation remain missing; K. N. Rao OCR review remains unresolved",
+    "source_review: bounded Sanjay Rath Upadesa, crop-aware Narayana pages 46-48, and K. N. Rao OCR fragments are hash-bound but quarantined and uncompiled; specialist review and overlay rule compilation remain missing",
     "specialist_review: no production rule/profile review"
   ],
   "external_review_missing": true,
