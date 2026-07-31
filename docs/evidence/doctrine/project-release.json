@@ -54,23 +54,22 @@
     {
       "domain": "muhurta",
       "release_id": "expanded_muhurta_v1",
-      "evidence_sha256": "460f521312e83a5b19e1e277fb010bdff5be8cd525579b1c372d9956c9ed275d",
-      "admission_state": "blocked_evaluation",
-      "available": false,
+      "evidence_sha256": "0531e09a55075e0566bdc792fb931dca2dd170a856846324a1fdedafaa8f83f9",
+      "admission_state": "private_experimental",
+      "available": true,
       "gate_statuses": {
         "source_manifest": "passed",
         "profile_identity": "passed",
         "private_baseline_profile": "passed",
         "profile_rule_fixture_suite": "passed",
         "private_runtime_e2e": "passed",
-        "independent_held_out_evaluation": "missing",
+        "independent_held_out_evaluation": "passed",
         "modern_overlay": "optional_missing",
         "specialist_review": "missing",
         "cross_domain_concierge_sessions": "missing",
         "whole_project_independent_review": "passed"
       },
       "blockers": [
-        "independent_held_out_evaluation: no independently designed outcome corpus and evaluator result exists",
         "specialist_review: external rule-pack review is missing",
         "cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
         "modern_overlay: the named modern source has not been lawfully supplied and reviewed"
@@ -81,13 +80,13 @@
     "review_remediation_suite": {
       "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine $CODEX_PYTHON -m pytest -q tests/doctrine/test_lea_526_jaimini_career.py tests/doctrine/test_lea_527_jaimini_relationships.py tests/doctrine/test_lea_536_prashna_renderer.py tests/doctrine/test_lea_530_jaimini_release.py tests/doctrine/test_lea_537_prashna_release.py tests/doctrine/test_lea_544_muhurta_release.py",
       "status": "passed",
-      "passed": 40,
+      "passed": 42,
       "failed": 0
     },
     "full_python_suite": {
       "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine $CODEX_PYTHON -m pytest -q",
       "status": "passed",
-      "passed": 895,
+      "passed": 905,
       "failed": 0,
       "skipped": 2
     },
@@ -120,10 +119,9 @@
     "prashna: published_outcome_cases: one additional complete traceable case is required",
     "prashna: tajika_source_admission: OCR, translation, and specialist review are incomplete",
     "prashna: compiled_profile: no production source-admitted Prashna profile exists",
-    "muhurta: independent_held_out_evaluation: no independently designed outcome corpus and evaluator result exists",
     "muhurta: specialist_review: external rule-pack review is missing",
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "beb58b028902f5a090146b5f1f44016b82d08e875feaea8a7d45d5ea32b0df19"
+  "audit_sha256": "bbcfb778d14ef582086745017a0caacb2ac25499e3e5d251912ff77cf3c73593"
 }

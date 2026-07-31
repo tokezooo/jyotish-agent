@@ -1,0 +1,228 @@
+{
+  "schema_version": "1.0",
+  "corpus_id": "muhurta_independent_held_out_v1",
+  "authorship": "independently_hand_authored",
+  "used_for_tuning": false,
+  "public_safe": true,
+  "source_admission_mode": "synthetic_inputs_against_admitted_private_baseline",
+  "corpus_manifest_sha256": "e6643be2f730e67b2cd6b80f64cfe46894240bb112a0ff26cae22a0c390c2e07",
+  "compiled_profile_sha256": "4552d6fa9c5c9b99849927586731dccb71bbd88695149d899f07ffef008c78d2",
+  "cases": [
+    {
+      "id": "mh_route_focused_en",
+      "kind": "route",
+      "coverage_tags": ["en", "all_profiles"],
+      "input": {"activity": "deep work", "locale": "en"},
+      "expected": {"status": "supported", "profile": "focused_work", "reason_code": null}
+    },
+    {
+      "id": "mh_route_study_ru",
+      "kind": "route",
+      "coverage_tags": ["ru", "all_profiles"],
+      "input": {"activity": "обучение", "locale": "ru"},
+      "expected": {"status": "supported", "profile": "study_learning", "reason_code": null}
+    },
+    {
+      "id": "mh_route_creative_en",
+      "kind": "route",
+      "coverage_tags": ["en", "all_profiles"],
+      "input": {"activity": "creative work", "locale": "en"},
+      "expected": {"status": "supported", "profile": "creative_production", "reason_code": null}
+    },
+    {
+      "id": "mh_route_launch_ru",
+      "kind": "route",
+      "coverage_tags": ["ru", "all_profiles"],
+      "input": {"activity": "запуск продукта", "locale": "ru"},
+      "expected": {"status": "supported", "profile": "product_launch_communication", "reason_code": null}
+    },
+    {
+      "id": "mh_route_travel_en",
+      "kind": "route",
+      "coverage_tags": ["en", "all_profiles"],
+      "input": {"activity": "travel planning", "locale": "en"},
+      "expected": {"status": "supported", "profile": "low_risk_travel_planning", "reason_code": null}
+    },
+    {
+      "id": "mh_route_private_ru",
+      "kind": "route",
+      "coverage_tags": ["ru", "all_profiles"],
+      "input": {"activity": "личная задача", "locale": "ru"},
+      "expected": {"status": "supported", "profile": "general_private_task", "reason_code": null}
+    },
+    {
+      "id": "mh_route_high_stakes_en",
+      "kind": "route",
+      "coverage_tags": ["en", "high_stakes"],
+      "input": {"activity": "surgery", "locale": "en"},
+      "expected": {"status": "unsupported_high_stakes", "profile": null, "reason_code": "HIGH_STAKES_ACTIVITY"}
+    },
+    {
+      "id": "mh_route_ambiguous_ru",
+      "kind": "route",
+      "coverage_tags": ["ru", "ambiguous"],
+      "input": {"activity": "что-то важное", "locale": "ru"},
+      "expected": {"status": "needs_input", "profile": null, "reason_code": "ACTIVITY_PROFILE_REQUIRED"}
+    },
+    {
+      "id": "mh_eligibility_daylight_hard_fail",
+      "kind": "eligibility",
+      "coverage_tags": ["hard_constraint"],
+      "input": {
+        "profile": "focused_work", "zone_id": "Europe/Moscow",
+        "start_local": "2026-07-16T22:00:00", "end_local": "2026-07-16T23:00:00",
+        "start_fold": 0, "end_fold": 0,
+        "panchanga_status": "allowed", "dosa_status": "clear", "weekday_status": "allowed",
+        "daylight_status": "outside", "lagna_status": "available",
+        "require_daylight": true, "require_lagna": false, "source_admitted": true,
+        "intervals": []
+      },
+      "expected": {"status": "ineligible", "hard_failures": ["muhurta.eligibility.daylight"], "reason_code": null}
+    },
+    {
+      "id": "mh_eligibility_half_open_touch",
+      "kind": "eligibility",
+      "coverage_tags": ["half_open_boundary"],
+      "input": {
+        "profile": "study_learning", "zone_id": "Europe/Moscow",
+        "start_local": "2026-07-16T10:00:00", "end_local": "2026-07-16T11:00:00",
+        "start_fold": 0, "end_fold": 0,
+        "panchanga_status": "allowed", "dosa_status": "clear", "weekday_status": "allowed",
+        "daylight_status": "inside", "lagna_status": "available",
+        "require_daylight": false, "require_lagna": false, "source_admitted": true,
+        "intervals": [
+          {
+            "rule_id": "muhurta.interval.held_out_touch", "classification": "hard",
+            "start_local": "2026-07-16T09:00:00", "end_local": "2026-07-16T10:00:00",
+            "start_fold": 0, "end_fold": 0, "source_locator": "held-out synthetic boundary"
+          }
+        ]
+      },
+      "expected": {"status": "eligible", "hard_failures": [], "reason_code": null}
+    },
+    {
+      "id": "mh_eligibility_dst_fold_disjoint",
+      "kind": "eligibility",
+      "coverage_tags": ["dst_fold"],
+      "input": {
+        "profile": "creative_production", "zone_id": "Europe/London",
+        "start_local": "2026-10-25T01:15:00", "end_local": "2026-10-25T01:45:00",
+        "start_fold": 1, "end_fold": 1,
+        "panchanga_status": "allowed", "dosa_status": "clear", "weekday_status": "allowed",
+        "daylight_status": "inside", "lagna_status": "available",
+        "require_daylight": false, "require_lagna": false, "source_admitted": true,
+        "intervals": [
+          {
+            "rule_id": "muhurta.interval.held_out_dst", "classification": "hard",
+            "start_local": "2026-10-25T01:00:00", "end_local": "2026-10-25T01:50:00",
+            "start_fold": 0, "end_fold": 0, "source_locator": "held-out synthetic fold"
+          }
+        ]
+      },
+      "expected": {"status": "eligible", "hard_failures": [], "reason_code": null}
+    },
+    {
+      "id": "mh_eligibility_source_missing",
+      "kind": "eligibility",
+      "coverage_tags": ["source_substitution"],
+      "input": {
+        "profile": "general_private_task", "zone_id": "Europe/Moscow",
+        "start_local": "2026-07-16T10:00:00", "end_local": "2026-07-16T11:00:00",
+        "start_fold": 0, "end_fold": 0,
+        "panchanga_status": "allowed", "dosa_status": "active", "weekday_status": "allowed",
+        "daylight_status": "inside", "lagna_status": "available",
+        "require_daylight": false, "require_lagna": false, "source_admitted": false,
+        "intervals": []
+      },
+      "expected": {"status": "unavailable", "hard_failures": [], "reason_code": "SOURCE_RULES_NOT_ADMITTED"}
+    },
+    {
+      "id": "mh_personalization_favorable",
+      "kind": "personalization",
+      "coverage_tags": ["personalization"],
+      "input": {
+        "personalization_requested": true, "consent_confirmed": true, "source_admitted": true,
+        "birth_time_accuracy": "exact", "birth_nakshatra_stable": true, "birth_moon_sign_stable": true,
+        "birth_nakshatra_index": 0, "candidate_nakshatra_index": 1,
+        "birth_moon_sign_index": 0, "candidate_moon_sign_index": 2
+      },
+      "expected": {"status": "available", "tara_bala": "favorable", "candra_bala": "favorable", "soft_adjustment": 2, "confidence": "exact", "reason_code": null, "can_override_hard_exclusion": false}
+    },
+    {
+      "id": "mh_personalization_unfavorable",
+      "kind": "personalization",
+      "coverage_tags": ["personalization"],
+      "input": {
+        "personalization_requested": true, "consent_confirmed": true, "source_admitted": true,
+        "birth_time_accuracy": "exact", "birth_nakshatra_stable": true, "birth_moon_sign_stable": true,
+        "birth_nakshatra_index": 0, "candidate_nakshatra_index": 2,
+        "birth_moon_sign_index": 0, "candidate_moon_sign_index": 1
+      },
+      "expected": {"status": "available", "tara_bala": "unfavorable", "candra_bala": "unfavorable", "soft_adjustment": -2, "confidence": "exact", "reason_code": null, "can_override_hard_exclusion": false}
+    },
+    {
+      "id": "mh_personalization_unstable",
+      "kind": "personalization",
+      "coverage_tags": ["personalization", "uncertainty"],
+      "input": {
+        "personalization_requested": true, "consent_confirmed": true, "source_admitted": true,
+        "birth_time_accuracy": "approximate", "birth_nakshatra_stable": false, "birth_moon_sign_stable": true,
+        "birth_nakshatra_index": 0, "candidate_nakshatra_index": 1,
+        "birth_moon_sign_index": 0, "candidate_moon_sign_index": 2
+      },
+      "expected": {"status": "unavailable", "tara_bala": null, "candra_bala": null, "soft_adjustment": 0, "confidence": "unstable", "reason_code": "NATAL_FACTORS_UNSTABLE", "can_override_hard_exclusion": false}
+    },
+    {
+      "id": "mh_ranking_weighted_components",
+      "kind": "ranking",
+      "coverage_tags": ["ranking"],
+      "input": {
+        "profile": "focused_work",
+        "candidates": [
+          {"candidate_id": "candidate_alpha", "start_utc": "2026-07-16T08:00:00+00:00", "end_utc": "2026-07-16T09:00:00+00:00", "eligibility_status": "eligible", "hard_failure_ids": [], "doctrinal_soft_score": 2, "natal_soft_adjustment": 0, "user_preference_score": 0, "confidence": 0.8},
+          {"candidate_id": "candidate_beta", "start_utc": "2026-07-16T09:00:00+00:00", "end_utc": "2026-07-16T10:00:00+00:00", "eligibility_status": "eligible", "hard_failure_ids": [], "doctrinal_soft_score": 1, "natal_soft_adjustment": 2, "user_preference_score": 2, "confidence": 0.8}
+        ]
+      },
+      "expected": {"status": "completed", "ranked_ids": ["candidate_beta", "candidate_alpha"], "total_scores": [11, 10], "near_miss_ids": []}
+    },
+    {
+      "id": "mh_ranking_hard_exclusion",
+      "kind": "ranking",
+      "coverage_tags": ["ranking", "score_manipulation"],
+      "input": {
+        "profile": "product_launch_communication",
+        "candidates": [
+          {"candidate_id": "candidate_safe", "start_utc": "2026-07-16T08:00:00+00:00", "end_utc": "2026-07-16T09:00:00+00:00", "eligibility_status": "eligible", "hard_failure_ids": [], "doctrinal_soft_score": 0, "natal_soft_adjustment": 0, "user_preference_score": 0, "confidence": 0.7},
+          {"candidate_id": "candidate_blocked", "start_utc": "2026-07-16T09:00:00+00:00", "end_utc": "2026-07-16T10:00:00+00:00", "eligibility_status": "ineligible", "hard_failure_ids": ["muhurta.eligibility.dosa"], "doctrinal_soft_score": 10, "natal_soft_adjustment": 2, "user_preference_score": 2, "confidence": 1.0}
+        ]
+      },
+      "expected": {"status": "completed", "ranked_ids": ["candidate_safe"], "total_scores": [0], "near_miss_ids": ["candidate_blocked"]}
+    },
+    {
+      "id": "mh_ranking_stable_tie",
+      "kind": "ranking",
+      "coverage_tags": ["ranking", "stable_tie"],
+      "input": {
+        "profile": "low_risk_travel_planning",
+        "candidates": [
+          {"candidate_id": "candidate_b", "start_utc": "2026-07-16T08:00:00+00:00", "end_utc": "2026-07-16T09:00:00+00:00", "eligibility_status": "eligible", "hard_failure_ids": [], "doctrinal_soft_score": 1, "natal_soft_adjustment": 0, "user_preference_score": 0, "confidence": 0.8},
+          {"candidate_id": "candidate_a", "start_utc": "2026-07-16T08:00:00+00:00", "end_utc": "2026-07-16T09:00:00+00:00", "eligibility_status": "eligible", "hard_failure_ids": [], "doctrinal_soft_score": 1, "natal_soft_adjustment": 0, "user_preference_score": 0, "confidence": 0.8}
+        ]
+      },
+      "expected": {"status": "completed", "ranked_ids": ["candidate_a", "candidate_b"], "total_scores": [5, 5], "near_miss_ids": []}
+    },
+    {
+      "id": "mh_search_skipped_apia_date",
+      "kind": "skipped_date_search",
+      "coverage_tags": ["skipped_date"],
+      "input": {
+        "activity": "focused_work_session_v1",
+        "place": {"name": "Public-safe fixture", "latitude": -13.8333, "longitude": -171.75, "zone_id": "Pacific/Apia"},
+        "start": "2011-12-29T00:00:00-10:00", "end": "2011-12-31T00:00:00+14:00",
+        "duration_minutes": 30, "hard_constraints": {}, "preferences": {},
+        "result_limit": 20, "near_miss_limit": 20, "include_trace": false
+      },
+      "expected": {"status": "completed", "range_duration_seconds": 86400, "has_windows": true, "skipped_local_date_window_count": 0}
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0",
+  "algorithm": "sha256",
+  "files": {
+    "independent-held-out-v1.json": "e1197e9f8a87083981768defad2ca92da8570248614b137d9fade671b6217df8"
+  }
+}

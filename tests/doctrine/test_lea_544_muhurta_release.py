@@ -20,6 +20,18 @@ AUDIT = ROOT / "docs/evidence/doctrine/muhurta-release.json"
 PACKAGED_AUDIT = ROOT / "src/jyotish_agent/data/doctrine/muhurta-release.json"
 
 
+def _admit_source_bytes(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from jyotish_agent.doctrine import muhurta_pack
+
+    monkeypatch.setattr(
+        muhurta_pack.SourceVerifier,
+        "verify",
+        staticmethod(lambda manifest, root: SimpleNamespace(ok=True)),
+    )
+
+
 def test_available_audit_requires_every_required_gate_to_pass() -> None:
     payload = json.loads(AUDIT.read_text(encoding="utf-8"))
     payload.update(admission_state="private_experimental", available=True)
@@ -67,13 +79,13 @@ def _request(mode: str = "full", locale: str = "en", **updates) -> dict[str, obj
     return payload
 
 
-def test_audit_blocks_release_until_real_held_out_evaluation_exists() -> None:
+def test_audit_promotes_private_release_after_real_held_out_evaluation() -> None:
     audit = MuhurtaReleaseAudit.model_validate_json(AUDIT.read_text())
     packaged = MuhurtaReleaseAudit.model_validate_json(PACKAGED_AUDIT.read_text())
     assert audit == packaged
     assert audit.release_id == "expanded_muhurta_v1"
-    assert audit.admission_state == "blocked_evaluation"
-    assert audit.available is False
+    assert audit.admission_state == "private_experimental"
+    assert audit.available is True
     assert audit.public_release_ready is False
     assert audit.external_review_missing is True
     assert {item.domain for item in audit.domain_metrics} == {
@@ -82,33 +94,63 @@ def test_audit_blocks_release_until_real_held_out_evaluation_exists() -> None:
         "muhurta",
     }
     muhurta = next(item for item in audit.domain_metrics if item.domain == "muhurta")
-    assert muhurta.automated_held_out_count == 0
-    assert muhurta.material_error_rate is None
+    assert muhurta.automated_held_out_count == 19
+    assert muhurta.material_error_count == 0
+    assert muhurta.material_error_rate == 0.0
     assert muhurta.concierge_session_count == 0
     assert muhurta.value_score is None
     assert {gate.gate_id for gate in audit.gates if gate.status == "missing"} >= {
         "specialist_review",
-        "independent_held_out_evaluation",
         "cross_domain_concierge_sessions",
     }
+    held_out = next(
+        gate for gate in audit.gates if gate.gate_id == "independent_held_out_evaluation"
+    )
+    assert held_out.status == "passed"
+    assert held_out.evidence is not None
+    assert "independent-held-out-v1.json" in held_out.evidence
+    assert "19/19" in held_out.evidence
+    assert all(
+        "independent_held_out_evaluation" not in blocker
+        for blocker in audit.public_release_blockers
+    )
     assert next(
         gate for gate in audit.gates if gate.gate_id == "whole_project_independent_review"
     ).status == "passed"
 
 
-def test_ru_en_public_adapters_fail_closed_while_release_gate_is_missing(tmp_path) -> None:
+def test_ru_en_public_adapters_execute_verified_private_release(
+    tmp_path, monkeypatch
+) -> None:
+    _admit_source_bytes(monkeypatch)
     facade = JyotishMcpFacade(tmp_path, None)
     for locale in ("ru", "en"):
         parsed = MuhurtaFullMcpInput.model_validate(_request(locale=locale))
         result = facade.muhurta_full(parsed)
         assert result.surface == "experimental_full"
-        assert result.status == "unavailable"
+        assert result.status == "completed"
         assert result.profile == "focused_work"
-        assert result.admission_state == "blocked_evaluation"
-        assert result.report is None
-        assert result.error_code == "RELEASE_GATES_INCOMPLETE"
+        assert result.admission_state == "private_experimental"
+        assert result.report is not None
+        assert result.error_code is None
         assert result.external_review_missing is True
         assert result.public_release_blockers
+
+
+def test_private_release_fails_closed_when_source_bytes_do_not_verify(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("JYOTISH_PRIVATE_SOURCES_ROOT", str(tmp_path / "missing"))
+    facade = JyotishMcpFacade(tmp_path, None)
+    parsed = MuhurtaFullMcpInput.model_validate(_request())
+
+    result = facade.muhurta_full(parsed)
+
+    assert result.status == "unavailable"
+    assert result.admission_state == "private_experimental"
+    assert result.profile == "focused_work"
+    assert result.report is None
+    assert result.error_code == "SOURCE_BYTES_UNVERIFIED"
 
 
 def test_high_stakes_activity_remains_blocked_before_engine_execution(tmp_path) -> None:
@@ -155,7 +197,8 @@ def test_malformed_input_is_sanitized_and_mcp_schema_is_strict(tmp_path) -> None
     assert schema["additionalProperties"] is False
 
 
-def test_runtime_is_deterministic_bounded_and_private(tmp_path) -> None:
+def test_runtime_is_deterministic_bounded_and_private(tmp_path, monkeypatch) -> None:
+    _admit_source_bytes(monkeypatch)
     facade = JyotishMcpFacade(tmp_path, None)
     parsed = MuhurtaFullMcpInput.model_validate(_request(mode="quick"))
     started = time.perf_counter()
@@ -170,17 +213,35 @@ def test_runtime_is_deterministic_bounded_and_private(tmp_path) -> None:
     assert ".pdf" not in rendered
 
 
-def test_http_adapter_exposes_same_fail_closed_release_state() -> None:
+def test_http_adapter_exposes_same_private_release_state(monkeypatch) -> None:
+    _admit_source_bytes(monkeypatch)
     response = TestClient(app).post(
         "/v2/doctrine/muhurta/full", json=_request(mode="quick", locale="en")
     )
     assert response.status_code == 200
     body = response.json()
     assert body["surface"] == "experimental_full"
+    assert body["status"] == "completed"
+    assert body["admission_state"] == "private_experimental"
+    assert body["report"] is not None
+    assert body["error_code"] is None
+
+
+def test_http_adapter_fails_closed_when_source_bytes_do_not_verify(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("JYOTISH_PRIVATE_SOURCES_ROOT", str(tmp_path / "missing"))
+
+    response = TestClient(app).post(
+        "/v2/doctrine/muhurta/full", json=_request(mode="quick", locale="en")
+    )
+
+    assert response.status_code == 200
+    body = response.json()
     assert body["status"] == "unavailable"
-    assert body["admission_state"] == "blocked_evaluation"
+    assert body["admission_state"] == "private_experimental"
     assert body["report"] is None
-    assert body["error_code"] == "RELEASE_GATES_INCOMPLETE"
+    assert body["error_code"] == "SOURCE_BYTES_UNVERIFIED"
 
 
 def test_internal_engine_evaluates_complete_bounded_range_before_result_limit() -> None:
