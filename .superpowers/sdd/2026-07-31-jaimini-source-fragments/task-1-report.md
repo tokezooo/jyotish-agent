@@ -18,6 +18,7 @@ private path, or source filename was changed or tracked.
 - `src/jyotish_agent/data/doctrine/jaimini-overlay-fragments.json`
 - `docs/evidence/doctrine/jaimini-overlay-fragments.json`
 - `tests/doctrine/test_jaimini_overlay_fragments_20260731.py`
+- `tests/doctrine/test_lea_529_jaimini_overlays.py`
 - `src/jyotish_agent/data/doctrine/jaimini-release.json`
 - `docs/evidence/doctrine/jaimini-release.json`
 - `docs/evidence/doctrine/project-release.json`
@@ -50,7 +51,7 @@ private path, or source filename was changed or tracked.
 Command:
 
 ```text
-PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine /Users/vlad/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m pytest -q tests/doctrine/test_jaimini_overlay_fragments_20260731.py
+PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine "$CODEX_PYTHON" -m pytest -q tests/doctrine/test_jaimini_overlay_fragments_20260731.py
 ```
 
 Initial result: collection failed because
@@ -88,7 +89,7 @@ Covered:
 Full Python suite, using the repository's proven bundled runtime and `uv` path:
 
 ```text
-PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine /Users/vlad/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m pytest -q
+PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine "$CODEX_PYTHON" -m pytest -q
 839 passed, 2 skipped in 180.17s
 ```
 
@@ -96,6 +97,9 @@ The two skips are the expected Swiss ephemeris mode skips. A preliminary run
 without `/tmp/jyotish-uv` in `PATH` reached 837 passing tests but failed two
 wheel/build tests with `FileNotFoundError: uv`; the final command above corrected
 the test environment and passed.
+
+`CODEX_PYTHON` denotes the bundled workspace Python 3.12 runtime used for these
+commands; the tracked report intentionally avoids a machine-specific home path.
 
 Additional checks:
 
@@ -120,6 +124,44 @@ passed
 
 - `c690d1c feat(jaimini): add quarantined source fragment ledger`
 - `8696a30 fix(jaimini): harden fragment quarantine gates`
+- `7377450 fix(jaimini): close overlay activation bypass`
+
+## Important review fix round
+
+Closed every Important review finding before merge:
+
+- The real `compare_jaimini_overlays(..., activate=True)` path now requires a
+  sealed `JaiminiOverlayActivationContract`. The contract is available only
+  through a strict loader that validates the ledger against the active source
+  manifest, baseline inventory, and overlay registry before returning.
+- Missing or duck-typed activation context fails with
+  `OVERLAY_ACTIVATION_CONTEXT_REQUIRED`. The currently unavailable Sanjay Rath
+  and K. N. Rao overlays fail with `OVERLAY_UNAVAILABLE`; fragment presence
+  cannot activate either overlay.
+- Context validation independently enforces positive page coordinates and
+  `printed_page == page_number + source.page_offset`.
+- Context validation now repeats the release-state, fragment source/school, and
+  binding rule/status checks so unchecked `model_copy` mutations cannot bypass
+  the loader boundary.
+- Adversarial coverage now mutates fragment source/school, binding rule/status,
+  doctrine/product flags, activation state, manifest hash, baseline hash, and
+  printed-page coordinates.
+- The privacy-safe audit test now derives and checks all hashes, source IDs,
+  page numbers, unresolved-source projections, binding counts/status counts,
+  and false release/activation flags against the validated ledger.
+- The project audit records the fresh full-suite evidence (`839 passed`, two
+  expected skips) and its canonical audit hash was regenerated.
+- Machine-specific home paths were removed from tracked report commands;
+  `CODEX_PYTHON` is the stable bundled-runtime placeholder.
+
+Review-fix RED evidence: the focused suites initially failed collection because
+the required safe loader did not exist. Final review-fix verification:
+
+```text
+focused + adjacent doctrine suites: 41 passed in 2.62s
+ruff check src tests: All checks passed!
+git diff --check: passed
+```
 
 ## Remaining concerns and blockers
 
