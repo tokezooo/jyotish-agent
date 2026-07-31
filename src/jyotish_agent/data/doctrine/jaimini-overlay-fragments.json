@@ -1,0 +1,407 @@
+{
+  "schema_version": "1.0",
+  "ledger_id": "jaimini_sanjay_rath_overlay_fragments_v1",
+  "overlay_id": "sanjay_rath",
+  "school": "sanjay_rath",
+  "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+  "baseline_inventory_sha256": "e52d07b2849ad054f6612d6215a5e886c699c6d785f9996af97a5ee409ff8496",
+  "activation_status": "unavailable",
+  "doctrine_admitted": false,
+  "product_rule_use_allowed": false,
+  "fragments": [
+    {
+      "fragment_id": "frag_822812cacae5d34bc7ab27d0",
+      "revision": 1,
+      "revision_sha256": "5d70e6dbf7df8a97b3eb47baa1a2af33c06f439f42efe00b40f257f8330b9877",
+      "draft_sha256": "b93e67389f37657ad23de0c8f9e8b0a0b7c321a466517921844cee528ecff8ba",
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "5b9600dfd6a7c07664731f8bdb82643364df1e47fd1b9a29be15ddcf2fb79ed1",
+      "page_number": 16,
+      "printed_page": 3,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-16",
+      "language": "sa+en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "rasi_drishti",
+      "full_text_sha256": "a2dfb9dfd7183a4f8ce2d4d7292c71638b4ed473edf8afbbcbf3f09254995ad4",
+      "normalized_content_sha256": "83d38b09335410a12a95b49388ed9a3f4149b5af0a81e5eb19b5f6f3e3513150",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_985345c3b82aea1eb6f65dc1",
+      "revision": 1,
+      "revision_sha256": "bcfbf41bc4e677e5bef6656811dfd669a736ad22b1fd5d42bfd458ec2101752f",
+      "draft_sha256": "b781e84eb8086dcbdb03aedf4452ed6f0f4d3499da7a2e7d5ac0bdb5be2eb2d7",
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "5b9600dfd6a7c07664731f8bdb82643364df1e47fd1b9a29be15ddcf2fb79ed1",
+      "page_number": 17,
+      "printed_page": 4,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-17",
+      "language": "sa+en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "argala",
+      "full_text_sha256": "6ee6c4fa696dad8e241f02ddc6e073ce6bf3e0699537af40a8b16c0835177b7d",
+      "normalized_content_sha256": "bb2a1e175e4642d44b67099517cb598d65676d1bfd7bdb20c974aef98aabd63a",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_de84d0edb9b4bd76161820cc",
+      "revision": 1,
+      "revision_sha256": "e23adb72a87153f8906cc4283fda7f90483217e8e93fe9a02e58aaba2ca56a9a",
+      "draft_sha256": "3bf4713042710234a4fba5a89fd772387b2fa273452390ccd814db924bc093e9",
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "5b9600dfd6a7c07664731f8bdb82643364df1e47fd1b9a29be15ddcf2fb79ed1",
+      "page_number": 18,
+      "printed_page": 5,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-18",
+      "language": "sa+en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "argala",
+      "full_text_sha256": "cbcd721f70fe2b0ebd92d69c8b72ae8aa4c916ccc180bcb7647f80d8858f8a5d",
+      "normalized_content_sha256": "b7010cdb2aa1eb087c08335aff0bc2151979ed1f5cfdeedd447c678b052b231e",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_4a10d4c7295d55103225a173",
+      "revision": 1,
+      "revision_sha256": "98b964f5f7d10631a54ef59e198073274fa95e9284d34c69cdc144f422b2b487",
+      "draft_sha256": "26bc2ff40aed619ad341b0220d3dba7faf97f47997e828382d14394c76139133",
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "5b9600dfd6a7c07664731f8bdb82643364df1e47fd1b9a29be15ddcf2fb79ed1",
+      "page_number": 19,
+      "printed_page": 6,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-19",
+      "language": "sa+en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "argala",
+      "full_text_sha256": "26369413cd6e010c71c0cca6bac14980fc70d371f1caa5c20c0813d0b9356593",
+      "normalized_content_sha256": "311e2f2cffad515030f3cdb773d27a38dcd979340ba24903ceff4986d2362123",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_7f5de0a9521c07f671303ff8",
+      "revision": 1,
+      "revision_sha256": "7ce1354d889183c7b3ea70c630f9febf284aaaf705bda962a9eb2536b0f15846",
+      "draft_sha256": "53e521dd12e2ae5c1ca0a2795f1a65d70fc1b1de61a63956f22cf9dec56768e8",
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "5b9600dfd6a7c07664731f8bdb82643364df1e47fd1b9a29be15ddcf2fb79ed1",
+      "page_number": 20,
+      "printed_page": 7,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-20",
+      "language": "sa+en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "chara_karakas",
+      "full_text_sha256": "06c0afcc6dfd9f826628a1865e334d2e3cd54e6788c8c417c666f800844c1a76",
+      "normalized_content_sha256": "e75cd2213bf5230e8e8af0999d3902bb3707f919994c4b184f543cc2c6fa5b03",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_7ae587298789e55b86d416c6",
+      "revision": 1,
+      "revision_sha256": "9235dac7a27979afc396d40c751bc8162034bebfd4e9e6d6052387ec6d9cefcd",
+      "draft_sha256": "0f879d00513c77c362cd3e0d7becc0e096ffa88ee304402b1747335a7062dbda",
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "5b9600dfd6a7c07664731f8bdb82643364df1e47fd1b9a29be15ddcf2fb79ed1",
+      "page_number": 25,
+      "printed_page": 12,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-25",
+      "language": "sa+en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "chara_dasha",
+      "full_text_sha256": "de437e0c3fe9373d18f175fa29a15eb1fce36030a3759e079dd8f40ebf89d352",
+      "normalized_content_sha256": "10b653022690d3059e36be549ca9c5985469e46e2e0ebde3afc4fbc3925359fe",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_0d6fcee3c984545e074d366e",
+      "revision": 1,
+      "revision_sha256": "3ae90ceeaba8c890dc1c0ccf19dc4b8ae96e47be2bf22983fb41a993fed08eaf",
+      "draft_sha256": "1093aa63c39ea2ff7dd90b3826930b95ec2aeda80de933dd37a1e9e9b71a3992",
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "5b9600dfd6a7c07664731f8bdb82643364df1e47fd1b9a29be15ddcf2fb79ed1",
+      "page_number": 26,
+      "printed_page": 13,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-26",
+      "language": "sa+en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "co_lords_chara_dasha",
+      "full_text_sha256": "67c9a92bd37d6be2c4a5d3aad2a69a798cf4f21160c535e14bf088a03c8319f5",
+      "normalized_content_sha256": "193bf6d7a6a6ad3a1657404adb8e4182d388855e9c46dd0efc3e7faadc73a834",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_56636b42fd27d2ae93c9cb3f",
+      "revision": 1,
+      "revision_sha256": "86c8f349e44685fb6f6dc7b5c40a9d19faef9d093fe7d1790a581d6aa2797f7b",
+      "draft_sha256": "232b1f7d19ca9f1ceb52079ccb4090e9e310acd183a954024e2546b39e641c82",
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "5b9600dfd6a7c07664731f8bdb82643364df1e47fd1b9a29be15ddcf2fb79ed1",
+      "page_number": 27,
+      "printed_page": 14,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-27",
+      "language": "sa+en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "chara_dasha_duration",
+      "full_text_sha256": "5c466bb5405fe5557b58a935bf72e8636b7dceddfe8bb6d85c6605185f180729",
+      "normalized_content_sha256": "dc9bce49b64a5b0baf6ba7ff64e4d6ef4dab7c84aa7d95b01c3505fe7b55f045",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_82177878aa4a7dc8a977a34c",
+      "revision": 1,
+      "revision_sha256": "8eccabaced07ed1a3b17d0b667abfbce173cacfdbf4a40f5c9a459feaa46a740",
+      "draft_sha256": "f3bc1b8d5e999553bb9b2078fd24016862780fb1597775e498b8d2b0600bc118",
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "5b9600dfd6a7c07664731f8bdb82643364df1e47fd1b9a29be15ddcf2fb79ed1",
+      "page_number": 28,
+      "printed_page": 15,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-28",
+      "language": "sa+en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "arudha",
+      "full_text_sha256": "d25b383281352710758ec4fa41e28469bd2909d91f6165108fdac55306d6626f",
+      "normalized_content_sha256": "8253e7ae0f44fa7e9d0d7fb5b4a56f444df2e18bbdf339e544e24c10135dd6e4",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_55eaee14c099bfc3461c5ad8",
+      "revision": 1,
+      "revision_sha256": "fa8e4ad31532669b4900c041693edb3d11f37ff857e8c924326fe6fff965132a",
+      "draft_sha256": "2f5166963bede1439e5ba3bae162c41069f4c78e6e1e43721f464e89c9491067",
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "5b9600dfd6a7c07664731f8bdb82643364df1e47fd1b9a29be15ddcf2fb79ed1",
+      "page_number": 49,
+      "printed_page": 36,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-49",
+      "language": "sa+en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "svamsa_karakamsa",
+      "full_text_sha256": "b04da3930090041b6ef09c5c98554b01d9a1dd61621e56372cc188c068c40067",
+      "normalized_content_sha256": "d74a914ba295554387d95be0dde9eb07a1da683ad1747538abf8c44992eb545a",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    }
+  ],
+  "bindings": [
+    {
+      "binding_id": "bind_8db02216521f14bd1a05f6ca",
+      "fragment": {
+        "fragment_id": "frag_822812cacae5d34bc7ab27d0",
+        "revision": 1,
+        "revision_sha256": "5d70e6dbf7df8a97b3eb47baa1a2af33c06f439f42efe00b40f257f8330b9877"
+      },
+      "rule_id": "rasi_drishti.modal_sign_aspects",
+      "rule_family": "rasi_drishti",
+      "paraphrase": "Commits the practical overlay page that tabulates sign-aspect geometry.",
+      "status": "anchored_unreviewed",
+      "discrepancy": null
+    },
+    {
+      "binding_id": "bind_954869ba2496643a766d6318",
+      "fragment": {
+        "fragment_id": "frag_985345c3b82aea1eb6f65dc1",
+        "revision": 1,
+        "revision_sha256": "bcfbf41bc4e677e5bef6656811dfd669a736ad22b1fd5d42bfd458ec2101752f"
+      },
+      "rule_id": "argala.houses",
+      "rule_family": "argala",
+      "paraphrase": "Commits the practical overlay page that identifies the primary intervening houses.",
+      "status": "anchored_unreviewed",
+      "discrepancy": null
+    },
+    {
+      "binding_id": "bind_26c9d39408e99d3566c6c7a1",
+      "fragment": {
+        "fragment_id": "frag_de84d0edb9b4bd76161820cc",
+        "revision": 1,
+        "revision_sha256": "e23adb72a87153f8906cc4283fda7f90483217e8e93fe9a02e58aaba2ca56a9a"
+      },
+      "rule_id": "argala.count_obstruction",
+      "rule_family": "argala",
+      "paraphrase": "Commits the practical overlay page that pairs interventions with their obstructions.",
+      "status": "anchored_unreviewed",
+      "discrepancy": null
+    },
+    {
+      "binding_id": "bind_90c77c233de414829c1558f7",
+      "fragment": {
+        "fragment_id": "frag_4a10d4c7295d55103225a173",
+        "revision": 1,
+        "revision_sha256": "98b964f5f7d10631a54ef59e198073274fa95e9284d34c69cdc144f422b2b487"
+      },
+      "rule_id": "argala.count_obstruction",
+      "rule_family": "argala",
+      "paraphrase": "Commits the continuation page covering secondary intervention and relative strength.",
+      "status": "anchored_unreviewed",
+      "discrepancy": null
+    },
+    {
+      "binding_id": "bind_a4a9b5a182913332d5887773",
+      "fragment": {
+        "fragment_id": "frag_7f5de0a9521c07f671303ff8",
+        "revision": 1,
+        "revision_sha256": "7ce1354d889183c7b3ea70c630f9febf284aaaf705bda962a9eb2536b0f15846"
+      },
+      "rule_id": "karakas.scheme",
+      "rule_family": "chara_karakas",
+      "paraphrase": "Commits the practical overlay page distinguishing seven- and eight-factor movable significator schemes.",
+      "status": "anchored_unreviewed",
+      "discrepancy": null
+    },
+    {
+      "binding_id": "bind_b7c85ecf08d96c51af1eabe8",
+      "fragment": {
+        "fragment_id": "frag_7f5de0a9521c07f671303ff8",
+        "revision": 1,
+        "revision_sha256": "7ce1354d889183c7b3ea70c630f9febf284aaaf705bda962a9eb2536b0f15846"
+      },
+      "rule_id": "karakas.rahu_reversal",
+      "rule_family": "chara_karakas",
+      "paraphrase": "Commits the same scheme page for the reversed longitude treatment of the lunar node.",
+      "status": "anchored_unreviewed",
+      "discrepancy": null
+    },
+    {
+      "binding_id": "bind_15f4916f89ba5d8c73cba852",
+      "fragment": {
+        "fragment_id": "frag_82177878aa4a7dc8a977a34c",
+        "revision": 1,
+        "revision_sha256": "8eccabaced07ed1a3b17d0b667abfbce173cacfdbf4a40f5c9a459feaa46a740"
+      },
+      "rule_id": "arudha.exception",
+      "rule_family": "arudha",
+      "paraphrase": "Commits the practical overlay page covering the derived-sign base rule and exception.",
+      "status": "anchored_unreviewed",
+      "discrepancy": null
+    },
+    {
+      "binding_id": "bind_b9627aa7eaf250b2116f2eec",
+      "fragment": {
+        "fragment_id": "frag_55eaee14c099bfc3461c5ad8",
+        "revision": 1,
+        "revision_sha256": "fa8e4ad31532669b4900c041693edb3d11f37ff857e8c924326fe6fff965132a"
+      },
+      "rule_id": "svamsa.d9_lagna",
+      "rule_family": "svamsa_karakamsa",
+      "paraphrase": "Commits the practical overlay page that keeps the divisional ascendant identity explicit.",
+      "status": "anchored_unreviewed",
+      "discrepancy": null
+    },
+    {
+      "binding_id": "bind_53ab49ef04153ea320de4682",
+      "fragment": {
+        "fragment_id": "frag_55eaee14c099bfc3461c5ad8",
+        "revision": 1,
+        "revision_sha256": "fa8e4ad31532669b4900c041693edb3d11f37ff857e8c924326fe6fff965132a"
+      },
+      "rule_id": "karakamsa.d9_atmakaraka",
+      "rule_family": "svamsa_karakamsa",
+      "paraphrase": "Commits the practical overlay page that distinguishes the movable-significator divisional placement.",
+      "status": "anchored_unreviewed",
+      "discrepancy": null
+    },
+    {
+      "binding_id": "bind_fe892716428adde63c44d88e",
+      "fragment": {
+        "fragment_id": "frag_0d6fcee3c984545e074d366e",
+        "revision": 1,
+        "revision_sha256": "3ae90ceeaba8c890dc1c0ccf19dc4b8ae96e47be2bf22983fb41a993fed08eaf"
+      },
+      "rule_id": "co_lords.resolution",
+      "rule_family": "co_lords",
+      "paraphrase": "Commits a practical co-lord resolution procedure without replacing the frozen core.",
+      "status": "quarantined_conflict",
+      "discrepancy": "The source procedure uses conditional co-lord strength resolution that is not represented by the frozen core policy."
+    },
+    {
+      "binding_id": "bind_2617b144138037493465c1f3",
+      "fragment": {
+        "fragment_id": "frag_7ae587298789e55b86d416c6",
+        "revision": 1,
+        "revision_sha256": "9235dac7a27979afc396d40c751bc8162034bebfd4e9e6d6052387ec6d9cefcd"
+      },
+      "rule_id": "chara_dasha.progression",
+      "rule_family": "chara_dasha",
+      "paraphrase": "Commits practical sign-period ordering conditions without changing the production sequence.",
+      "status": "quarantined_conflict",
+      "discrepancy": "The source describes conditional progression rules beyond the frozen core simplified parity sequence."
+    },
+    {
+      "binding_id": "bind_47b6c8cc37571f457a0d6ca7",
+      "fragment": {
+        "fragment_id": "frag_56636b42fd27d2ae93c9cb3f",
+        "revision": 1,
+        "revision_sha256": "86c8f349e44685fb6f6dc7b5c40a9d19faef9d093fe7d1790a581d6aa2797f7b"
+      },
+      "rule_id": "chara_dasha.duration",
+      "rule_family": "chara_dasha",
+      "paraphrase": "Commits practical sign-period duration conditions without changing the production calculation.",
+      "status": "quarantined_conflict",
+      "discrepancy": "The source duration and exception procedure is more conditional than the frozen core counting rule."
+    }
+  ],
+  "unresolved_sources": [
+    {
+      "overlay_id": "sanjay_rath",
+      "school": "sanjay_rath",
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "blocker_code": "crop_aware_extraction_required",
+      "blocker": "The normalized edition retains duplicated two-up embedded text and needs crop-aware extraction review before fragment binding."
+    },
+    {
+      "overlay_id": "kn_rao_practical",
+      "school": "kn_rao_practical",
+      "source_id": "jaimini_kn_rao_chara_dasha_vani_scan_2010",
+      "blocker_code": "ocr_review_pending",
+      "blocker": "OCR output requires page-level human review before any fragment can be bound."
+    }
+  ]
+}

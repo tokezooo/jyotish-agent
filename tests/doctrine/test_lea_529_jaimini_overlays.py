@@ -7,16 +7,30 @@ import pytest
 
 from jaimini_helpers import build_jaimini_graph
 from jyotish_agent.doctrine.jaimini_pack import (
+    JaiminiOverlayActivationContract,
     JaiminiOverlayFailure,
     JaiminiOverlayRegistry,
     JaiminiTopic,
     analyze_jaimini_topic,
     compare_jaimini_overlays,
+    load_jaimini_overlay_activation_contract,
 )
 
 
 ROOT = Path(__file__).parents[2]
 REGISTRY = ROOT / "src/jyotish_agent/data/doctrine/jaimini-overlays.json"
+LEDGER = ROOT / "src/jyotish_agent/data/doctrine/jaimini-overlay-fragments.json"
+MANIFEST = ROOT / "src/jyotish_agent/data/doctrine/jaimini-sources.json"
+INVENTORY = ROOT / "src/jyotish_agent/data/doctrine/jaimini-rules.json"
+
+
+def _activation_contract():
+    return load_jaimini_overlay_activation_contract(
+        ledger_path=LEDGER,
+        manifest_path=MANIFEST,
+        baseline_inventory_path=INVENTORY,
+        overlay_registry_path=REGISTRY,
+    )
 
 
 def _analysis(school: str, rule_id: str):
@@ -71,34 +85,95 @@ def test_overlay_requires_explicit_activation_and_preserves_baseline_identity() 
     inactive = compare_jaimini_overlays(
         baseline, overlay, overlay_id="sanjay_rath", activate=False
     )
-    active = compare_jaimini_overlays(
-        baseline, overlay, overlay_id="sanjay_rath", activate=True
-    )
-
     assert inactive.overlay_active is False
     assert inactive.overlay_signals == ()
-    assert active.overlay_active is True
-    assert active.baseline_graph_sha256 == baseline.graph_sha256
-    assert active.overlay_graph_sha256 == overlay.graph_sha256
-    assert active.baseline_signals == baseline.signals
-    assert active.overlay_signals == overlay.signals
+    assert baseline.model_dump_json() == baseline_before
+
+    with pytest.raises(JaiminiOverlayFailure) as missing_context:
+        compare_jaimini_overlays(
+            baseline, overlay, overlay_id="sanjay_rath", activate=True
+        )
+    assert missing_context.value.code == "OVERLAY_ACTIVATION_CONTEXT_REQUIRED"
+
+    with pytest.raises(JaiminiOverlayFailure) as unavailable:
+        compare_jaimini_overlays(
+            baseline,
+            overlay,
+            overlay_id="sanjay_rath",
+            activate=True,
+            activation_contract=_activation_contract(),
+        )
+    assert unavailable.value.code == "OVERLAY_UNAVAILABLE"
     assert baseline.model_dump_json() == baseline_before
 
 
-def test_side_by_side_overlay_comparison_is_deterministic_and_explicit() -> None:
+def test_unavailable_kn_rao_overlay_cannot_activate_even_with_valid_context() -> None:
     baseline = _analysis("nilakantha_baseline", "self.baseline")
     overlay = _analysis("kn_rao_practical", "self.kn_rao")
+    contract = _activation_contract()
 
-    first = compare_jaimini_overlays(
-        baseline, overlay, overlay_id="kn_rao_practical", activate=True
-    )
-    second = compare_jaimini_overlays(
-        baseline, overlay, overlay_id="kn_rao_practical", activate=True
-    )
+    for _ in range(2):
+        with pytest.raises(JaiminiOverlayFailure) as unavailable:
+            compare_jaimini_overlays(
+                baseline,
+                overlay,
+                overlay_id="kn_rao_practical",
+                activate=True,
+                activation_contract=contract,
+            )
+        assert unavailable.value.code == "OVERLAY_UNAVAILABLE"
 
-    assert first == second
-    assert first.school_ids == ("kn_rao_practical", "nilakantha_baseline")
-    assert first.divergences == (("self.baseline", "self.kn_rao"),)
+
+def test_duck_typed_activation_context_cannot_bypass_validated_loader() -> None:
+    baseline = _analysis("nilakantha_baseline", "self.baseline")
+    overlay = _analysis("sanjay_rath", "self.rath")
+
+    class FakeContract:
+        def require_activation_ready(self, _overlay_id: str) -> None:
+            return None
+
+    with pytest.raises(JaiminiOverlayFailure) as missing_context:
+        compare_jaimini_overlays(
+            baseline,
+            overlay,
+            overlay_id="sanjay_rath",
+            activate=True,
+            activation_contract=FakeContract(),  # type: ignore[arg-type]
+        )
+    assert missing_context.value.code == "OVERLAY_ACTIVATION_CONTEXT_REQUIRED"
+
+
+def test_activation_contract_rejects_subclass_and_unvalidated_exact_instance() -> None:
+    with pytest.raises(TypeError, match="cannot be subclassed"):
+
+        class BypassContract(JaiminiOverlayActivationContract):
+            def require_activation_ready(self, _overlay_id: str) -> None:
+                return None
+
+    baseline = _analysis("nilakantha_baseline", "self.baseline")
+    overlay = _analysis("sanjay_rath", "self.rath")
+    forged = object.__new__(JaiminiOverlayActivationContract)
+    with pytest.raises(JaiminiOverlayFailure) as invalid_context:
+        compare_jaimini_overlays(
+            baseline,
+            overlay,
+            overlay_id="sanjay_rath",
+            activate=True,
+            activation_contract=forged,
+        )
+    assert invalid_context.value.code == "OVERLAY_ACTIVATION_CONTEXT_INVALID"
+
+    stale = _activation_contract()
+    object.__setattr__(stale, "_validation_state_sha256", "0" * 64)
+    with pytest.raises(JaiminiOverlayFailure) as stale_context:
+        compare_jaimini_overlays(
+            baseline,
+            overlay,
+            overlay_id="sanjay_rath",
+            activate=True,
+            activation_contract=stale,
+        )
+    assert stale_context.value.code == "OVERLAY_ACTIVATION_CONTEXT_INVALID"
 
 
 def test_hidden_school_blending_is_rejected() -> None:
