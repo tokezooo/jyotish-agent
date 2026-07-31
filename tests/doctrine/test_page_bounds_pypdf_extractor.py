@@ -300,6 +300,30 @@ def test_page_bounds_extractor_applies_implicit_tstar_before_shorthand_text(
     assert "SIBLING" not in bounded
 
 
+@pytest.mark.parametrize("shorthand", [b"(SIBLING) '", b'0 0 (SIBLING) "'])
+def test_page_bounds_extractor_tracks_td_leading_for_shorthand_text(
+    tmp_path: Path, shorthand: bytes
+) -> None:
+    path = tmp_path / "td-shorthand-sibling.pdf"
+    _write_pdf(
+        path,
+        (
+            b"BT /F1 12 Tf 1 0 0 1 25 70 Tm 0 -10 TD "
+            b"(VISIBLE) Tj "
+            + shorthand
+            + b" ET",
+        ),
+    )
+
+    pypdf = pytest.importorskip("pypdf")
+    default = pypdf.PdfReader(path, strict=True).pages[0].extract_text()
+    bounded = PageBoundsPyPdfExtractor().extract(path)[0].text
+
+    assert "VISIBLE" in default and "SIBLING" in default
+    assert bounded.strip() == "VISIBLE"
+    assert "SIBLING" not in bounded
+
+
 def test_page_bounds_extractor_preserves_default_separate_text_objects(
     tmp_path: Path,
 ) -> None:

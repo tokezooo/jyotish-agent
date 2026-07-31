@@ -285,15 +285,20 @@ class PageBoundsPyPdfExtractor:
                         except (TypeError, ValueError):
                             pass
                         return
-                    if operator == b"TL" and operands:
+                    if operator in {b"TL", b"TD"} and operands:
                         try:
                             scale_x = math.sqrt(
                                 float(tm[0]) ** 2 + float(tm[2]) ** 2
                             )
-                            text_leading[-1] = (
-                                float(operands[0]) * font_sizes[-1] * scale_x
+                            leading_operand = (
+                                operands[0]
+                                if operator == b"TL"
+                                else -float(operands[1])
                             )
-                        except (TypeError, ValueError):
+                            text_leading[-1] = (
+                                float(leading_operand) * font_sizes[-1] * scale_x
+                            )
+                        except (IndexError, TypeError, ValueError):
                             text_leading[-1] = 0.0
                         return
                     if operator == b"Do":
