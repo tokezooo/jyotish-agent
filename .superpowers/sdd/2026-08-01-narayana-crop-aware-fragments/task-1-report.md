@@ -85,3 +85,20 @@ Review-wave verification:
 Review-wave commit:
 
 - `2be8b95 fix(doctrine): preserve crop-aware PDF text`
+
+## Review wave 2 remediation
+
+Review found that pypdf's `TD` operator updates text leading as `TL(-ty)` before applying `Td`, while the bounds tracker only mirrored explicit `TL`. The stale leading caused both shorthand text operators (`'` and `"`) to evaluate their implicit `T*` at the previous line and retain an off-page sibling.
+
+Exact RED fixtures covered `Tm 0 -10 TD (VISIBLE) Tj` followed by each shorthand operator; both returned `VISIBLE\nSIBLING` before the fix. The tracker now derives `-ty`, applies pypdf's font-size and text-matrix x-scale calculation, and retains its typed fallback for malformed operands.
+
+Review-wave 2 verification:
+
+- exact `TD` shorthand regressions plus all extractor fixtures: `19 passed`;
+- focused plus adjacent ingestion/overlay/release/project suites: `64 passed in 7.80s`;
+- explicit `TL`, `T*`, Form/nested-Form, affine, per-show single-`BT`, and private Narayana replay regressions remain green;
+- Ruff 0.12.7 on the changed scope: passed.
+
+Review-wave 2 commit:
+
+- `be6a76f fix(doctrine): track TD leading for PDF shorthand`
