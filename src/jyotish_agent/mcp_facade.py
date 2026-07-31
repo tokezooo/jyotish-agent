@@ -469,21 +469,24 @@ class JyotishMcpFacade:
         )
         from .doctrine.muhurta_release import execute_muhurta_full
 
-        audit = load_muhurta_release_audit()
-        if not audit.available:
-            route = route_muhurta_activity(value.activity, locale=value.locale)
-            if route.status == "unsupported_high_stakes":
-                error_code = "HIGH_STAKES_ACTIVITY"
-                status = "unavailable"
-            elif route.status != "supported":
-                error_code = route.reason_code or "ACTIVITY_UNSUPPORTED"
-                status = "needs_input"
-            elif value.natal is not None:
-                error_code = "NATAL_PERSONALIZATION_NOT_COMPILED"
-                status = "unavailable"
-            else:
-                error_code = "RELEASE_GATES_INCOMPLETE"
-                status = "unavailable"
+        audit = load_muhurta_release_audit(verify_source_bytes=False)
+        route = route_muhurta_activity(value.activity, locale=value.locale)
+        if route.status == "unsupported_high_stakes":
+            error_code = "HIGH_STAKES_ACTIVITY"
+            status = "unavailable"
+        elif route.status != "supported":
+            error_code = route.reason_code or "ACTIVITY_UNSUPPORTED"
+            status = "needs_input"
+        elif value.natal is not None:
+            error_code = "NATAL_PERSONALIZATION_NOT_COMPILED"
+            status = "unavailable"
+        elif not audit.available:
+            error_code = "RELEASE_GATES_INCOMPLETE"
+            status = "unavailable"
+        else:
+            error_code = None
+            status = None
+        if status is not None:
             return MuhurtaFullReleaseResult(
                 status=status,
                 request_mode=value.mode,
@@ -494,6 +497,20 @@ class JyotishMcpFacade:
                 external_review_missing=audit.external_review_missing,
                 report=None,
                 error_code=error_code,
+            )
+        try:
+            load_muhurta_release_audit()
+        except ValueError:
+            return MuhurtaFullReleaseResult(
+                status="unavailable",
+                request_mode=value.mode,
+                locale=value.locale,
+                profile=route.profile,
+                admission_state=audit.admission_state,
+                public_release_blockers=list(audit.public_release_blockers),
+                external_review_missing=audit.external_review_missing,
+                report=None,
+                error_code="SOURCE_BYTES_UNVERIFIED",
             )
         execution = execute_muhurta_full(
             value,

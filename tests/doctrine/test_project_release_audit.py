@@ -29,4 +29,9 @@ def test_project_release_audit_is_generated_from_current_domain_evidence() -> No
         "status": "passed",
         "tracked_private_source_count": 0,
     }
-    assert any("held_out" in item for item in recorded["blockers"])
+    assert not any("held_out" in item for item in recorded["blockers"])
+    muhurta = next(
+        item for item in recorded["domains"] if item["domain"] == "muhurta"
+    )
+    assert muhurta["available"] is True
+    assert muhurta["admission_state"] == "private_experimental"
