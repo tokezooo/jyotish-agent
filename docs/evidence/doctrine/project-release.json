@@ -80,20 +80,20 @@
   ],
   "verification": {
     "review_remediation_suite": {
-      "command": "uv run pytest -q tests/doctrine/test_lea_526_jaimini_career.py tests/doctrine/test_lea_527_jaimini_relationships.py tests/doctrine/test_lea_536_prashna_renderer.py tests/doctrine/test_lea_530_jaimini_release.py tests/doctrine/test_lea_537_prashna_release.py tests/doctrine/test_lea_544_muhurta_release.py",
+      "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine /Users/vlad/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m pytest -q tests/doctrine/test_lea_526_jaimini_career.py tests/doctrine/test_lea_527_jaimini_relationships.py tests/doctrine/test_lea_536_prashna_renderer.py tests/doctrine/test_lea_530_jaimini_release.py tests/doctrine/test_lea_537_prashna_release.py tests/doctrine/test_lea_544_muhurta_release.py",
       "status": "passed",
       "passed": 40,
       "failed": 0
     },
     "full_python_suite": {
-      "command": "uv run pytest -q",
+      "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine /Users/vlad/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m pytest -q",
       "status": "passed",
-      "passed": 793,
+      "passed": 829,
       "failed": 0,
       "skipped": 2
     },
     "ruff": {
-      "command": "uv run ruff check src tests",
+      "command": "UV_CACHE_DIR=/tmp/jyotish-uv-cache /tmp/jyotish-uv/uvx --from ruff==0.12.7 ruff check src tests",
       "status": "passed"
     },
     "typescript": {
@@ -127,5 +127,5 @@
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "b350ecb08bed7cbff13602fdf3ff0c0da22b3ecea7adc039284b257c53745917"
+  "audit_sha256": "fbf9737b12fb8dcb8f74413ca9e7ec7e42381513f487afd83118e7b219da775a"
 }

@@ -84,6 +84,15 @@ def _number(value: Any, label: str, *, upper: float | None = None) -> None:
         raise HeldOutCorpusError(f"{label} is outside the synthetic geometry range")
 
 
+def _utc_timestamp(value: Any, label: str) -> dt.datetime:
+    if not isinstance(value, str) or not _UTC_TIMESTAMP.fullmatch(value):
+        raise HeldOutCorpusError(f"{label} must be a UTC timestamp")
+    try:
+        return dt.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.UTC)
+    except ValueError as exc:
+        raise HeldOutCorpusError(f"{label} must be a real UTC timestamp") from exc
+
+
 def _validate_case(case: Any) -> None:
     if not isinstance(case, dict):
         raise HeldOutCorpusError("case must be an object")
@@ -169,7 +178,7 @@ def _validate_case(case: Any) -> None:
         ):
             raise HeldOutCorpusError("co-lord input is invalid")
         for candidate in candidates:
-            _number(durations[candidate], f"co-lord duration {candidate}")
+            _number(durations[candidate], f"co-lord duration {candidate}", upper=12)
             _number(degrees[candidate], f"co-lord degree {candidate}", upper=30)
         return
 
@@ -201,7 +210,7 @@ def _validate_case(case: Any) -> None:
     if family == "special_lagnas":
         _require_keys(scenario, {"sun_longitude", "minutes_since_sunrise"}, "special-lagna input")
         _number(scenario["sun_longitude"], "sun_longitude", upper=360)
-        _number(scenario["minutes_since_sunrise"], "minutes_since_sunrise")
+        _number(scenario["minutes_since_sunrise"], "minutes_since_sunrise", upper=1440)
         if not isinstance(expected, dict) or set(expected) != {"bhava_lagna", "hora_lagna", "ghati_lagna"}:
             raise HeldOutCorpusError("special-lagna expected value is invalid")
         for name, value in expected.items():
@@ -216,10 +225,9 @@ def _validate_case(case: Any) -> None:
         _sign(sign, "chara dasha lord sign")
     if (
         scenario["gender"] not in {"female", "male"}
-        or not isinstance(scenario["start"], str)
-        or not _UTC_TIMESTAMP.fullmatch(scenario["start"])
     ):
         raise HeldOutCorpusError("chara dasha input is invalid")
+    _utc_timestamp(scenario["start"], "chara dasha start")
     if not isinstance(expected, dict) or set(expected) != {
         "signs", "years", "first_end", "first_end_in_first", "first_end_in_second"
     }:
@@ -229,12 +237,11 @@ def _validate_case(case: Any) -> None:
         or len(expected["signs"]) != 12
         or not isinstance(expected["years"], list)
         or len(expected["years"]) != 12
-        or not isinstance(expected["first_end"], str)
-        or not _UTC_TIMESTAMP.fullmatch(expected["first_end"])
         or type(expected["first_end_in_first"]) is not bool
         or type(expected["first_end_in_second"]) is not bool
     ):
         raise HeldOutCorpusError("chara dasha expected value is invalid")
+    _utc_timestamp(expected["first_end"], "chara dasha expected first_end")
     for sign in expected["signs"]:
         _sign(sign, "chara dasha expected sign")
     for years in expected["years"]:
@@ -353,13 +360,19 @@ def evaluate_held_out_geometry(
         raise ValueError("held-out execution requires allow_held_out=True")
     _check_checksum(corpus_path, manifest_path)
     corpus = _json_object(corpus_path, "held-out corpus")
-    _validate_corpus(corpus)
+    try:
+        _validate_corpus(corpus)
+    except HeldOutCorpusError:
+        raise
+    except (TypeError, ValueError, OverflowError) as exc:
+        raise HeldOutCorpusError("held-out corpus semantic validation failed") from exc
     failures: list[dict[str, Any]] = []
     for case in corpus["cases"]:
         observed = _OBSERVERS[case["rule_family"]](case["input"])
         if observed != case["expected"]:
             failures.append(
                 {
+                    "case_id": case["id"],
                     "rule_family": case["rule_family"],
                     "expected": case["expected"],
                     "observed": observed,

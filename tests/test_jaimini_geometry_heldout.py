@@ -191,8 +191,41 @@ def test_expected_value_drift_reports_a_failed_oracle_case(tmp_path: Path) -> No
     )
 
     assert report["failed_count"] == 1
+    assert report["failures"][0]["case_id"] == "karaka_7_ranking"
     assert report["failures"][0]["rule_family"] == "karakas"
     assert report["failures"][0]["expected"]["AK"] == "Sun"
+
+
+@pytest.mark.parametrize(
+    ("case_id", "mutate"),
+    [
+        ("co_lord_duration", lambda case: case["input"]["durations"].update(Mars=-1)),
+        ("co_lord_degree", lambda case: case["input"]["degrees"].update(Mars=-0.1)),
+        ("special_lagnas_wrap", lambda case: case["input"].update(minutes_since_sunrise=-1)),
+        ("special_lagnas_wrap", lambda case: case["input"].update(minutes_since_sunrise=1440)),
+        ("chara_dasha_boundary", lambda case: case["input"].update(start="2026-99-99T99:99:99Z")),
+        ("chara_dasha_boundary", lambda case: case["expected"].update(first_end="2026-99-99T99:99:99Z")),
+        ("chara_dasha_boundary", lambda case: case["expected"].update(years=[0] * 12)),
+    ],
+)
+def test_semantically_impossible_geometry_is_rejected_before_observer_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case_id: str, mutate
+) -> None:
+    def mutate_payload(payload: dict[str, object]) -> None:
+        case = next(item for item in payload["cases"] if item["id"] == case_id)
+        mutate(case)
+
+    corpus, manifest = _mutated_paths(tmp_path, mutate_payload)
+
+    def should_not_run(_scenario: object) -> object:
+        raise AssertionError("observer received a semantically impossible held-out case")
+
+    for family in jaimini_evaluation._OBSERVERS:
+        monkeypatch.setitem(jaimini_evaluation._OBSERVERS, family, should_not_run)
+    with pytest.raises(HeldOutCorpusError):
+        evaluate_held_out_geometry(
+            corpus_path=corpus, manifest_path=manifest, allow_held_out=True
+        )
 
 
 @pytest.mark.parametrize(
