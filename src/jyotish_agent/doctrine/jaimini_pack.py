@@ -377,9 +377,12 @@ class JaiminiOverlayFragmentLedger(FrozenModel):
         ):
             raise ValueError("fragment source manifest identity does not match ledger")
         if {fragment.source_id for fragment in self.fragments} != {
-            "jaimini_sanjay_rath_upadesa_sutras_1997"
+            "jaimini_sanjay_rath_upadesa_sutras_1997",
+            "jaimini_sanjay_rath_narayana_dasa_2004",
         }:
-            raise ValueError("this ledger accepts only bounded Upadesa source pages")
+            raise ValueError(
+                "this ledger requires exactly the declared Sanjay Rath source pages"
+            )
         if any(fragment.school != self.school for fragment in self.fragments):
             raise ValueError("overlay fragment ledger cannot blend schools")
         if any(
@@ -457,8 +460,13 @@ class JaiminiOverlayFragmentLedger(FrozenModel):
             raise ValueError("fragment bindings must remain quarantined")
 
         for fragment in self.fragments:
-            if fragment.source_id != "jaimini_sanjay_rath_upadesa_sutras_1997":
-                raise ValueError("fragment ledger accepts only bounded Upadesa pages")
+            if fragment.source_id not in {
+                "jaimini_sanjay_rath_upadesa_sutras_1997",
+                "jaimini_sanjay_rath_narayana_dasa_2004",
+            }:
+                raise ValueError(
+                    "fragment ledger accepts only declared Sanjay Rath source pages"
+                )
             if fragment.school != self.school:
                 raise ValueError("overlay fragment ledger cannot blend schools")
             source = sources.get(fragment.source_id)

@@ -5,7 +5,7 @@
     {
       "domain": "jaimini",
       "release_id": "full_jaimini_v1",
-      "evidence_sha256": "43a0aca70d43d8f20b184b2d13afc219d4e8b6e3681522fe24a0d9cf7ebba582",
+      "evidence_sha256": "76a1d005973214dcffe10c5ad4bff190513c5970720b896b11647290df8560c8",
       "admission_state": "blocked_sources",
       "available": false,
       "gate_statuses": {
@@ -23,7 +23,7 @@
       "blockers": [
         "compiled_profile: no source-admitted production profile exists",
         "nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
-        "source_review: Sanjay Rath Upadesa page fragments are hash-bound but quarantined; specialist review and overlay rule compilation remain missing; Narayana crop-aware extraction and K. N. Rao OCR review are unresolved",
+        "source_review: Sanjay Rath Upadesa and crop-aware Narayana pages 46-48 are hash-bound but quarantined and uncompiled; specialist review and overlay rule compilation remain missing; K. N. Rao OCR review remains unresolved",
         "specialist_review: no production rule/profile review"
       ]
     },
@@ -116,7 +116,7 @@
   "blockers": [
     "jaimini: compiled_profile: no source-admitted production profile exists",
     "jaimini: nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
-    "jaimini: source_review: Sanjay Rath Upadesa page fragments are hash-bound but quarantined; specialist review and overlay rule compilation remain missing; Narayana crop-aware extraction and K. N. Rao OCR review are unresolved",
+    "jaimini: source_review: Sanjay Rath Upadesa and crop-aware Narayana pages 46-48 are hash-bound but quarantined and uncompiled; specialist review and overlay rule compilation remain missing; K. N. Rao OCR review remains unresolved",
     "jaimini: specialist_review: no production rule/profile review",
     "prashna: published_outcome_cases: one additional complete traceable case is required",
     "prashna: tajika_source_admission: OCR, translation, and specialist review are incomplete",
@@ -127,5 +127,5 @@
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "930a89409b91772b7f641b5bc3f6077f323775102085d15f8087f9729963c8d9"
+  "audit_sha256": "88e6e297c0651a8fddd2067e1220c23480fa312ac2e041619858ae0c216c9f45"
 }

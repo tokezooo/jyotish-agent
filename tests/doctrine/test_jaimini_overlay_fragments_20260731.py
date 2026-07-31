@@ -6,7 +6,12 @@ from pathlib import Path
 
 import pytest
 
-from jyotish_agent.doctrine.ingestion import PyPdfExtractor, _extract_anchors, _normalize_text
+from jyotish_agent.doctrine.ingestion import (
+    PageBoundsPyPdfExtractor,
+    PyPdfExtractor,
+    _extract_anchors,
+    _normalize_text,
+)
 from jyotish_agent.doctrine.jaimini_pack import (
     JaiminiOverlayFailure,
     JaiminiOverlayFragmentLedger,
@@ -30,6 +35,7 @@ INVENTORY_PATH = ROOT / "src/jyotish_agent/data/doctrine/jaimini-rules.json"
 OVERLAYS_PATH = ROOT / "src/jyotish_agent/data/doctrine/jaimini-overlays.json"
 CORE_PATH = ROOT / "src/jyotish_agent/data/jaimini/jaimini_core_v1.json"
 UPADESA_SOURCE_ID = "jaimini_sanjay_rath_upadesa_sutras_1997"
+NARAYANA_SOURCE_ID = "jaimini_sanjay_rath_narayana_dasa_2004"
 
 
 def _context_parts():
@@ -68,7 +74,8 @@ def test_overlay_fragment_ledger_is_hash_bound_and_context_valid() -> None:
     assert len(ledger.fragments) >= 8
     assert len(ledger.bindings) >= 10
     assert {fragment.source_id for fragment in ledger.fragments} == {
-        UPADESA_SOURCE_ID
+        UPADESA_SOURCE_ID,
+        NARAYANA_SOURCE_ID,
     }
     assert all(fragment.admission_status == "quarantined" for fragment in ledger.fragments)
     assert all(fragment.excerpt_permission == "none" for fragment in ledger.fragments)
@@ -93,6 +100,7 @@ def test_overlay_bindings_cover_bounded_families_and_make_conflicts_explicit() -
         "co_lords.resolution",
         "chara_dasha.progression",
         "chara_dasha.duration",
+        "chara_dasha.antardasha",
     } <= set(by_rule)
     assert all(
         binding.status == JaiminiRuleStatus.QUARANTINED_CONFLICT
@@ -101,6 +109,7 @@ def test_overlay_bindings_cover_bounded_families_and_make_conflicts_explicit() -
             "co_lords.resolution",
             "chara_dasha.progression",
             "chara_dasha.duration",
+            "chara_dasha.antardasha",
         )
         for binding in by_rule[rule_id]
     )
@@ -133,7 +142,7 @@ def test_fragment_and_binding_identities_fail_closed_on_substitution() -> None:
 
 def test_unresolved_source_school_cannot_be_relabelled() -> None:
     payload = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
-    payload["unresolved_sources"][0]["school"] = "kn_rao_practical"
+    payload["unresolved_sources"][0]["school"] = "sanjay_rath"
 
     with pytest.raises(ValueError, match="school must match"):
         JaiminiOverlayFragmentLedger.model_validate(payload)
@@ -185,8 +194,8 @@ def test_context_validation_rejects_release_identity_mutations(
     [
         (
             "source_id",
-            "jaimini_sanjay_rath_narayana_dasa_2004",
-            "bounded Upadesa",
+            "jaimini_kn_rao_chara_dasha_vani_scan_2010",
+            "declared Sanjay Rath",
         ),
         ("school", "kn_rao_practical", "cannot blend schools"),
     ],
@@ -271,13 +280,7 @@ def test_unresolved_sources_are_explicit_and_do_not_enter_fragment_evidence() ->
     ledger = _ledger()
     unresolved = {item.source_id: item for item in ledger.unresolved_sources}
 
-    assert set(unresolved) == {
-        "jaimini_sanjay_rath_narayana_dasa_2004",
-        "jaimini_kn_rao_chara_dasha_vani_scan_2010",
-    }
-    assert unresolved[
-        "jaimini_sanjay_rath_narayana_dasa_2004"
-    ].blocker_code == "crop_aware_extraction_required"
+    assert set(unresolved) == {"jaimini_kn_rao_chara_dasha_vani_scan_2010"}
     assert unresolved[
         "jaimini_kn_rao_chara_dasha_vani_scan_2010"
     ].blocker_code == "ocr_review_pending"
@@ -304,7 +307,9 @@ def test_private_upadesa_pages_match_tracked_normalized_page_commitments() -> No
 
     extracted = PyPdfExtractor().extract(private_path)
     ledger = _ledger()
-    for fragment in ledger.fragments:
+    for fragment in (
+        item for item in ledger.fragments if item.source_id == UPADESA_SOURCE_ID
+    ):
         text = _normalize_text(extracted[fragment.page_number - 1].text)
         anchors = _extract_anchors(text)
         page_payload = {
@@ -325,6 +330,57 @@ def test_private_upadesa_pages_match_tracked_normalized_page_commitments() -> No
         )
 
 
+def test_private_narayana_pages_replay_crop_aware_commitments_without_duplicates() -> None:
+    manifest = load_source_manifest(MANIFEST_PATH)
+    source = next(
+        item for item in manifest.sources if item.source_id == NARAYANA_SOURCE_ID
+    )
+    private_path = ROOT / "private_sources" / source.local_file
+    if not private_path.is_file():
+        pytest.skip("private Narayana source is unavailable in this checkout")
+
+    bounded = PageBoundsPyPdfExtractor().extract(private_path)
+    default = PyPdfExtractor().extract(private_path)
+    ledger = _ledger()
+    fragments = sorted(
+        (
+            fragment
+            for fragment in ledger.fragments
+            if fragment.source_id == NARAYANA_SOURCE_ID
+        ),
+        key=lambda fragment: fragment.page_number,
+    )
+
+    assert [fragment.page_number for fragment in fragments] == [46, 47, 48]
+    assert [fragment.printed_page for fragment in fragments] == [46, 47, 48]
+    bounded_hashes: list[str] = []
+    for fragment in fragments:
+        text = _normalize_text(bounded[fragment.page_number - 1].text)
+        anchors = _extract_anchors(text)
+        page_payload = {
+            "page_number": fragment.page_number,
+            "printed_page": fragment.printed_page,
+            "language": fragment.language,
+            "text": text,
+            "source_method": "embedded_text",
+            "confidence": 1.0,
+            "admission_status": "admitted",
+            "anchors": [anchor.model_dump(mode="json") for anchor in anchors],
+        }
+        page_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        bounded_hashes.append(page_hash)
+        assert page_hash == fragment.full_text_sha256
+        assert hashlib.sha256(canonical_json(page_payload).encode("utf-8")).hexdigest() == (
+            fragment.normalized_content_sha256
+        )
+
+    assert len(set(bounded_hashes)) == 3
+    assert _normalize_text(default[45].text) != _normalize_text(bounded[45].text)
+    assert _normalize_text(default[46].text) != _normalize_text(bounded[46].text)
+    assert _normalize_text(default[46].text) == _normalize_text(default[47].text)
+    assert _normalize_text(bounded[46].text) != _normalize_text(bounded[47].text)
+
+
 def test_privacy_safe_audit_is_bound_to_ledger_and_preserves_release_blockers() -> None:
     ledger = _ledger()
     audit = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
@@ -336,8 +392,16 @@ def test_privacy_safe_audit_is_bound_to_ledger_and_preserves_release_blockers() 
     assert audit["fragment_source_ids"] == sorted(
         {fragment.source_id for fragment in ledger.fragments}
     )
-    assert audit["normalized_page_numbers"] == sorted(
-        fragment.page_number for fragment in ledger.fragments
+    assert audit["normalized_pages"] == sorted(
+        [
+            {
+                "source_id": fragment.source_id,
+                "page_number": fragment.page_number,
+                "printed_page": fragment.printed_page,
+            }
+            for fragment in ledger.fragments
+        ],
+        key=lambda item: (item["source_id"], item["page_number"]),
     )
     assert audit["fragment_count"] == len(ledger.fragments)
     assert audit["binding_count"] == len(ledger.bindings)

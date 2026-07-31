@@ -32,6 +32,72 @@
       "admission_status": "quarantined"
     },
     {
+      "fragment_id": "frag_f7b1d8e116f1edbddc37a321",
+      "revision": 1,
+      "revision_sha256": "ecb0a504f2e2adf12213c0248ddff782de239959e78405fb61dabb311812875f",
+      "draft_sha256": "1750a9133c78ccdba76a75bc7425389d150b23715bad0e6efd40c36e8b2f4268",
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "a7d9e860d28ee20ed1c420f1c84d6ec850ffb68bf225fb60d77e53f2925a9a66",
+      "page_number": 46,
+      "printed_page": 46,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-46",
+      "language": "en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "chara_dasha_progression",
+      "full_text_sha256": "483dcd1c37ea402e795f6daf6d1d26b52cee192836e7ca61aef5dd59cbd1f223",
+      "normalized_content_sha256": "aebf9306cfe4464bd027a403171f33c4929e8231c28eda96a7807174855029e8",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_23ed7263770ce9ddf9fc1271",
+      "revision": 1,
+      "revision_sha256": "bae681dea4841d7b7324e319123be2c5cf6788e935dc54e73c86c5e77972c721",
+      "draft_sha256": "4bea5bfa47f91285ec88cb1cfcdfa0f2c1908b7899176b433bc76dac3b868b46",
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "a7d9e860d28ee20ed1c420f1c84d6ec850ffb68bf225fb60d77e53f2925a9a66",
+      "page_number": 47,
+      "printed_page": 47,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-47",
+      "language": "en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "chara_dasha_antardasha",
+      "full_text_sha256": "91dec8a856c80498662cbeb60556c97c5a99176634bef641506fdf62bbe4f4b7",
+      "normalized_content_sha256": "4c1cbaea2308114541b962f564bc1fc6382aa08985ae798bae0b3ca312152a15",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_4cdb275f241bbc0d637b963a",
+      "revision": 1,
+      "revision_sha256": "9af989b2b0505909c8fe740f49adbe571e124aa885fbedffe193e10adbcc2641",
+      "draft_sha256": "22b2bf41b51bcf6f88da410bb7deaabe2eec8d01783b5bfeee44e4beb668ddb6",
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "a7d9e860d28ee20ed1c420f1c84d6ec850ffb68bf225fb60d77e53f2925a9a66",
+      "page_number": 48,
+      "printed_page": 48,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-48",
+      "language": "en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "chara_dasha_antardasha",
+      "full_text_sha256": "3c4247b00c946497d4df3b8fd4fe3a6658384af2e14055b764c528cf52da81f6",
+      "normalized_content_sha256": "94d7e1184fadddf8a768d75437d922f64de4c1d611d9037df1fbb06472168b6d",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
       "fragment_id": "frag_985345c3b82aea1eb6f65dc1",
       "revision": 1,
       "revision_sha256": "bcfbf41bc4e677e5bef6656811dfd669a736ad22b1fd5d42bfd458ec2101752f",
@@ -386,16 +452,48 @@
       "paraphrase": "Commits practical sign-period duration conditions without changing the production calculation.",
       "status": "quarantined_conflict",
       "discrepancy": "The source duration and exception procedure is more conditional than the frozen core counting rule."
+    },
+    {
+      "binding_id": "bind_de6dd17a82e096a4aa2d1680",
+      "fragment": {
+        "fragment_id": "frag_f7b1d8e116f1edbddc37a321",
+        "revision": 1,
+        "revision_sha256": "ecb0a504f2e2adf12213c0248ddff782de239959e78405fb61dabb311812875f"
+      },
+      "rule_id": "chara_dasha.progression",
+      "rule_family": "chara_dasha",
+      "paraphrase": "Commits the practical overlay page that specifies sign-period start and ordering conditions.",
+      "status": "quarantined_conflict",
+      "discrepancy": "The source defines conditional start and ordering rules beyond the frozen core simplified progression."
+    },
+    {
+      "binding_id": "bind_4284a8454ed9c49cb8b876a1",
+      "fragment": {
+        "fragment_id": "frag_23ed7263770ce9ddf9fc1271",
+        "revision": 1,
+        "revision_sha256": "bae681dea4841d7b7324e319123be2c5cf6788e935dc54e73c86c5e77972c721"
+      },
+      "rule_id": "chara_dasha.antardasha",
+      "rule_family": "chara_dasha",
+      "paraphrase": "Commits the practical overlay page that specifies subdivision order and duration.",
+      "status": "quarantined_conflict",
+      "discrepancy": "The source subdivides major periods through sign-order conditions not represented by the frozen core."
+    },
+    {
+      "binding_id": "bind_76b9b1c60a562ff477a09e3e",
+      "fragment": {
+        "fragment_id": "frag_4cdb275f241bbc0d637b963a",
+        "revision": 1,
+        "revision_sha256": "9af989b2b0505909c8fe740f49adbe571e124aa885fbedffe193e10adbcc2641"
+      },
+      "rule_id": "chara_dasha.antardasha",
+      "rule_family": "chara_dasha",
+      "paraphrase": "Commits the continuation page for practical subdivision ordering conditions.",
+      "status": "quarantined_conflict",
+      "discrepancy": "The source continuation adds subdivision direction conditions not represented by the frozen core."
     }
   ],
   "unresolved_sources": [
-    {
-      "overlay_id": "sanjay_rath",
-      "school": "sanjay_rath",
-      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
-      "blocker_code": "crop_aware_extraction_required",
-      "blocker": "The normalized edition retains duplicated two-up embedded text and needs crop-aware extraction review before fragment binding."
-    },
     {
       "overlay_id": "kn_rao_practical",
       "school": "kn_rao_practical",

@@ -26,7 +26,7 @@
 - [x] Run real Codex conversational RU/EN quick and inspection smokes for all three domains.
 - [x] Run held-out calculation/trust adversarial domain evals (15 independently authored cases).
 - [x] Bind Sanjay Rath Upadesa overlay pages to text-free, quarantined fragment identities; no rule admission or overlay activation.
-- [ ] Add crop-aware extraction review for Narayana Dasa and page-level OCR review for the K. N. Rao overlay before fragment binding.
+- [ ] Complete page-level OCR review for the K. N. Rao overlay before fragment binding; Narayana pages 46-48 are crop-aware and hash-bound but remain quarantined pending specialist review and compilation.
 - [ ] Run one real deep Codex case per domain; inspection does not satisfy the plan's deep-mode gate.
 - [ ] Run adjudicated real/concierge sessions and doctrinal-quality held-out evals.
 
