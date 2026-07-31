@@ -13,6 +13,7 @@ from jyotish_agent.doctrine.jaimini_pack import (
     JaiminiOverlayRegistry,
     JaiminiRuleInventory,
     JaiminiRuleStatus,
+    load_jaimini_overlay_activation_contract,
 )
 from jyotish_agent.doctrine.sources import load_source_manifest
 from jyotish_agent.research_store import canonical_json
@@ -30,20 +31,29 @@ CORE_PATH = ROOT / "src/jyotish_agent/data/jaimini/jaimini_core_v1.json"
 UPADESA_SOURCE_ID = "jaimini_sanjay_rath_upadesa_sutras_1997"
 
 
-def _ledger() -> JaiminiOverlayFragmentLedger:
-    ledger = JaiminiOverlayFragmentLedger.model_validate_json(
-        LEDGER_PATH.read_text(encoding="utf-8")
-    )
-    ledger.validate_context(
-        manifest=load_source_manifest(MANIFEST_PATH),
-        baseline_inventory=JaiminiRuleInventory.model_validate_json(
+def _context_parts():
+    return (
+        load_source_manifest(MANIFEST_PATH),
+        JaiminiRuleInventory.model_validate_json(
             INVENTORY_PATH.read_text(encoding="utf-8")
         ),
-        overlay_registry=JaiminiOverlayRegistry.model_validate_json(
+        JaiminiOverlayRegistry.model_validate_json(
             OVERLAYS_PATH.read_text(encoding="utf-8")
         ),
     )
-    return ledger
+
+
+def _activation_contract():
+    return load_jaimini_overlay_activation_contract(
+        ledger_path=LEDGER_PATH,
+        manifest_path=MANIFEST_PATH,
+        baseline_inventory_path=INVENTORY_PATH,
+        overlay_registry_path=OVERLAYS_PATH,
+    )
+
+
+def _ledger() -> JaiminiOverlayFragmentLedger:
+    return _activation_contract().ledger
 
 
 def test_overlay_fragment_ledger_is_hash_bound_and_context_valid() -> None:
@@ -128,6 +138,116 @@ def test_unresolved_source_school_cannot_be_relabelled() -> None:
         JaiminiOverlayFragmentLedger.model_validate(payload)
 
 
+def test_context_validation_rejects_page_offset_substitution() -> None:
+    ledger = _ledger()
+    manifest, inventory, registry = _context_parts()
+    fragment = ledger.fragments[0].model_copy(update={"printed_page": 999})
+    mutated = ledger.model_copy(
+        update={"fragments": (fragment, *ledger.fragments[1:])}
+    )
+
+    with pytest.raises(ValueError, match="page coordinates"):
+        mutated.validate_context(
+            manifest=manifest,
+            baseline_inventory=inventory,
+            overlay_registry=registry,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("activation_status", "available", "unavailable quarantine state"),
+        ("doctrine_admitted", True, "unavailable quarantine state"),
+        ("product_rule_use_allowed", True, "unavailable quarantine state"),
+        ("source_manifest_sha256", "0" * 64, "source manifest"),
+        ("baseline_inventory_sha256", "0" * 64, "baseline inventory"),
+    ],
+)
+def test_context_validation_rejects_release_identity_mutations(
+    field: str, value: object, message: str
+) -> None:
+    ledger = _ledger()
+    manifest, inventory, registry = _context_parts()
+    mutated = ledger.model_copy(update={field: value})
+
+    with pytest.raises(ValueError, match=message):
+        mutated.validate_context(
+            manifest=manifest,
+            baseline_inventory=inventory,
+            overlay_registry=registry,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        (
+            "source_id",
+            "jaimini_sanjay_rath_narayana_dasa_2004",
+            "bounded Upadesa",
+        ),
+        ("school", "kn_rao_practical", "cannot blend schools"),
+    ],
+)
+def test_context_validation_rejects_fragment_identity_mutations(
+    field: str, value: str, message: str
+) -> None:
+    ledger = _ledger()
+    manifest, inventory, registry = _context_parts()
+    fragment = ledger.fragments[0].model_copy(update={field: value})
+    mutated = ledger.model_copy(
+        update={"fragments": (fragment, *ledger.fragments[1:])}
+    )
+
+    with pytest.raises(ValueError, match=message):
+        mutated.validate_context(
+            manifest=manifest,
+            baseline_inventory=inventory,
+            overlay_registry=registry,
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("rule_id", "unknown.overlay_rule", "unknown baseline rule"),
+        ("status", JaiminiRuleStatus.ADMITTED, "must remain quarantined"),
+    ],
+)
+def test_context_validation_rejects_binding_mutations(
+    field: str, value: object, message: str
+) -> None:
+    ledger = _ledger()
+    manifest, inventory, registry = _context_parts()
+    binding = ledger.bindings[0].model_copy(update={field: value})
+    mutated = ledger.model_copy(
+        update={"bindings": (binding, *ledger.bindings[1:])}
+    )
+
+    with pytest.raises(ValueError, match=message):
+        mutated.validate_context(
+            manifest=manifest,
+            baseline_inventory=inventory,
+            overlay_registry=registry,
+        )
+
+
+def test_safe_loader_cannot_return_without_context_validation(tmp_path: Path) -> None:
+    payload = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
+    payload["baseline_inventory_sha256"] = "0" * 64
+    substituted = tmp_path / "substituted-ledger.json"
+    substituted.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="baseline inventory"):
+        load_jaimini_overlay_activation_contract(
+            ledger_path=substituted,
+            manifest_path=MANIFEST_PATH,
+            baseline_inventory_path=INVENTORY_PATH,
+            overlay_registry_path=OVERLAYS_PATH,
+        )
+
+
 def test_tracked_projection_contains_no_source_text_or_private_locator() -> None:
     ledger_payload = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
     audit_payload = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
@@ -209,12 +329,38 @@ def test_privacy_safe_audit_is_bound_to_ledger_and_preserves_release_blockers() 
     audit = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
 
     assert audit["ledger_sha256"] == ledger.ledger_sha256
+    assert audit["source_manifest_sha256"] == ledger.source_manifest_sha256
+    assert audit["baseline_inventory_sha256"] == ledger.baseline_inventory_sha256
+    assert audit["fragment_source_ids"] == sorted(
+        {fragment.source_id for fragment in ledger.fragments}
+    )
+    assert audit["normalized_page_numbers"] == sorted(
+        fragment.page_number for fragment in ledger.fragments
+    )
     assert audit["fragment_count"] == len(ledger.fragments)
     assert audit["binding_count"] == len(ledger.bindings)
-    assert audit["admitted_binding_count"] == 0
-    assert audit["conflict_binding_count"] >= 3
+    assert audit["anchored_unreviewed_binding_count"] == sum(
+        binding.status == JaiminiRuleStatus.ANCHORED_UNREVIEWED
+        for binding in ledger.bindings
+    )
+    assert audit["conflict_binding_count"] == sum(
+        binding.status == JaiminiRuleStatus.QUARANTINED_CONFLICT
+        for binding in ledger.bindings
+    )
+    assert audit["admitted_binding_count"] == sum(
+        binding.status == JaiminiRuleStatus.ADMITTED for binding in ledger.bindings
+    )
+    assert audit["unresolved_sources"] == [
+        {
+            "source_id": item.source_id,
+            "blocker_code": item.blocker_code,
+        }
+        for item in ledger.unresolved_sources
+    ]
+    assert audit["doctrine_admitted"] == ledger.doctrine_admitted
+    assert audit["product_rule_use_allowed"] == ledger.product_rule_use_allowed
     assert audit["release_promoted"] is False
-    assert audit["overlay_activated"] is False
+    assert audit["overlay_activated"] == ledger.activation_allowed
     assert {
         "nilakantha_subodhini_translation",
         "specialist_review",

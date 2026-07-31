@@ -9,8 +9,10 @@ from __future__ import annotations
 
 import hashlib
 import datetime as dt
+import json
 import re
 from enum import StrEnum
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -20,7 +22,13 @@ from .evaluation import AdmissionEvaluator, REQUIRED_AUTOMATED_GATES
 from .evidence import FragmentRef, SourceFragment
 from .graph import AnalysisGraph
 from .models import FrozenModel, ScanQuality
-from .sources import Sha256, SourceId, SourceManifest, SourceVerificationReport
+from .sources import (
+    Sha256,
+    SourceId,
+    SourceManifest,
+    SourceVerificationReport,
+    load_source_manifest,
+)
 
 
 class JaiminiCorpusRequirement(StrEnum):
@@ -419,6 +427,12 @@ class JaiminiOverlayFragmentLedger(FrozenModel):
         baseline_inventory: JaiminiRuleInventory,
         overlay_registry: "JaiminiOverlayRegistry",
     ) -> None:
+        if (
+            self.activation_status != "unavailable"
+            or self.doctrine_admitted is not False
+            or self.product_rule_use_allowed is not False
+        ):
+            raise ValueError("fragment ledger must retain its unavailable quarantine state")
         if manifest.manifest_sha256 != self.source_manifest_sha256:
             raise ValueError("active source manifest does not match fragment ledger")
         if baseline_inventory.inventory_sha256 != self.baseline_inventory_sha256:
@@ -432,8 +446,21 @@ class JaiminiOverlayFragmentLedger(FrozenModel):
         known_rules = {candidate.rule_id for candidate in baseline_inventory.candidates}
         if any(binding.rule_id not in known_rules for binding in self.bindings):
             raise ValueError("fragment binding references an unknown baseline rule family")
+        if any(
+            binding.status
+            not in {
+                JaiminiRuleStatus.ANCHORED_UNREVIEWED,
+                JaiminiRuleStatus.QUARANTINED_CONFLICT,
+            }
+            for binding in self.bindings
+        ):
+            raise ValueError("fragment bindings must remain quarantined")
 
         for fragment in self.fragments:
+            if fragment.source_id != "jaimini_sanjay_rath_upadesa_sutras_1997":
+                raise ValueError("fragment ledger accepts only bounded Upadesa pages")
+            if fragment.school != self.school:
+                raise ValueError("overlay fragment ledger cannot blend schools")
             source = sources.get(fragment.source_id)
             if source is None:
                 raise ValueError("fragment source is absent from active manifest")
@@ -443,6 +470,14 @@ class JaiminiOverlayFragmentLedger(FrozenModel):
                 raise ValueError("fragment source does not belong to named overlay")
             if fragment.source_file_sha256 != source.sha256:
                 raise ValueError("fragment source bytes do not match active manifest")
+            if (
+                fragment.page_number < 1
+                or fragment.printed_page < 1
+                or fragment.printed_page != fragment.page_number + source.page_offset
+            ):
+                raise ValueError(
+                    "fragment page coordinates do not match the source page offset"
+                )
 
         for unresolved in self.unresolved_sources:
             source = sources.get(unresolved.source_id)
@@ -931,6 +966,111 @@ class JaiminiOverlayRegistry(FrozenModel):
         return self
 
 
+_VALIDATED_OVERLAY_CONTEXT = object()
+
+
+class JaiminiOverlayActivationContract:
+    """Validated registry/ledger context required by the real activation path."""
+
+    __slots__ = ("_ledger", "_registry", "_sealed")
+
+    def __init__(
+        self,
+        *,
+        ledger: JaiminiOverlayFragmentLedger,
+        registry: JaiminiOverlayRegistry,
+        _validation_token: object,
+    ) -> None:
+        if _validation_token is not _VALIDATED_OVERLAY_CONTEXT:
+            raise TypeError("use load_jaimini_overlay_activation_contract")
+        object.__setattr__(self, "_ledger", ledger)
+        object.__setattr__(self, "_registry", registry)
+        object.__setattr__(self, "_sealed", True)
+
+    def __setattr__(self, _name: str, _value: object) -> None:
+        if getattr(self, "_sealed", False):
+            raise AttributeError("validated activation contracts are immutable")
+        object.__setattr__(self, _name, _value)
+
+    @property
+    def ledger(self) -> JaiminiOverlayFragmentLedger:
+        return self._ledger
+
+    def require_activation_ready(self, overlay_id: str) -> None:
+        overlay = next(
+            (
+                definition
+                for definition in self._registry.overlays
+                if definition.overlay_id == overlay_id
+            ),
+            None,
+        )
+        if overlay is None:
+            raise JaiminiOverlayFailure(
+                "OVERLAY_UNKNOWN", "The requested overlay is not registered."
+            )
+        if overlay.activation_status != "available":
+            raise JaiminiOverlayFailure(
+                "OVERLAY_UNAVAILABLE",
+                "The requested overlay has not passed its activation gates.",
+            )
+        if self._ledger.overlay_id != overlay_id:
+            raise JaiminiOverlayFailure(
+                "OVERLAY_LEDGER_MISSING",
+                "The requested overlay has no validated source-fragment ledger.",
+            )
+        self._ledger.require_activation_ready()
+
+
+def load_jaimini_overlay_activation_contract(
+    *,
+    ledger_path: Path,
+    manifest_path: Path,
+    baseline_inventory_path: Path,
+    overlay_registry_path: Path,
+) -> JaiminiOverlayActivationContract:
+    """Load all activation inputs and return only after full context validation."""
+
+    ledger = JaiminiOverlayFragmentLedger.model_validate(
+        _load_strict_jaimini_json(ledger_path)
+    )
+    manifest = load_source_manifest(manifest_path)
+    inventory = JaiminiRuleInventory.model_validate(
+        _load_strict_jaimini_json(baseline_inventory_path)
+    )
+    registry = JaiminiOverlayRegistry.model_validate(
+        _load_strict_jaimini_json(overlay_registry_path)
+    )
+    ledger.validate_context(
+        manifest=manifest,
+        baseline_inventory=inventory,
+        overlay_registry=registry,
+    )
+    return JaiminiOverlayActivationContract(
+        ledger=ledger,
+        registry=registry,
+        _validation_token=_VALIDATED_OVERLAY_CONTEXT,
+    )
+
+
+def _load_strict_jaimini_json(path: Path) -> object:
+    def reject_duplicate_keys(pairs: list[tuple[str, object]]) -> dict[str, object]:
+        result: dict[str, object] = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"duplicate JSON key: {key}")
+            result[key] = value
+        return result
+
+    try:
+        return json.loads(
+            Path(path).read_text(encoding="utf-8"),
+            object_pairs_hook=reject_duplicate_keys,
+        )
+    except OSError as exc:
+        raise ValueError("Jaimini overlay context could not be loaded") from exc
+
+
 class JaiminiOverlayComparison(FrozenModel):
     schema_version: Literal["1.0"] = "1.0"
     topic: JaiminiTopic
@@ -950,6 +1090,7 @@ def compare_jaimini_overlays(
     *,
     overlay_id: str,
     activate: bool,
+    activation_contract: JaiminiOverlayActivationContract | None = None,
 ) -> JaiminiOverlayComparison:
     """Compare isolated analyses; never merge overlay signals into baseline state."""
 
@@ -979,6 +1120,12 @@ def compare_jaimini_overlays(
             "OVERLAY_ID_MISMATCH",
             "Activated overlay identity does not match its analysis school.",
         )
+    if not isinstance(activation_contract, JaiminiOverlayActivationContract):
+        raise JaiminiOverlayFailure(
+            "OVERLAY_ACTIVATION_CONTEXT_REQUIRED",
+            "Overlay activation requires a validated registry and source ledger.",
+        )
+    activation_contract.require_activation_ready(overlay_id)
     divergences = tuple(
         sorted(
             (baseline_rule, overlay_rule)
