@@ -59,3 +59,29 @@ Result before ledger changes: `6 failed, 16 passed`. Failures identified the abs
 - K. N. Rao page-level OCR review remains unresolved.
 - Hand-worked and deep conversational E2E gates remain missing.
 - `full_jaimini_v1` remains `blocked_sources`, `available=false`; neither overlay activation nor product rule use is allowed.
+
+## Review wave 1 remediation
+
+Independent review found that reconstructing output from `visitor_text` callbacks was not text-preserving: Form XObject callbacks duplicated aggregate text and a `T*`/multiline stream could lose canonical spacing or a later line.
+
+RED regressions reproduced:
+
+- a Form XObject returned `FORM-TEXTFORM-TEXT` instead of the default `FORM-TEXT`;
+- a multiline/default-parity fixture lost canonical text or newline structure;
+- a same-`BT` visible text show followed by an off-page sibling exposed the risk of treating one text object as wholly visible.
+
+The corrected adapter now performs a separate unfiltered extraction for typed-empty detection, then runs pypdf canonical extraction while suppressing only off-page text-show operands. It evaluates each `Tj`/`TJ` independently, applies tracked `Tf`/`TL` state before shorthand `'`/`"` implicit `T*`, preserves pypdf ordering/spacing, and maintains nested Form XObject transformation/resource stacks. Default `PyPdfExtractor` remains unchanged.
+
+Corrected canonical normalization changed only the three Narayana commitments. Their text/content hashes, SourceFragment revision hashes, binding references/IDs, and the overlay ledger audit were regenerated through `EvidenceStore`; the corrected ledger SHA-256 is `0fa6a1d750897e969006a327fb83334b30cc05e7b593fd0b2667962dc007fce4`. Upadesa/default hashes, the baseline inventory, frozen core, release state, and project-domain evidence hashes remain unchanged.
+
+Review-wave verification:
+
+- exact extractor regressions and generated-only fixtures: `17 passed`;
+- focused plus adjacent ingestion/overlay/release/project suites: `62 passed in 7.54s`;
+- private Narayana pages 46–48 replayed to the corrected commitments;
+- Ruff 0.12.7 on the changed Python/test scope: passed;
+- project-release audit regeneration remained byte-consistent.
+
+Review-wave commit:
+
+- `2be8b95 fix(doctrine): preserve crop-aware PDF text`
