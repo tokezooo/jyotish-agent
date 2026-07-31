@@ -17,6 +17,7 @@ from pydantic import Field, model_validator
 
 from ..research_store import canonical_json
 from .evaluation import AdmissionEvaluator, REQUIRED_AUTOMATED_GATES
+from .evidence import FragmentRef, SourceFragment
 from .graph import AnalysisGraph
 from .models import FrozenModel, ScanQuality
 from .sources import Sha256, SourceId, SourceManifest, SourceVerificationReport
@@ -235,6 +236,227 @@ class JaiminiRuleInventory(FrozenModel):
             payload["candidates"], key=lambda candidate: candidate["rule_id"]
         )
         return hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
+
+
+class JaiminiOverlayFragmentBinding(FrozenModel):
+    """A non-quoting overlay claim bound to an inspection-safe fragment identity."""
+
+    binding_id: str = Field(pattern=r"^bind_[0-9a-f]{24}$")
+    fragment: FragmentRef
+    rule_id: str = Field(pattern=r"^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$")
+    rule_family: str = Field(pattern=r"^[a-z][a-z0-9_]{2,63}$")
+    paraphrase: str = Field(min_length=1, max_length=500)
+    status: JaiminiRuleStatus
+    discrepancy: str | None = Field(default=None, min_length=1, max_length=500)
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        fragment: FragmentRef,
+        rule_id: str,
+        rule_family: str,
+        paraphrase: str,
+        status: JaiminiRuleStatus,
+        discrepancy: str | None = None,
+    ) -> "JaiminiOverlayFragmentBinding":
+        payload = {
+            "fragment": fragment.model_dump(mode="json"),
+            "rule_id": rule_id,
+            "rule_family": rule_family,
+            "paraphrase": paraphrase,
+            "status": status.value,
+            "discrepancy": discrepancy,
+        }
+        return cls(binding_id=f"bind_{_hash_jaimini_payload(payload)[:24]}", **payload)
+
+    @model_validator(mode="after")
+    def _quarantined_and_content_addressed(self) -> "JaiminiOverlayFragmentBinding":
+        if self.status not in {
+            JaiminiRuleStatus.ANCHORED_UNREVIEWED,
+            JaiminiRuleStatus.QUARANTINED_CONFLICT,
+        }:
+            raise ValueError("overlay fragment bindings must remain quarantined")
+        if self.status == JaiminiRuleStatus.QUARANTINED_CONFLICT:
+            if self.discrepancy is None:
+                raise ValueError("conflict bindings require an explicit discrepancy")
+        elif self.discrepancy is not None:
+            raise ValueError("unreviewed non-conflict bindings cannot claim a discrepancy")
+        _reject_private_locator(self.paraphrase)
+        if self.discrepancy is not None:
+            _reject_private_locator(self.discrepancy)
+        payload = self.model_dump(mode="json", exclude={"binding_id"})
+        expected = f"bind_{_hash_jaimini_payload(payload)[:24]}"
+        if self.binding_id != expected:
+            raise ValueError("overlay fragment binding identity is not content-addressed")
+        return self
+
+
+class JaiminiUnresolvedOverlaySource(FrozenModel):
+    overlay_id: str = Field(pattern=r"^[a-z][a-z0-9_]{2,95}$")
+    school: str = Field(pattern=r"^[a-z][a-z0-9_]{2,95}$")
+    source_id: SourceId
+    blocker_code: Literal[
+        "crop_aware_extraction_required", "ocr_review_pending"
+    ]
+    blocker: str = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def _privacy_safe_blocker(self) -> "JaiminiUnresolvedOverlaySource":
+        _reject_private_locator(self.blocker)
+        return self
+
+
+class JaiminiOverlayFragmentLedger(FrozenModel):
+    """Hash-bound overlay evidence that is structurally unable to activate rules."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    ledger_id: Literal["jaimini_sanjay_rath_overlay_fragments_v1"]
+    overlay_id: Literal["sanjay_rath"]
+    school: Literal["sanjay_rath"]
+    source_manifest_sha256: Sha256
+    baseline_inventory_sha256: Sha256
+    activation_status: Literal["unavailable"]
+    doctrine_admitted: Literal[False]
+    product_rule_use_allowed: Literal[False]
+    fragments: tuple[SourceFragment, ...] = Field(min_length=1)
+    bindings: tuple[JaiminiOverlayFragmentBinding, ...] = Field(min_length=1)
+    unresolved_sources: tuple[JaiminiUnresolvedOverlaySource, ...] = Field(
+        min_length=1
+    )
+
+    @model_validator(mode="after")
+    def _coherent_quarantine(self) -> "JaiminiOverlayFragmentLedger":
+        fragment_ids = [fragment.fragment_id for fragment in self.fragments]
+        if len(fragment_ids) != len(set(fragment_ids)):
+            raise ValueError("overlay fragment IDs must be unique")
+        binding_ids = [binding.binding_id for binding in self.bindings]
+        if len(binding_ids) != len(set(binding_ids)):
+            raise ValueError("overlay fragment binding IDs must be unique")
+        binding_keys = [
+            (
+                binding.fragment.fragment_id,
+                binding.fragment.revision,
+                binding.rule_id,
+            )
+            for binding in self.bindings
+        ]
+        if len(binding_keys) != len(set(binding_keys)):
+            raise ValueError("duplicate fragment-to-rule binding")
+
+        references = {
+            (
+                fragment.fragment_id,
+                fragment.revision,
+                fragment.revision_sha256,
+            )
+            for fragment in self.fragments
+        }
+        for binding in self.bindings:
+            reference = (
+                binding.fragment.fragment_id,
+                binding.fragment.revision,
+                binding.fragment.revision_sha256,
+            )
+            if reference not in references:
+                raise ValueError("binding references a missing or stale source fragment")
+
+        if any(
+            fragment.source_manifest_sha256 != self.source_manifest_sha256
+            for fragment in self.fragments
+        ):
+            raise ValueError("fragment source manifest identity does not match ledger")
+        if any(fragment.school != self.school for fragment in self.fragments):
+            raise ValueError("overlay fragment ledger cannot blend schools")
+        if any(
+            fragment.admission_status != "quarantined"
+            or fragment.excerpt_permission != "none"
+            or fragment.permitted_excerpt is not None
+            for fragment in self.fragments
+        ):
+            raise ValueError("overlay fragments must be text-free and quarantined")
+        unresolved_ids = [item.source_id for item in self.unresolved_sources]
+        if len(unresolved_ids) != len(set(unresolved_ids)):
+            raise ValueError("unresolved overlay source IDs must be unique")
+        return self
+
+    @property
+    def ledger_sha256(self) -> str:
+        payload = self.model_dump(mode="json")
+        payload["fragments"] = sorted(
+            payload["fragments"], key=lambda item: item["fragment_id"]
+        )
+        payload["bindings"] = sorted(
+            payload["bindings"], key=lambda item: item["binding_id"]
+        )
+        payload["unresolved_sources"] = sorted(
+            payload["unresolved_sources"], key=lambda item: item["source_id"]
+        )
+        return _hash_jaimini_payload(payload)
+
+    @property
+    def activation_allowed(self) -> bool:
+        return False
+
+    def require_activation_ready(self) -> None:
+        raise JaiminiOverlayFailure(
+            "OVERLAY_FRAGMENT_LEDGER_QUARANTINED",
+            "Overlay source fragments are quarantined and cannot activate product rules.",
+        )
+
+    def validate_context(
+        self,
+        *,
+        manifest: SourceManifest,
+        baseline_inventory: JaiminiRuleInventory,
+        overlay_registry: "JaiminiOverlayRegistry",
+    ) -> None:
+        if manifest.manifest_sha256 != self.source_manifest_sha256:
+            raise ValueError("active source manifest does not match fragment ledger")
+        if baseline_inventory.inventory_sha256 != self.baseline_inventory_sha256:
+            raise ValueError("baseline inventory does not match fragment ledger")
+
+        sources = {source.source_id: source for source in manifest.sources}
+        overlays = {overlay.overlay_id: overlay for overlay in overlay_registry.overlays}
+        overlay = overlays.get(self.overlay_id)
+        if overlay is None or overlay.activation_status != "unavailable":
+            raise ValueError("fragment ledger requires an unavailable named overlay")
+        known_rules = {candidate.rule_id for candidate in baseline_inventory.candidates}
+        if any(binding.rule_id not in known_rules for binding in self.bindings):
+            raise ValueError("fragment binding references an unknown baseline rule family")
+
+        for fragment in self.fragments:
+            source = sources.get(fragment.source_id)
+            if source is None:
+                raise ValueError("fragment source is absent from active manifest")
+            if source.school_role.value != "overlay":
+                raise ValueError("fragment source is not classified as an overlay")
+            if fragment.source_id not in overlay.source_ids:
+                raise ValueError("fragment source does not belong to named overlay")
+            if fragment.source_file_sha256 != source.sha256:
+                raise ValueError("fragment source bytes do not match active manifest")
+
+        for unresolved in self.unresolved_sources:
+            source = sources.get(unresolved.source_id)
+            source_overlay = overlays.get(unresolved.overlay_id)
+            if source is None or source_overlay is None:
+                raise ValueError("unresolved source identity is unknown")
+            if source_overlay.activation_status != "unavailable":
+                raise ValueError("unresolved source overlay must remain unavailable")
+            if unresolved.source_id not in source_overlay.source_ids:
+                raise ValueError("unresolved source does not belong to named overlay")
+            if source.school_role.value != "overlay":
+                raise ValueError("unresolved source is not classified as an overlay")
+
+
+def _hash_jaimini_payload(payload: object) -> str:
+    return hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
+
+
+def _reject_private_locator(value: str) -> None:
+    lowered = value.casefold()
+    if any(marker in lowered for marker in ("private_sources", ".pdf", "/users/")):
+        raise ValueError("tracked overlay evidence cannot contain private source locators")
 
 
 class JaiminiTopic(StrEnum):

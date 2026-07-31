@@ -1,0 +1,47 @@
+{
+  "schema_version": "1.0",
+  "audit_id": "jaimini_overlay_fragments_2026_07_31",
+  "ledger_sha256": "ac9a1b7f357b142a887a1c2f47711d2a8f9ac9dea0157da595e4611ed494e672",
+  "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+  "baseline_inventory_sha256": "e52d07b2849ad054f6612d6215a5e886c699c6d785f9996af97a5ee409ff8496",
+  "fragment_source_ids": [
+    "jaimini_sanjay_rath_upadesa_sutras_1997"
+  ],
+  "normalized_page_numbers": [
+    16,
+    17,
+    18,
+    19,
+    20,
+    25,
+    26,
+    27,
+    28,
+    49
+  ],
+  "fragment_count": 10,
+  "binding_count": 12,
+  "anchored_unreviewed_binding_count": 9,
+  "conflict_binding_count": 3,
+  "admitted_binding_count": 0,
+  "unresolved_sources": [
+    {
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "blocker_code": "crop_aware_extraction_required"
+    },
+    {
+      "source_id": "jaimini_kn_rao_chara_dasha_vani_scan_2010",
+      "blocker_code": "ocr_review_pending"
+    }
+  ],
+  "preserved_release_blockers": [
+    "nilakantha_subodhini_translation",
+    "specialist_review",
+    "hand_worked_cases",
+    "deep_conversational_e2e"
+  ],
+  "doctrine_admitted": false,
+  "product_rule_use_allowed": false,
+  "overlay_activated": false,
+  "release_promoted": false
+}
