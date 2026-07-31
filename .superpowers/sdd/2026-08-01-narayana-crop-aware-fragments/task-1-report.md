@@ -38,12 +38,12 @@ Result before ledger changes: `6 failed, 16 passed`. Failures identified the abs
 
 ## Full verification
 
-- Python: `863 passed, 2 skipped in 188.45s`; both skips are the expected missing Swiss-ephemeris golden checks.
+- Python: `880 passed, 2 skipped in 177.26s`; both skips are the expected missing Swiss-ephemeris golden checks.
 - Ruff: `UV_CACHE_DIR=/tmp/jyotish-uv-cache /tmp/jyotish-uv/uvx --from ruff==0.12.7 ruff check src tests` — passed.
 - Bun: `58 pass, 0 fail`.
 - TypeScript: `bun run typecheck` / `tsc --noEmit` — passed.
 - Private-source tracking scan: `git ls-files private_sources '*.pdf'` returned no tracked files.
-- Release/project audit replay: passed; canonical project audit SHA-256 is `700f65194d4e2c8c040a1390723077f45afab0eef85f8c05cc84e9295d88e843`.
+- Release/project audit replay: passed; canonical project audit SHA-256 is `c29d69aeb9d228be494dc140ba22f8d12a3a4cacb12d9e1a40db5f72ec1d83ab`.
 
 ## Commits
 
@@ -107,7 +107,7 @@ Review-wave 2 commit:
 
 Review found that the crop-aware state machine did not track the PDF `Ts` text-rise operator. A positive rise could leave physically off-crop text admitted, while a negative rise could incorrectly reject text moved into the crop.
 
-Exact RED probes used crop y=10..90: `20 Ts` with `Tm` y=85 retained `RISEN-OUT`, and `-20 Ts` with `Tm` y=95 raised `PDF_TEXT_OUT_OF_BOUNDS` instead of returning `LOWERED-IN`. The tracker now saves text rise with `q/Q`, resets it for each nested Form extraction context, and applies rise after shorthand implicit `T*` along the text-matrix y basis (`x += rise*tm[2]`, `y += rise*tm[3]`).
+Exact RED probes used crop y=10..90: `20 Ts` with `Tm` y=85 retained `RISEN-OUT`, and `-20 Ts` with `Tm` y=95 raised `PDF_TEXT_OUT_OF_BOUNDS` instead of returning `LOWERED-IN`. The tracker now saves text rise with `q/Q`, propagates it through isolated Form state frames, and applies rise after shorthand implicit `T*` along the text-matrix y basis (`x += rise*tm[2]`, `y += rise*tm[3]`).
 
 Review-wave 3 verification:
 
