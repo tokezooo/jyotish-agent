@@ -24,6 +24,7 @@ LEDGER_PATH = (
     ROOT / "src/jyotish_agent/data/doctrine/jaimini-overlay-fragments.json"
 )
 AUDIT_PATH = ROOT / "docs/evidence/doctrine/jaimini-overlay-fragments.json"
+RELEASE_PATH = ROOT / "docs/evidence/doctrine/jaimini-release.json"
 MANIFEST_PATH = ROOT / "src/jyotish_agent/data/doctrine/jaimini-sources.json"
 INVENTORY_PATH = ROOT / "src/jyotish_agent/data/doctrine/jaimini-rules.json"
 OVERLAYS_PATH = ROOT / "src/jyotish_agent/data/doctrine/jaimini-overlays.json"
@@ -327,6 +328,7 @@ def test_private_upadesa_pages_match_tracked_normalized_page_commitments() -> No
 def test_privacy_safe_audit_is_bound_to_ledger_and_preserves_release_blockers() -> None:
     ledger = _ledger()
     audit = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
+    release = json.loads(RELEASE_PATH.read_text(encoding="utf-8"))
 
     assert audit["ledger_sha256"] == ledger.ledger_sha256
     assert audit["source_manifest_sha256"] == ledger.source_manifest_sha256
@@ -359,11 +361,22 @@ def test_privacy_safe_audit_is_bound_to_ledger_and_preserves_release_blockers() 
     ]
     assert audit["doctrine_admitted"] == ledger.doctrine_admitted
     assert audit["product_rule_use_allowed"] == ledger.product_rule_use_allowed
-    assert audit["release_promoted"] is False
+    assert audit["release_id"] == release["release_id"]
+    assert audit["release_evidence_sha256"] == hashlib.sha256(
+        RELEASE_PATH.read_bytes()
+    ).hexdigest()
+    assert audit["release_admission_state"] == release["admission_state"]
+    assert audit["release_promoted"] == release["available"]
     assert audit["overlay_activated"] == ledger.activation_allowed
-    assert {
-        "nilakantha_subodhini_translation",
-        "specialist_review",
-        "hand_worked_cases",
-        "deep_conversational_e2e",
-    } <= set(audit["preserved_release_blockers"])
+    expected_release_blockers = sorted(
+        [
+            f"gate:{gate['gate_id']}"
+            for gate in release["gates"]
+            if gate["status"] == "missing"
+        ]
+        + [
+            f"blocker:{blocker.split(':', 1)[0]}"
+            for blocker in release["blockers"]
+        ]
+    )
+    assert audit["preserved_release_blockers"] == expected_release_blockers

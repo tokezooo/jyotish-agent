@@ -34,11 +34,16 @@
       "blocker_code": "ocr_review_pending"
     }
   ],
+  "release_id": "full_jaimini_v1",
+  "release_evidence_sha256": "43a0aca70d43d8f20b184b2d13afc219d4e8b6e3681522fe24a0d9cf7ebba582",
+  "release_admission_state": "blocked_sources",
   "preserved_release_blockers": [
-    "nilakantha_subodhini_translation",
-    "specialist_review",
-    "hand_worked_cases",
-    "deep_conversational_e2e"
+    "blocker:compiled_profile",
+    "blocker:nilakantha_subodhini_translation",
+    "blocker:source_review",
+    "blocker:specialist_review",
+    "gate:deep_conversational_e2e",
+    "gate:hand_worked_cases"
   ],
   "doctrine_admitted": false,
   "product_rule_use_allowed": false,

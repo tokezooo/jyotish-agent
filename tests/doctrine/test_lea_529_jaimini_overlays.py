@@ -7,6 +7,7 @@ import pytest
 
 from jaimini_helpers import build_jaimini_graph
 from jyotish_agent.doctrine.jaimini_pack import (
+    JaiminiOverlayActivationContract,
     JaiminiOverlayFailure,
     JaiminiOverlayRegistry,
     JaiminiTopic,
@@ -140,6 +141,39 @@ def test_duck_typed_activation_context_cannot_bypass_validated_loader() -> None:
             activation_contract=FakeContract(),  # type: ignore[arg-type]
         )
     assert missing_context.value.code == "OVERLAY_ACTIVATION_CONTEXT_REQUIRED"
+
+
+def test_activation_contract_rejects_subclass_and_unvalidated_exact_instance() -> None:
+    with pytest.raises(TypeError, match="cannot be subclassed"):
+
+        class BypassContract(JaiminiOverlayActivationContract):
+            def require_activation_ready(self, _overlay_id: str) -> None:
+                return None
+
+    baseline = _analysis("nilakantha_baseline", "self.baseline")
+    overlay = _analysis("sanjay_rath", "self.rath")
+    forged = object.__new__(JaiminiOverlayActivationContract)
+    with pytest.raises(JaiminiOverlayFailure) as invalid_context:
+        compare_jaimini_overlays(
+            baseline,
+            overlay,
+            overlay_id="sanjay_rath",
+            activate=True,
+            activation_contract=forged,
+        )
+    assert invalid_context.value.code == "OVERLAY_ACTIVATION_CONTEXT_INVALID"
+
+    stale = _activation_contract()
+    object.__setattr__(stale, "_validation_state_sha256", "0" * 64)
+    with pytest.raises(JaiminiOverlayFailure) as stale_context:
+        compare_jaimini_overlays(
+            baseline,
+            overlay,
+            overlay_id="sanjay_rath",
+            activate=True,
+            activation_contract=stale,
+        )
+    assert stale_context.value.code == "OVERLAY_ACTIVATION_CONTEXT_INVALID"
 
 
 def test_hidden_school_blending_is_rejected() -> None:

@@ -972,7 +972,16 @@ _VALIDATED_OVERLAY_CONTEXT = object()
 class JaiminiOverlayActivationContract:
     """Validated registry/ledger context required by the real activation path."""
 
-    __slots__ = ("_ledger", "_registry", "_sealed")
+    __slots__ = (
+        "_ledger",
+        "_registry",
+        "_sealed",
+        "_validation_state_sha256",
+        "_validation_token",
+    )
+
+    def __init_subclass__(cls, **_kwargs: object) -> None:
+        raise TypeError("JaiminiOverlayActivationContract cannot be subclassed")
 
     def __init__(
         self,
@@ -985,6 +994,12 @@ class JaiminiOverlayActivationContract:
             raise TypeError("use load_jaimini_overlay_activation_contract")
         object.__setattr__(self, "_ledger", ledger)
         object.__setattr__(self, "_registry", registry)
+        object.__setattr__(self, "_validation_token", _validation_token)
+        object.__setattr__(
+            self,
+            "_validation_state_sha256",
+            _jaimini_overlay_validation_state(ledger, registry),
+        )
         object.__setattr__(self, "_sealed", True)
 
     def __setattr__(self, _name: str, _value: object) -> None:
@@ -997,10 +1012,25 @@ class JaiminiOverlayActivationContract:
         return self._ledger
 
     def require_activation_ready(self, overlay_id: str) -> None:
+        ledger = getattr(self, "_ledger", None)
+        registry = getattr(self, "_registry", None)
+        if (
+            type(self) is not JaiminiOverlayActivationContract
+            or getattr(self, "_validation_token", None)
+            is not _VALIDATED_OVERLAY_CONTEXT
+            or not isinstance(ledger, JaiminiOverlayFragmentLedger)
+            or not isinstance(registry, JaiminiOverlayRegistry)
+            or getattr(self, "_validation_state_sha256", None)
+            != _jaimini_overlay_validation_state(ledger, registry)
+        ):
+            raise JaiminiOverlayFailure(
+                "OVERLAY_ACTIVATION_CONTEXT_INVALID",
+                "Overlay activation context is absent, forged, or stale.",
+            )
         overlay = next(
             (
                 definition
-                for definition in self._registry.overlays
+                for definition in registry.overlays
                 if definition.overlay_id == overlay_id
             ),
             None,
@@ -1014,12 +1044,28 @@ class JaiminiOverlayActivationContract:
                 "OVERLAY_UNAVAILABLE",
                 "The requested overlay has not passed its activation gates.",
             )
-        if self._ledger.overlay_id != overlay_id:
+        if ledger.overlay_id != overlay_id:
             raise JaiminiOverlayFailure(
                 "OVERLAY_LEDGER_MISSING",
                 "The requested overlay has no validated source-fragment ledger.",
             )
-        self._ledger.require_activation_ready()
+        ledger.require_activation_ready()
+
+
+def _jaimini_overlay_validation_state(
+    ledger: JaiminiOverlayFragmentLedger,
+    registry: JaiminiOverlayRegistry,
+) -> str:
+    registry_payload = registry.model_dump(mode="json")
+    registry_payload["overlays"] = sorted(
+        registry_payload["overlays"], key=lambda item: item["overlay_id"]
+    )
+    return _hash_jaimini_payload(
+        {
+            "ledger_sha256": ledger.ledger_sha256,
+            "registry": registry_payload,
+        }
+    )
 
 
 def load_jaimini_overlay_activation_contract(
@@ -1120,7 +1166,7 @@ def compare_jaimini_overlays(
             "OVERLAY_ID_MISMATCH",
             "Activated overlay identity does not match its analysis school.",
         )
-    if not isinstance(activation_contract, JaiminiOverlayActivationContract):
+    if type(activation_contract) is not JaiminiOverlayActivationContract:
         raise JaiminiOverlayFailure(
             "OVERLAY_ACTIVATION_CONTEXT_REQUIRED",
             "Overlay activation requires a validated registry and source ledger.",
