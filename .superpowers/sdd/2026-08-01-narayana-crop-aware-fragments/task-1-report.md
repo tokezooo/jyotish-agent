@@ -119,3 +119,20 @@ Review-wave 3 verification:
 Review-wave 3 commit:
 
 - `2816dd6 fix(doctrine): apply PDF text rise to bounds`
+
+## Review wave 4 remediation
+
+Review found that entering a Form XObject reset tracked font size, leading, and text rise to defaults, although a Form inherits the invoking PDF text state. This admitted a Form raised above the crop, rejected one lowered into the crop, and retained shorthand text that inherited an off-page parent leading.
+
+Exact RED probes covered parent `20 Ts` with Form y=85, parent `-20 Ts` with Form y=95, and parent `100 TL` with a quote operator inside the Form. The Form state frame now copies current font size, leading, and rise while retaining independent transform/resource/graphics stacks; the frame is popped after `Do`, so Form-local changes cannot leak back to the parent. A nested-Form inheritance fixture covers propagation through two Form levels.
+
+Review-wave 4 verification:
+
+- Form inheritance, nested inheritance, and post-`Do` isolation plus all extractor regressions: `27 passed`;
+- focused plus adjacent ingestion/overlay/release/project suites: `72 passed in 7.68s`;
+- `Ts`, `TD`/quotes, `TJ`, `T*`, affine, per-show single-`BT`, and private Narayana replay remain green;
+- Ruff 0.12.7 on the changed scope: passed.
+
+Review-wave 4 commit:
+
+- `9006917 fix(doctrine): inherit PDF text state in forms`
