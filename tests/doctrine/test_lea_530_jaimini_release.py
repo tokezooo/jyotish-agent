@@ -62,9 +62,12 @@ def test_release_audit_is_honest_and_blocks_promotion_without_compiled_sources()
     assert audit.external_review_missing is True
     assert {gate.gate_id for gate in audit.gates if gate.status == "missing"} >= {
         "hand_worked_cases",
-        "held_out_cases",
         "deep_conversational_e2e",
     }
+    held_out = next(gate for gate in audit.gates if gate.gate_id == "held_out_cases")
+    assert held_out.status == "passed"
+    assert held_out.evidence is not None
+    assert "geometry-held-out-v1.json" in held_out.evidence
     assert any("nilakantha_subodhini_translation" in item for item in audit.blockers)
 
 

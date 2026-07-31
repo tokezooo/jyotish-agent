@@ -5,7 +5,7 @@
     {
       "domain": "jaimini",
       "release_id": "full_jaimini_v1",
-      "evidence_sha256": "03c99b18fae7d173e9e9acca69f04c7c0f9e9ad1253cf9f69979f702706bf245",
+      "evidence_sha256": "4d0fa38fc416a55353fd63a396d76c80f423dad9e837344db8e5001fab88a114",
       "admission_state": "blocked_sources",
       "available": false,
       "gate_statuses": {
@@ -13,7 +13,7 @@
         "hand_worked_cases": "missing",
         "school_conflict_cases": "passed",
         "metamorphic_tests": "passed",
-        "held_out_cases": "missing",
+        "held_out_cases": "passed",
         "conversational_e2e_ru": "passed",
         "conversational_e2e_en": "passed",
         "privacy_adversarial": "passed",
@@ -24,7 +24,6 @@
         "compiled_profile: no source-admitted production profile exists",
         "nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
         "source_review: acquired Jaimini overlay books have not completed fragment-level specialist review or rule compilation",
-        "held_out_cases: the 20 published worked interpretations are not independent expected outcomes",
         "specialist_review: no production rule/profile review"
       ]
     },
@@ -81,20 +80,20 @@
   ],
   "verification": {
     "review_remediation_suite": {
-      "command": "uv run pytest -q tests/doctrine/test_lea_526_jaimini_career.py tests/doctrine/test_lea_527_jaimini_relationships.py tests/doctrine/test_lea_536_prashna_renderer.py tests/doctrine/test_lea_530_jaimini_release.py tests/doctrine/test_lea_537_prashna_release.py tests/doctrine/test_lea_544_muhurta_release.py",
+      "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine /Users/vlad/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m pytest -q tests/doctrine/test_lea_526_jaimini_career.py tests/doctrine/test_lea_527_jaimini_relationships.py tests/doctrine/test_lea_536_prashna_renderer.py tests/doctrine/test_lea_530_jaimini_release.py tests/doctrine/test_lea_537_prashna_release.py tests/doctrine/test_lea_544_muhurta_release.py",
       "status": "passed",
       "passed": 40,
       "failed": 0
     },
     "full_python_suite": {
-      "command": "uv run pytest -q",
+      "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine /Users/vlad/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m pytest -q",
       "status": "passed",
-      "passed": 793,
+      "passed": 829,
       "failed": 0,
       "skipped": 2
     },
     "ruff": {
-      "command": "uv run ruff check src tests",
+      "command": "UV_CACHE_DIR=/tmp/jyotish-uv-cache /tmp/jyotish-uv/uvx --from ruff==0.12.7 ruff check src tests",
       "status": "passed"
     },
     "typescript": {
@@ -118,7 +117,6 @@
     "jaimini: compiled_profile: no source-admitted production profile exists",
     "jaimini: nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
     "jaimini: source_review: acquired Jaimini overlay books have not completed fragment-level specialist review or rule compilation",
-    "jaimini: held_out_cases: the 20 published worked interpretations are not independent expected outcomes",
     "jaimini: specialist_review: no production rule/profile review",
     "prashna: published_outcome_cases: one additional complete traceable case is required",
     "prashna: tajika_source_admission: OCR, translation, and specialist review are incomplete",
@@ -129,5 +127,5 @@
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "2fcf6a3b11ad21c1c36b51c79b7d28a3b35556a9ece33c60721a654f949fad7c"
+  "audit_sha256": "fbf9737b12fb8dcb8f74413ca9e7ec7e42381513f487afd83118e7b219da775a"
 }

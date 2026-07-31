@@ -26,7 +26,6 @@
 - [x] Run real Codex conversational RU/EN quick and inspection smokes for all three domains.
 - [x] Run held-out calculation/trust adversarial domain evals (15 independently authored cases).
 - [ ] Run one real deep Codex case per domain; inspection does not satisfy the plan's deep-mode gate.
-- [ ] Add held-out independent Jaimini geometry expected values and school-labeling cases.
 - [ ] Run adjudicated real/concierge sessions and doctrinal-quality held-out evals.
 
 ## Next Implementation Tasks
