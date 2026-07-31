@@ -56,9 +56,7 @@ def test_catalog_declares_every_required_role_and_topic_without_false_acquisitio
         "chara_dasha",
     } <= set(catalog.required_topics)
     missing = {item.requirement for item in catalog.requirements if not item.source_ids}
-    assert JaiminiCorpusRequirement.NILAKANTHA_SUBODHINI_TRANSLATION in missing
-    assert JaiminiCorpusRequirement.SANJAY_RATH_OVERLAY in missing
-    assert JaiminiCorpusRequirement.KN_RAO_OVERLAY in missing
+    assert missing == {JaiminiCorpusRequirement.NILAKANTHA_SUBODHINI_TRANSLATION}
 
 
 def test_coverage_requires_verified_bytes_and_does_not_count_missing_books(
@@ -87,8 +85,8 @@ def test_coverage_requires_verified_bytes_and_does_not_count_missing_books(
         JaiminiCorpusRequirement.NILAKANTHA_SUBODHINI_TRANSLATION
         in report.missing_requirements
     )
-    assert report.verified_worked_chart_count == 0
-    assert report.missing_worked_chart_count == 20
+    assert report.verified_worked_chart_count == 20
+    assert report.missing_worked_chart_count == 0
 
 
 def test_hash_mismatch_and_low_quality_are_explicit_and_page_offsets_are_tested(
@@ -135,7 +133,9 @@ def test_coverage_projection_is_deterministic_private_and_matches_tracked_audit(
         )
     )
     assert tracked["ready"] is False
-    assert "nilakantha_subodhini_translation" in tracked["missing_requirements"]
+    assert tracked["missing_requirements"] == ["nilakantha_subodhini_translation"]
+    assert tracked["verified_worked_chart_count"] == 20
+    assert tracked["missing_worked_chart_count"] == 0
     assert tracked["acquisition_blockers"]
 
 

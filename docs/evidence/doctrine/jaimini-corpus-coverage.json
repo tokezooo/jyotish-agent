@@ -1,25 +1,26 @@
 {
   "schema_version": "1.0",
-  "manifest_sha256": "56c46d90e671cb6db8652a182b977eb36b7514f26f543c79254c256e129c44aa",
+  "manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
   "verified_source_ids": [
     "jaimini_astro_databank_20_chart_candidates_2026",
     "jaimini_jyotish_pradipika_chapter1_medavarapu_2016",
     "jaimini_jyotish_pradipika_corrections_medavarapu_2016",
+    "jaimini_kn_rao_chara_dasha_vani_scan_2010",
+    "jaimini_sanjay_rath_narayana_dasa_2004",
+    "jaimini_sanjay_rath_upadesa_sutras_1997",
     "jaimini_sutras_b_suryanarain_rao_1949",
     "jaimini_sutras_vimala_achyutananda_jha_1943"
   ],
   "unverified_source_ids": [],
   "covered_requirements": [
     "independent_translation",
-    "sanskrit_upadesa_sutras"
-  ],
-  "missing_requirements": [
     "kn_rao_overlay",
-    "nilakantha_subodhini_translation",
     "practical_chara_dasha",
     "published_worked_charts",
-    "sanjay_rath_overlay"
+    "sanjay_rath_overlay",
+    "sanskrit_upadesa_sutras"
   ],
+  "missing_requirements": ["nilakantha_subodhini_translation"],
   "covered_topics": [
     "argala",
     "arudha",
@@ -31,17 +32,11 @@
     "svamsa"
   ],
   "missing_topics": [],
-  "low_quality_source_ids": [
-    "jaimini_sutras_b_suryanarain_rao_1949"
-  ],
-  "verified_worked_chart_count": 0,
-  "missing_worked_chart_count": 20,
+  "low_quality_source_ids": ["jaimini_sutras_b_suryanarain_rao_1949"],
+  "verified_worked_chart_count": 20,
+  "missing_worked_chart_count": 0,
   "acquisition_blockers": [
-    "kn_rao_overlay: An official bookseller reference for K. N. Rao's practical Chara Dasha work was supplied, but licensed source bytes were not included.",
-    "nilakantha_subodhini_translation: The supplied similarly named file is byte-identical to the existing 1943 Vimala commentary, not the specified 2025 K. Guru Rajesh English translation; an official procurement reference is recorded but licensed translation bytes are still required.",
-    "practical_chara_dasha: Official procurement references for practical Chara Dasha works were supplied, but no licensed book bytes were included.",
-    "published_worked_charts: Twenty traceable natal chart candidates were supplied, but they contain no published Jaimini worked interpretations, exact book-page anchors, or independent expected outcomes.",
-    "sanjay_rath_overlay: Official Sanjay Rath and bookseller references were supplied, but licensed Upadesa Sutra or Narayana Dasa bytes were not included."
+    "nilakantha_subodhini_translation: The supplied similarly named file is byte-identical to the existing 1943 Vimala commentary, not the specified 2025 K. Guru Rajesh English translation; an official procurement reference is recorded but licensed translation bytes are still required."
   ],
   "ready": false
 }

@@ -5,7 +5,7 @@
     {
       "domain": "jaimini",
       "release_id": "full_jaimini_v1",
-      "evidence_sha256": "24d98e40aa2bd35460684723e236d3d9748e44b44000c2c4dc4b1468bdd31188",
+      "evidence_sha256": "03c99b18fae7d173e9e9acca69f04c7c0f9e9ad1253cf9f69979f702706bf245",
       "admission_state": "blocked_sources",
       "available": false,
       "gate_statuses": {
@@ -23,10 +23,8 @@
       "blockers": [
         "compiled_profile: no source-admitted production profile exists",
         "nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
-        "practical_chara_dasha: procurement references captured, but licensed source bytes remain missing",
-        "published_worked_charts: 20 traceable natal candidates imported, but zero published worked interpretations or independent expected outcomes",
-        "sanjay_rath_overlay: official procurement references captured, but licensed source bytes remain missing",
-        "kn_rao_overlay: official procurement reference captured, but licensed source bytes remain missing",
+        "source_review: acquired Jaimini overlay books have not completed fragment-level specialist review or rule compilation",
+        "held_out_cases: the 20 published worked interpretations are not independent expected outcomes",
         "specialist_review: no production rule/profile review"
       ]
     },
@@ -119,10 +117,8 @@
   "blockers": [
     "jaimini: compiled_profile: no source-admitted production profile exists",
     "jaimini: nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
-    "jaimini: practical_chara_dasha: procurement references captured, but licensed source bytes remain missing",
-    "jaimini: published_worked_charts: 20 traceable natal candidates imported, but zero published worked interpretations or independent expected outcomes",
-    "jaimini: sanjay_rath_overlay: official procurement references captured, but licensed source bytes remain missing",
-    "jaimini: kn_rao_overlay: official procurement reference captured, but licensed source bytes remain missing",
+    "jaimini: source_review: acquired Jaimini overlay books have not completed fragment-level specialist review or rule compilation",
+    "jaimini: held_out_cases: the 20 published worked interpretations are not independent expected outcomes",
     "jaimini: specialist_review: no production rule/profile review",
     "prashna: published_outcome_cases: one additional complete traceable case is required",
     "prashna: tajika_source_admission: OCR, translation, and specialist review are incomplete",
@@ -133,5 +129,5 @@
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "0f5c768ded63b39e06ef8972edfb7af3a5ee0326f17bc5466ab847f4cd6092a6"
+  "audit_sha256": "2fcf6a3b11ad21c1c36b51c79b7d28a3b35556a9ece33c60721a654f949fad7c"
 }

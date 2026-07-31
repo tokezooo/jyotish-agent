@@ -65,7 +65,7 @@ def test_telegram_bundle_audit_is_hash_bound_private_and_honest() -> None:
     assert "/Users/" not in rendered
 
 
-def test_verified_supplemental_sources_do_not_promote_missing_release_gates() -> None:
+def test_verified_acquisitions_close_book_gaps_without_promoting_release() -> None:
     manifest = load_source_manifest(MANIFEST)
     catalog = JaiminiCorpusCatalog.model_validate_json(
         CATALOG.read_text(encoding="utf-8")
@@ -80,12 +80,8 @@ def test_verified_supplemental_sources_do_not_promote_missing_release_gates() ->
 
     coverage = build_jaimini_corpus_coverage(manifest, verification, catalog)
     assert coverage.ready is False
-    assert coverage.verified_worked_chart_count == 0
-    assert coverage.missing_worked_chart_count == 20
+    assert coverage.verified_worked_chart_count == 20
+    assert coverage.missing_worked_chart_count == 0
     assert set(coverage.missing_requirements) == {
         JaiminiCorpusRequirement.NILAKANTHA_SUBODHINI_TRANSLATION,
-        JaiminiCorpusRequirement.PRACTICAL_CHARA_DASHA,
-        JaiminiCorpusRequirement.PUBLISHED_WORKED_CHARTS,
-        JaiminiCorpusRequirement.SANJAY_RATH_OVERLAY,
-        JaiminiCorpusRequirement.KN_RAO_OVERLAY,
     }

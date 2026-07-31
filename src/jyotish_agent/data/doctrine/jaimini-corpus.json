@@ -47,31 +47,37 @@
     },
     {
       "requirement": "practical_chara_dasha",
-      "source_ids": [],
-      "topics": [],
+      "source_ids": [
+        "jaimini_sanjay_rath_narayana_dasa_2004",
+        "jaimini_kn_rao_chara_dasha_vani_scan_2010"
+      ],
+      "topics": ["chara_dasha"],
       "worked_chart_count": 0,
-      "acquisition_blocker": "Official procurement references for practical Chara Dasha works were supplied, but no licensed book bytes were included."
+      "acquisition_blocker": null
     },
     {
       "requirement": "published_worked_charts",
-      "source_ids": [],
-      "topics": [],
-      "worked_chart_count": 0,
-      "acquisition_blocker": "Twenty traceable natal chart candidates were supplied, but they contain no published Jaimini worked interpretations, exact book-page anchors, or independent expected outcomes."
+      "source_ids": ["jaimini_sanjay_rath_upadesa_sutras_1997"],
+      "topics": ["karaka", "karakamsa", "svamsa", "arudha", "argala", "rasi_drishti", "chara_dasha", "relationships"],
+      "worked_chart_count": 20,
+      "acquisition_blocker": null
     },
     {
       "requirement": "sanjay_rath_overlay",
-      "source_ids": [],
-      "topics": [],
+      "source_ids": [
+        "jaimini_sanjay_rath_upadesa_sutras_1997",
+        "jaimini_sanjay_rath_narayana_dasa_2004"
+      ],
+      "topics": ["karaka", "karakamsa", "svamsa", "arudha", "argala", "rasi_drishti", "chara_dasha", "relationships"],
       "worked_chart_count": 0,
-      "acquisition_blocker": "Official Sanjay Rath and bookseller references were supplied, but licensed Upadesa Sutra or Narayana Dasa bytes were not included."
+      "acquisition_blocker": null
     },
     {
       "requirement": "kn_rao_overlay",
-      "source_ids": [],
-      "topics": [],
+      "source_ids": ["jaimini_kn_rao_chara_dasha_vani_scan_2010"],
+      "topics": ["karaka", "chara_dasha"],
       "worked_chart_count": 0,
-      "acquisition_blocker": "An official bookseller reference for K. N. Rao's practical Chara Dasha work was supplied, but licensed source bytes were not included."
+      "acquisition_blocker": null
     }
   ]
 }
