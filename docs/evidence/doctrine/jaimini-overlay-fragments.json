@@ -82,15 +82,14 @@
   "admitted_binding_count": 0,
   "unresolved_sources": [],
   "release_id": "full_jaimini_v1",
-  "release_evidence_sha256": "4e841fb932622587f8d03d3c1be8b8a99ae1fe9bd00985ddec8cb0c17a50bea3",
+  "release_evidence_sha256": "fcd48ab98249bb54c20779e31db971884f2ea2b6e72069d61293fd7aeee1b5fe",
   "release_admission_state": "blocked_sources",
   "preserved_release_blockers": [
     "blocker:compiled_profile",
     "blocker:nilakantha_subodhini_translation",
     "blocker:source_review",
     "blocker:specialist_review",
-    "gate:deep_conversational_e2e",
-    "gate:hand_worked_cases"
+    "gate:deep_conversational_e2e"
   ],
   "doctrine_admitted": false,
   "product_rule_use_allowed": false,

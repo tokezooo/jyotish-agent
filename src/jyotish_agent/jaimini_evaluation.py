@@ -24,16 +24,24 @@ from .jaimini import (
     resolve_co_lord,
     special_lagnas,
 )
-from .rule_profiles import jaimini_rule_profile_sha256
+from .rule_profiles import jaimini_rule_profile_sha256, jaimini_source_map_sha256
 
 
 class HeldOutCorpusError(ValueError):
     """The sealed geometry corpus is malformed, substituted, or unsafe."""
 
 
+class HandWorkedCorpusError(ValueError):
+    """The hand-worked corpus is malformed, substituted, or runtime-derived."""
+
+
 _ROOT = Path(__file__).resolve().parents[2]
 _DEFAULT_CORPUS = _ROOT / "eval" / "jaimini" / "geometry-held-out-v1.json"
 _DEFAULT_MANIFEST = _ROOT / "eval" / "jaimini" / "geometry-held-out-v1-checksums.json"
+_DEFAULT_HAND_WORKED_CORPUS = _ROOT / "eval" / "jaimini" / "hand-worked-v1.json"
+_DEFAULT_HAND_WORKED_MANIFEST = (
+    _ROOT / "eval" / "jaimini" / "hand-worked-v1-checksums.json"
+)
 _SCHOOL = "project-canonical-jaimini-v1"
 _REQUIRED_FAMILIES = {
     "karakas",
@@ -383,5 +391,189 @@ def evaluate_held_out_geometry(
         "case_count": len(corpus["cases"]),
         "passed_count": len(corpus["cases"]) - len(failures),
         "failed_count": len(failures),
+        "failures": failures,
+    }
+
+
+def _check_hand_worked_checksum(corpus_path: Path, manifest_path: Path) -> None:
+    try:
+        manifest = _json_object(manifest_path, "hand-worked checksum manifest")
+    except HeldOutCorpusError as exc:
+        raise HandWorkedCorpusError(str(exc)) from exc
+    try:
+        _require_keys(
+            manifest,
+            {"schema_version", "algorithm", "files"},
+            "hand-worked checksum manifest",
+        )
+        if manifest["schema_version"] != "1.0" or manifest["algorithm"] != "sha256":
+            raise HandWorkedCorpusError("invalid hand-worked checksum manifest")
+        files = manifest["files"]
+        if not isinstance(files, dict) or set(files) != {corpus_path.name}:
+            raise HandWorkedCorpusError("invalid hand-worked checksum manifest")
+        expected = files[corpus_path.name]
+        if not isinstance(expected, str) or not re.fullmatch(r"[0-9a-f]{64}", expected):
+            raise HandWorkedCorpusError("invalid hand-worked checksum manifest")
+        if hashlib.sha256(corpus_path.read_bytes()).hexdigest() != expected:
+            raise HandWorkedCorpusError("hand-worked checksum mismatch")
+    except OSError as exc:
+        raise HandWorkedCorpusError("invalid hand-worked corpus") from exc
+
+
+def _validate_hand_worked_corpus(payload: dict[str, Any]) -> None:
+    try:
+        _require_keys(
+            payload,
+            {
+                "schema_version",
+                "corpus_id",
+                "authorship",
+                "used_for_tuning",
+                "public_safe",
+                "school",
+                "rule_profile_id",
+                "rule_profile_sha256",
+                "source_map_sha256",
+                "cases",
+            },
+            "hand-worked corpus",
+        )
+    except HeldOutCorpusError as exc:
+        raise HandWorkedCorpusError(str(exc)) from exc
+    if (
+        payload["schema_version"] != "1.0"
+        or payload["corpus_id"] != "jaimini_hand_worked_v1"
+        or payload["authorship"] != "independently_hand_calculated"
+        or payload["used_for_tuning"] is not False
+        or payload["public_safe"] is not True
+        or payload["school"] != _SCHOOL
+        or payload["rule_profile_id"] != "jaimini_core_v1"
+        or payload["rule_profile_sha256"] != jaimini_rule_profile_sha256()
+        or payload["source_map_sha256"] != jaimini_source_map_sha256()
+    ):
+        raise HandWorkedCorpusError("hand-worked corpus provenance is invalid")
+    cases = payload["cases"]
+    if not isinstance(cases, list) or len(cases) < 5:
+        raise HandWorkedCorpusError("hand-worked corpus requires at least five cases")
+
+    case_ids: list[str] = []
+    check_ids: list[str] = []
+    covered: set[str] = set()
+    for case in cases:
+        if not isinstance(case, dict):
+            raise HandWorkedCorpusError("hand-worked case must be an object")
+        if set(case) != {
+            "id",
+            "authorship",
+            "runtime_derived_expected",
+            "derivation",
+            "checks",
+        }:
+            raise HandWorkedCorpusError("hand-worked case has an invalid schema")
+        if (
+            not isinstance(case["id"], str)
+            or not _CASE_ID.fullmatch(case["id"])
+            or case["authorship"] != "independently_hand_calculated"
+            or case["runtime_derived_expected"] is not False
+        ):
+            raise HandWorkedCorpusError("hand-worked case provenance is invalid")
+        derivation = case["derivation"]
+        if (
+            not isinstance(derivation, list)
+            or not derivation
+            or not all(
+                isinstance(step, str)
+                and 1 <= len(step) <= 500
+                and not any(
+                    marker in step.casefold()
+                    for marker in ("private_sources", ".pdf", "/users/")
+                )
+                for step in derivation
+            )
+        ):
+            raise HandWorkedCorpusError("hand-worked derivation is invalid")
+        checks = case["checks"]
+        if not isinstance(checks, list) or not checks:
+            raise HandWorkedCorpusError("hand-worked case requires checks")
+        case_ids.append(case["id"])
+        for check in checks:
+            if not isinstance(check, dict) or set(check) != {
+                "check_id",
+                "rule_family",
+                "input",
+                "expected",
+            }:
+                raise HandWorkedCorpusError("hand-worked check has an invalid schema")
+            check_id = check["check_id"]
+            if not isinstance(check_id, str) or not _CASE_ID.fullmatch(check_id):
+                raise HandWorkedCorpusError("hand-worked check ID is invalid")
+            synthetic_case = {
+                "id": check_id,
+                "school": payload["school"],
+                "rule_profile_id": payload["rule_profile_id"],
+                "rule_profile_sha256": payload["rule_profile_sha256"],
+                "rule_family": check["rule_family"],
+                "input": check["input"],
+                "expected": check["expected"],
+            }
+            try:
+                _validate_case(synthetic_case)
+            except HeldOutCorpusError as exc:
+                raise HandWorkedCorpusError(str(exc)) from exc
+            check_ids.append(check_id)
+            covered.add(check["rule_family"])
+    if len(case_ids) != len(set(case_ids)):
+        raise HandWorkedCorpusError("duplicate hand-worked case ID")
+    if len(check_ids) != len(set(check_ids)):
+        raise HandWorkedCorpusError("duplicate hand-worked check ID")
+    if covered != _REQUIRED_FAMILIES:
+        raise HandWorkedCorpusError("hand-worked corpus is missing a rule family")
+
+
+def evaluate_hand_worked_cases(
+    *,
+    corpus_path: Path = _DEFAULT_HAND_WORKED_CORPUS,
+    manifest_path: Path = _DEFAULT_HAND_WORKED_MANIFEST,
+    allow_hand_worked: bool = False,
+) -> dict[str, Any]:
+    """Run independently hand-calculated public-safe composite cases."""
+    if not allow_hand_worked:
+        raise ValueError("hand-worked execution requires allow_hand_worked=True")
+    _check_hand_worked_checksum(corpus_path, manifest_path)
+    try:
+        corpus = _json_object(corpus_path, "hand-worked corpus")
+    except HeldOutCorpusError as exc:
+        raise HandWorkedCorpusError(str(exc)) from exc
+    _validate_hand_worked_corpus(corpus)
+
+    failures: list[dict[str, Any]] = []
+    check_count = 0
+    covered: set[str] = set()
+    for case in corpus["cases"]:
+        for check in case["checks"]:
+            check_count += 1
+            covered.add(check["rule_family"])
+            observed = _OBSERVERS[check["rule_family"]](check["input"])
+            if observed != check["expected"]:
+                failures.append(
+                    {
+                        "case_id": case["id"],
+                        "check_id": check["check_id"],
+                        "rule_family": check["rule_family"],
+                        "expected": check["expected"],
+                        "observed": observed,
+                    }
+                )
+    return {
+        "corpus_id": corpus["corpus_id"],
+        "corpus_sha256": hashlib.sha256(corpus_path.read_bytes()).hexdigest(),
+        "rule_profile_sha256": corpus["rule_profile_sha256"],
+        "source_map_sha256": corpus["source_map_sha256"],
+        "status": "failed" if failures else "passed",
+        "case_count": len(corpus["cases"]),
+        "check_count": check_count,
+        "passed_count": check_count - len(failures),
+        "failed_count": len(failures),
+        "covered_rule_families": sorted(covered),
         "failures": failures,
     }

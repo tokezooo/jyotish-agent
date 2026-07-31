@@ -13,8 +13,8 @@
     },
     {
       "gate_id": "hand_worked_cases",
-      "status": "missing",
-      "evidence": null
+      "status": "passed",
+      "evidence": "LEA-530: eval/jaimini/hand-worked-v1.json (SHA-256 cafa1778659323c261798a3065ddbb8f64947538cc0a5412744b69b672c96a0a) executed by jyotish_agent.jaimini_evaluation.evaluate_hand_worked_cases(allow_hand_worked=True): 11/11 checks across 5 hand-worked cases passed"
     },
     {
       "gate_id": "school_conflict_cases",
