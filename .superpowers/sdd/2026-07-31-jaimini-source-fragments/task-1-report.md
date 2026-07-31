@@ -189,6 +189,19 @@ ruff check src tests: All checks passed!
 git diff --check: passed
 ```
 
+## Final HEAD verification
+
+After both independent review fix waves, the complete Python suite was rerun
+on the final implementation head:
+
+```text
+PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine "$CODEX_PYTHON" -m pytest -q
+852 passed, 2 skipped in 181.68s
+```
+
+The two skips are the expected Swiss ephemeris mode skips. The project release
+audit was updated to this final count and its canonical hash regenerated.
+
 ## Remaining concerns and blockers
 
 - The licensed Nilakantha Subodhini translation is still missing.
