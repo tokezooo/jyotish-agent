@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "audit_id": "jaimini_overlay_fragments_2026_08_01",
-  "ledger_sha256": "74683d81d834f644cdbd8a2e12ae1b4a98ed2431017ad97b6b8fd9235eeee778",
+  "ledger_sha256": "0fa6a1d750897e969006a327fb83334b30cc05e7b593fd0b2667962dc007fce4",
   "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
   "baseline_inventory_sha256": "e52d07b2849ad054f6612d6215a5e886c699c6d785f9996af97a5ee409ff8496",
   "fragment_source_ids": [

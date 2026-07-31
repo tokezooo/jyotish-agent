@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import math
 import re
 import subprocess
 import unicodedata
@@ -151,6 +152,9 @@ class PyPdfExtractor:
 
 
 PdfBounds = tuple[float, float, float, float]
+PdfMatrix = tuple[float, float, float, float, float, float]
+_IDENTITY_PDF_MATRIX: PdfMatrix = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+_PDF_TEXT_SHOW_OPERATORS = {b"Tj", b"TJ", b"'", b'"'}
 
 
 def _transform_pdf_text_origin(
@@ -176,6 +180,38 @@ def _origin_within_bounds(
     x, y = origin
     left, bottom, right, top = bounds
     return left <= x < right and bottom <= y < top
+
+
+def _compose_pdf_matrices(local: Sequence[float], parent: Sequence[float]) -> PdfMatrix:
+    """Compose PDF affine matrices for a local point transformed into its parent."""
+
+    la, lb, lc, ld, le, lf = (float(value) for value in local)
+    pa, pb, pc, pd, pe, pf = (float(value) for value in parent)
+    return (
+        la * pa + lb * pc,
+        la * pb + lb * pd,
+        lc * pa + ld * pc,
+        lc * pb + ld * pd,
+        le * pa + lf * pc + pe,
+        le * pb + lf * pd + pf,
+    )
+
+
+def _blank_pdf_text_operands(operator: bytes, operands: list[object]) -> None:
+    """Suppress glyphs while retaining positioning operands for canonical extraction."""
+
+    def empty_like(value: object) -> str | bytes:
+        return b"" if isinstance(value, bytes) else ""
+
+    if operator in {b"Tj", b"'"} and operands:
+        operands[-1] = empty_like(operands[-1])
+    elif operator == b'"' and len(operands) >= 3:
+        operands[2] = empty_like(operands[2])
+    elif operator == b"TJ" and operands and isinstance(operands[0], list):
+        array = operands[0]
+        for index, value in enumerate(array):
+            if isinstance(value, (str, bytes)):
+                array[index] = empty_like(value)
 
 
 class PageBoundsPyPdfExtractor:
@@ -223,23 +259,121 @@ class PageBoundsPyPdfExtractor:
             pages: list[ExtractedPage] = []
             for index, page in enumerate(reader.pages, start=1):
                 bounds = self._visible_bounds(page)
-                visible_chunks: list[str] = []
+                embedded_text = page.extract_text() or ""
+                form_bases: list[PdfMatrix] = [_IDENTITY_PDF_MATRIX]
+                form_resources: list[object] = [page["/Resources"].get_object()]
+                form_markers: list[bool] = []
+                font_sizes: list[float] = [12.0]
+                text_leading: list[float] = [0.0]
+                graphics_states: list[list[tuple[float, float]]] = [[]]
 
-                def visit_text(
-                    text: str,
+                def visit_operand_before(
+                    operator: bytes,
+                    operands: list[object],
                     cm: Sequence[float],
                     tm: Sequence[float],
-                    _font: object,
-                    _font_size: float,
                     _bounds: PdfBounds = bounds,
-                    _visible_chunks: list[str] = visible_chunks,
                 ) -> None:
-                    origin = _transform_pdf_text_origin(tm=tm, cm=cm)
-                    if _origin_within_bounds(origin, _bounds):
-                        _visible_chunks.append(text)
+                    if operator == b"q":
+                        graphics_states[-1].append(
+                            (font_sizes[-1], text_leading[-1])
+                        )
+                        return
+                    if operator == b"Tf" and len(operands) >= 2:
+                        try:
+                            font_sizes[-1] = float(operands[1])
+                        except (TypeError, ValueError):
+                            pass
+                        return
+                    if operator == b"TL" and operands:
+                        try:
+                            scale_x = math.sqrt(
+                                float(tm[0]) ** 2 + float(tm[2]) ** 2
+                            )
+                            text_leading[-1] = (
+                                float(operands[0]) * font_sizes[-1] * scale_x
+                            )
+                        except (TypeError, ValueError):
+                            text_leading[-1] = 0.0
+                        return
+                    if operator == b"Do":
+                        marker = False
+                        try:
+                            resources = form_resources[-1]
+                            xobjects = resources["/XObject"].get_object()  # type: ignore[index]
+                            xobject = xobjects[operands[0]].get_object()
+                            if xobject.get("/Subtype") != "/Image":
+                                form_matrix = tuple(
+                                    float(value)
+                                    for value in xobject.get(
+                                        "/Matrix", _IDENTITY_PDF_MATRIX
+                                    )
+                                )
+                                effective_parent = _compose_pdf_matrices(
+                                    cm, form_bases[-1]
+                                )
+                                form_bases.append(
+                                    _compose_pdf_matrices(
+                                        form_matrix, effective_parent
+                                    )
+                                )
+                                child_resources = xobject.get("/Resources")
+                                form_resources.append(
+                                    child_resources.get_object()
+                                    if child_resources is not None
+                                    else resources
+                                )
+                                font_sizes.append(12.0)
+                                text_leading.append(0.0)
+                                graphics_states.append([])
+                                marker = True
+                        except Exception:
+                            # pypdf owns malformed-XObject handling; keep its behavior.
+                            marker = False
+                        form_markers.append(marker)
+                        return
+                    if operator not in _PDF_TEXT_SHOW_OPERATORS:
+                        return
 
-                embedded_text = page.extract_text(visitor_text=visit_text) or ""
-                visible_text = "".join(visible_chunks)
+                    effective_cm = _compose_pdf_matrices(cm, form_bases[-1])
+                    show_tm = tuple(float(value) for value in tm)
+                    if operator in {b"'", b'"'}:
+                        mutable_tm = list(show_tm)
+                        mutable_tm[4] -= text_leading[-1] * mutable_tm[2]
+                        mutable_tm[5] -= text_leading[-1] * mutable_tm[3]
+                        show_tm = tuple(mutable_tm)
+                    visible = _origin_within_bounds(
+                        _transform_pdf_text_origin(tm=show_tm, cm=effective_cm),
+                        _bounds,
+                    )
+                    if not visible:
+                        _blank_pdf_text_operands(operator, operands)
+
+                def visit_operand_after(
+                    operator: bytes,
+                    _operands: list[object],
+                    _cm: Sequence[float],
+                    _tm: Sequence[float],
+                ) -> None:
+                    if operator == b"Q":
+                        if graphics_states[-1]:
+                            font_sizes[-1], text_leading[-1] = (
+                                graphics_states[-1].pop()
+                            )
+                        return
+                    if operator == b"Do" and form_markers:
+                        if form_markers.pop():
+                            form_bases.pop()
+                            form_resources.pop()
+                            font_sizes.pop()
+                            text_leading.pop()
+                            graphics_states.pop()
+
+                canonical_visible_text = page.extract_text(
+                    visitor_operand_before=visit_operand_before,
+                    visitor_operand_after=visit_operand_after,
+                ) or ""
+                visible_text = canonical_visible_text
                 if embedded_text.strip() and not visible_text.strip():
                     raise IngestionFailure(
                         "PDF_TEXT_OUT_OF_BOUNDS",

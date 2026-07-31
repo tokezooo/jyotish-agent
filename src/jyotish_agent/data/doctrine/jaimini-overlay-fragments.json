@@ -34,8 +34,8 @@
     {
       "fragment_id": "frag_f7b1d8e116f1edbddc37a321",
       "revision": 1,
-      "revision_sha256": "ecb0a504f2e2adf12213c0248ddff782de239959e78405fb61dabb311812875f",
-      "draft_sha256": "1750a9133c78ccdba76a75bc7425389d150b23715bad0e6efd40c36e8b2f4268",
+      "revision_sha256": "c521251192b2616f3fbcbc235369f649936da63e1ce7aeeab555faa68e8a63d6",
+      "draft_sha256": "92c179aee66df26721128462d6152ee67d77e46d3d4a41e2cc7eb46a8fc38f9a",
       "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
       "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
       "source_file_sha256": "a7d9e860d28ee20ed1c420f1c84d6ec850ffb68bf225fb60d77e53f2925a9a66",
@@ -47,8 +47,8 @@
       "content_role": "school_interpretation",
       "school": "sanjay_rath",
       "scope": "chara_dasha_progression",
-      "full_text_sha256": "483dcd1c37ea402e795f6daf6d1d26b52cee192836e7ca61aef5dd59cbd1f223",
-      "normalized_content_sha256": "aebf9306cfe4464bd027a403171f33c4929e8231c28eda96a7807174855029e8",
+      "full_text_sha256": "13d026d08e37f3a0f2290c65ce0d5f05228da6093cf254bd19d7987fe8683595",
+      "normalized_content_sha256": "5d1058ad6bab8f22ed235cd660421de1a8624a2ddfac7b03ebd51cbc36b83b85",
       "excerpt_permission": "none",
       "permitted_excerpt": null,
       "admission_status": "quarantined"
@@ -56,8 +56,8 @@
     {
       "fragment_id": "frag_23ed7263770ce9ddf9fc1271",
       "revision": 1,
-      "revision_sha256": "bae681dea4841d7b7324e319123be2c5cf6788e935dc54e73c86c5e77972c721",
-      "draft_sha256": "4bea5bfa47f91285ec88cb1cfcdfa0f2c1908b7899176b433bc76dac3b868b46",
+      "revision_sha256": "64b6f4155b300ea6ce95c3ddf16dcad0d9b14558f79050dc7552128551eca6c0",
+      "draft_sha256": "21f8e15a71dca051065fa380a96172ca976e07a4f02312ac5f42e0e1b2d016b3",
       "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
       "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
       "source_file_sha256": "a7d9e860d28ee20ed1c420f1c84d6ec850ffb68bf225fb60d77e53f2925a9a66",
@@ -69,8 +69,8 @@
       "content_role": "school_interpretation",
       "school": "sanjay_rath",
       "scope": "chara_dasha_antardasha",
-      "full_text_sha256": "91dec8a856c80498662cbeb60556c97c5a99176634bef641506fdf62bbe4f4b7",
-      "normalized_content_sha256": "4c1cbaea2308114541b962f564bc1fc6382aa08985ae798bae0b3ca312152a15",
+      "full_text_sha256": "ae1beea77f1f92b2a5b2f2627d4be49ed1e9c5a1e9f03c5a5330185f16038980",
+      "normalized_content_sha256": "cd872c52162a5c4d8ae813cd3bff8f71c22945d7f4e7f84fb720b5e6d9d66701",
       "excerpt_permission": "none",
       "permitted_excerpt": null,
       "admission_status": "quarantined"
@@ -78,8 +78,8 @@
     {
       "fragment_id": "frag_4cdb275f241bbc0d637b963a",
       "revision": 1,
-      "revision_sha256": "9af989b2b0505909c8fe740f49adbe571e124aa885fbedffe193e10adbcc2641",
-      "draft_sha256": "22b2bf41b51bcf6f88da410bb7deaabe2eec8d01783b5bfeee44e4beb668ddb6",
+      "revision_sha256": "5f003687dac363a7874336cfb46da0556ac246005be1d8aac8efb660cdbe5624",
+      "draft_sha256": "a2c7248808e2bf7b461b7066d25e4086447082269bf56f522a3779a9f770b93e",
       "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
       "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
       "source_file_sha256": "a7d9e860d28ee20ed1c420f1c84d6ec850ffb68bf225fb60d77e53f2925a9a66",
@@ -91,8 +91,8 @@
       "content_role": "school_interpretation",
       "school": "sanjay_rath",
       "scope": "chara_dasha_antardasha",
-      "full_text_sha256": "3c4247b00c946497d4df3b8fd4fe3a6658384af2e14055b764c528cf52da81f6",
-      "normalized_content_sha256": "94d7e1184fadddf8a768d75437d922f64de4c1d611d9037df1fbb06472168b6d",
+      "full_text_sha256": "05618c195bc97de106241831e02cea24ac85627078a8d13a30f851f6fd57de6a",
+      "normalized_content_sha256": "5fc1f6ebc25103f99cc2713a9b44fc84bb75b89b45d4d6ea72bdffb7b7493322",
       "excerpt_permission": "none",
       "permitted_excerpt": null,
       "admission_status": "quarantined"
@@ -454,11 +454,11 @@
       "discrepancy": "The source duration and exception procedure is more conditional than the frozen core counting rule."
     },
     {
-      "binding_id": "bind_de6dd17a82e096a4aa2d1680",
+      "binding_id": "bind_8c2342b313eac2144084362d",
       "fragment": {
         "fragment_id": "frag_f7b1d8e116f1edbddc37a321",
         "revision": 1,
-        "revision_sha256": "ecb0a504f2e2adf12213c0248ddff782de239959e78405fb61dabb311812875f"
+        "revision_sha256": "c521251192b2616f3fbcbc235369f649936da63e1ce7aeeab555faa68e8a63d6"
       },
       "rule_id": "chara_dasha.progression",
       "rule_family": "chara_dasha",
@@ -467,11 +467,11 @@
       "discrepancy": "The source defines conditional start and ordering rules beyond the frozen core simplified progression."
     },
     {
-      "binding_id": "bind_4284a8454ed9c49cb8b876a1",
+      "binding_id": "bind_e8d8eeb6b3ccc64177c69cee",
       "fragment": {
         "fragment_id": "frag_23ed7263770ce9ddf9fc1271",
         "revision": 1,
-        "revision_sha256": "bae681dea4841d7b7324e319123be2c5cf6788e935dc54e73c86c5e77972c721"
+        "revision_sha256": "64b6f4155b300ea6ce95c3ddf16dcad0d9b14558f79050dc7552128551eca6c0"
       },
       "rule_id": "chara_dasha.antardasha",
       "rule_family": "chara_dasha",
@@ -480,11 +480,11 @@
       "discrepancy": "The source subdivides major periods through sign-order conditions not represented by the frozen core."
     },
     {
-      "binding_id": "bind_76b9b1c60a562ff477a09e3e",
+      "binding_id": "bind_4919c7a8cf20a776bedc5e8b",
       "fragment": {
         "fragment_id": "frag_4cdb275f241bbc0d637b963a",
         "revision": 1,
-        "revision_sha256": "9af989b2b0505909c8fe740f49adbe571e124aa885fbedffe193e10adbcc2641"
+        "revision_sha256": "5f003687dac363a7874336cfb46da0556ac246005be1d8aac8efb660cdbe5624"
       },
       "rule_id": "chara_dasha.antardasha",
       "rule_family": "chara_dasha",

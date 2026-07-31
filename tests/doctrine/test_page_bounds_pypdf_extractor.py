@@ -12,12 +12,18 @@ from jyotish_agent.doctrine.ingestion import (
 )
 
 
-def _write_pdf(path: Path, content_streams: tuple[bytes, ...]) -> None:
+def _write_pdf(
+    path: Path,
+    content_streams: tuple[bytes, ...],
+    *,
+    crop_bounds: tuple[float, float, float, float] | None = None,
+) -> None:
     pypdf = pytest.importorskip("pypdf")
     from pypdf.generic import (
         DecodedStreamObject,
         DictionaryObject,
         NameObject,
+        RectangleObject,
     )
 
     writer = pypdf.PdfWriter()
@@ -31,6 +37,8 @@ def _write_pdf(path: Path, content_streams: tuple[bytes, ...]) -> None:
     font_ref = writer._add_object(font)
     for content in content_streams:
         page = writer.add_blank_page(width=100, height=100)
+        if crop_bounds is not None:
+            page.cropbox = RectangleObject(crop_bounds)
         page[NameObject("/Resources")] = DictionaryObject(
             {
                 NameObject("/Font"): DictionaryObject(
@@ -41,6 +49,134 @@ def _write_pdf(path: Path, content_streams: tuple[bytes, ...]) -> None:
         stream = DecodedStreamObject()
         stream.set_data(content)
         page[NameObject("/Contents")] = writer._add_object(stream)
+    with path.open("wb") as handle:
+        writer.write(handle)
+
+
+def _write_form_pdf(path: Path) -> None:
+    pypdf = pytest.importorskip("pypdf")
+    from pypdf.generic import (
+        ArrayObject,
+        DecodedStreamObject,
+        DictionaryObject,
+        FloatObject,
+        NameObject,
+    )
+
+    writer = pypdf.PdfWriter()
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    font_ref = writer._add_object(font)
+    form = DecodedStreamObject()
+    form.set_data(b"BT /F1 12 Tf (FORM-TEXT) Tj ET")
+    form.update(
+        {
+            NameObject("/Type"): NameObject("/XObject"),
+            NameObject("/Subtype"): NameObject("/Form"),
+            NameObject("/BBox"): ArrayObject(
+                [FloatObject(0), FloatObject(0), FloatObject(80), FloatObject(40)]
+            ),
+            NameObject("/Resources"): DictionaryObject(
+                {
+                    NameObject("/Font"): DictionaryObject(
+                        {NameObject("/F1"): font_ref}
+                    )
+                }
+            ),
+        }
+    )
+    form_ref = writer._add_object(form)
+    page = writer.add_blank_page(width=100, height=100)
+    page[NameObject("/Resources")] = DictionaryObject(
+        {
+            NameObject("/XObject"): DictionaryObject(
+                {NameObject("/Fm1"): form_ref}
+            )
+        }
+    )
+    content = DecodedStreamObject()
+    content.set_data(b"q 1 0 0 1 25 50 cm /Fm1 Do Q")
+    page[NameObject("/Contents")] = writer._add_object(content)
+    with path.open("wb") as handle:
+        writer.write(handle)
+
+
+def _write_nested_form_pdf(path: Path) -> None:
+    pypdf = pytest.importorskip("pypdf")
+    from pypdf.generic import (
+        ArrayObject,
+        DecodedStreamObject,
+        DictionaryObject,
+        FloatObject,
+        NameObject,
+    )
+
+    writer = pypdf.PdfWriter()
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    font_ref = writer._add_object(font)
+    inner = DecodedStreamObject()
+    inner.set_data(b"BT /F1 12 Tf (INNER-TEXT) Tj ET")
+    inner.update(
+        {
+            NameObject("/Type"): NameObject("/XObject"),
+            NameObject("/Subtype"): NameObject("/Form"),
+            NameObject("/BBox"): ArrayObject(
+                [FloatObject(0), FloatObject(0), FloatObject(80), FloatObject(40)]
+            ),
+            NameObject("/Resources"): DictionaryObject(
+                {
+                    NameObject("/Font"): DictionaryObject(
+                        {NameObject("/F1"): font_ref}
+                    )
+                }
+            ),
+        }
+    )
+    inner_ref = writer._add_object(inner)
+    outer = DecodedStreamObject()
+    outer.set_data(b"/Inner Do")
+    outer.update(
+        {
+            NameObject("/Type"): NameObject("/XObject"),
+            NameObject("/Subtype"): NameObject("/Form"),
+            NameObject("/BBox"): ArrayObject(
+                [FloatObject(0), FloatObject(0), FloatObject(80), FloatObject(40)]
+            ),
+            NameObject("/Resources"): DictionaryObject(
+                {
+                    NameObject("/XObject"): DictionaryObject(
+                        {NameObject("/Inner"): inner_ref}
+                    )
+                }
+            ),
+        }
+    )
+    outer_ref = writer._add_object(outer)
+    page = writer.add_blank_page(width=100, height=100)
+    page[NameObject("/Resources")] = DictionaryObject(
+        {
+            NameObject("/XObject"): DictionaryObject(
+                {NameObject("/Outer"): outer_ref}
+            )
+        }
+    )
+    content = DecodedStreamObject()
+    content.set_data(
+        b"q 1 0 0 1 25 50 cm /Outer Do Q "
+        b"q 1 0 0 1 125 50 cm /Outer Do Q"
+    )
+    page[NameObject("/Contents")] = writer._add_object(content)
     with path.open("wb") as handle:
         writer.write(handle)
 
@@ -67,6 +203,122 @@ def test_page_bounds_extractor_splits_generated_two_up_stream_deterministically(
     assert first == second
     assert [page.text.strip() for page in first] == ["LEFT-ONLY", "RIGHT-ONLY"]
     assert extractor.tool_name == "pypdf-page-bounds"
+
+
+def test_page_bounds_extractor_preserves_default_form_xobject_text_once(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "form-xobject.pdf"
+    _write_form_pdf(path)
+
+    pypdf = pytest.importorskip("pypdf")
+    default = pypdf.PdfReader(path, strict=True).pages[0].extract_text()
+    bounded = PageBoundsPyPdfExtractor().extract(path)[0].text
+
+    assert default.strip() == "FORM-TEXT"
+    assert bounded == default
+
+
+def test_page_bounds_extractor_tracks_nested_form_placement_for_siblings(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "nested-form-xobject.pdf"
+    _write_nested_form_pdf(path)
+
+    pypdf = pytest.importorskip("pypdf")
+    default = pypdf.PdfReader(path, strict=True).pages[0].extract_text()
+    bounded = PageBoundsPyPdfExtractor().extract(path)[0].text
+
+    assert default.count("INNER-TEXT") == 2
+    assert bounded.count("INNER-TEXT") == 1
+    assert bounded.strip() == "INNER-TEXT"
+
+
+def test_page_bounds_extractor_preserves_default_single_text_object_tstar_lines(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "multiline.pdf"
+    _write_pdf(
+        path,
+        (
+            b"BT /F1 12 Tf 3 TL 1 0 0 1 25 70 Tm "
+            b"(HELLO) Tj T* (WORLD) Tj ET",
+        ),
+        crop_bounds=(10, 10, 90, 90),
+    )
+
+    pypdf = pytest.importorskip("pypdf")
+    default = pypdf.PdfReader(path, strict=True).pages[0].extract_text()
+    bounded = PageBoundsPyPdfExtractor().extract(path)[0].text
+
+    assert default == "HELLO\nWORLD"
+    assert bounded == default
+
+
+def test_page_bounds_extractor_filters_sibling_inside_one_text_object(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "single-text-object-sibling.pdf"
+    _write_pdf(
+        path,
+        (
+            b"BT /F1 12 Tf 1 0 0 1 25 50 Tm (VISIBLE) Tj "
+            b"1 0 0 1 125 50 Tm (SIBLING) Tj ET",
+        ),
+    )
+
+    pypdf = pytest.importorskip("pypdf")
+    default = pypdf.PdfReader(path, strict=True).pages[0].extract_text()
+    bounded = PageBoundsPyPdfExtractor().extract(path)[0].text
+
+    assert "VISIBLE" in default and "SIBLING" in default
+    assert bounded.strip() == "VISIBLE"
+    assert "SIBLING" not in bounded
+
+
+@pytest.mark.parametrize("shorthand", [b"(SIBLING) '", b'0 0 (SIBLING) "'])
+def test_page_bounds_extractor_applies_implicit_tstar_before_shorthand_text(
+    tmp_path: Path, shorthand: bytes
+) -> None:
+    path = tmp_path / "shorthand-sibling.pdf"
+    _write_pdf(
+        path,
+        (
+            b"BT /F1 12 Tf 10 TL 1 0 0 1 25 70 Tm (VISIBLE) Tj "
+            + shorthand
+            + b" ET",
+        ),
+        crop_bounds=(10, 10, 90, 90),
+    )
+
+    pypdf = pytest.importorskip("pypdf")
+    default = pypdf.PdfReader(path, strict=True).pages[0].extract_text()
+    bounded = PageBoundsPyPdfExtractor().extract(path)[0].text
+
+    assert "VISIBLE" in default and "SIBLING" in default
+    assert bounded.strip() == "VISIBLE"
+    assert "SIBLING" not in bounded
+
+
+def test_page_bounds_extractor_preserves_default_separate_text_objects(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "separate-text-objects.pdf"
+    _write_pdf(
+        path,
+        (
+            b"BT /F1 12 Tf 1 0 0 1 25 70 Tm (HELLO) Tj ET "
+            b"BT /F1 12 Tf 1 0 0 1 25 30 Tm (WORLD) Tj ET",
+        ),
+        crop_bounds=(10, 10, 90, 90),
+    )
+
+    pypdf = pytest.importorskip("pypdf")
+    default = pypdf.PdfReader(path, strict=True).pages[0].extract_text()
+    bounded = PageBoundsPyPdfExtractor().extract(path)[0].text
+
+    assert default == "HELLO\nWORLD"
+    assert bounded == default
 
 
 def test_text_origin_uses_full_affine_transform_including_rotation() -> None:
