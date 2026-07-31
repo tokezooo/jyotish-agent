@@ -102,3 +102,20 @@ Review-wave 2 verification:
 Review-wave 2 commit:
 
 - `be6a76f fix(doctrine): track TD leading for PDF shorthand`
+
+## Review wave 3 remediation
+
+Review found that the crop-aware state machine did not track the PDF `Ts` text-rise operator. A positive rise could leave physically off-crop text admitted, while a negative rise could incorrectly reject text moved into the crop.
+
+Exact RED probes used crop y=10..90: `20 Ts` with `Tm` y=85 retained `RISEN-OUT`, and `-20 Ts` with `Tm` y=95 raised `PDF_TEXT_OUT_OF_BOUNDS` instead of returning `LOWERED-IN`. The tracker now saves text rise with `q/Q`, resets it for each nested Form extraction context, and applies rise after shorthand implicit `T*` along the text-matrix y basis (`x += rise*tm[2]`, `y += rise*tm[3]`).
+
+Review-wave 3 verification:
+
+- exact positive/negative `Ts`, `q/Q` restoration, and Form-reset fixtures plus all extractor regressions: `23 passed`;
+- focused plus adjacent ingestion/overlay/release/project suites: `68 passed in 8.39s`;
+- `TD`/quotes, `TJ`, Form/nested-Form, `T*`, affine, per-show single-`BT`, and private Narayana replay remain green;
+- Ruff 0.12.7 on the changed scope: passed.
+
+Review-wave 3 commit:
+
+- `2816dd6 fix(doctrine): apply PDF text rise to bounds`
