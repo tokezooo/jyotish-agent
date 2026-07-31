@@ -5,9 +5,11 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
+import math
 import re
 import subprocess
 import unicodedata
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal, Protocol
 
@@ -147,6 +149,264 @@ class PyPdfExtractor:
         if not pages:
             raise IngestionFailure("PDF_CORRUPT", "The PDF contains no pages.")
         return pages
+
+
+PdfBounds = tuple[float, float, float, float]
+PdfMatrix = tuple[float, float, float, float, float, float]
+_IDENTITY_PDF_MATRIX: PdfMatrix = (1.0, 0.0, 0.0, 1.0, 0.0, 0.0)
+_PDF_TEXT_SHOW_OPERATORS = {b"Tj", b"TJ", b"'", b'"'}
+
+
+def _transform_pdf_text_origin(
+    *, tm: Sequence[float], cm: Sequence[float]
+) -> tuple[float, float]:
+    """Return the text origin after applying the current transformation matrix."""
+
+    return (
+        float(tm[4]) * float(cm[0])
+        + float(tm[5]) * float(cm[2])
+        + float(cm[4]),
+        float(tm[4]) * float(cm[1])
+        + float(tm[5]) * float(cm[3])
+        + float(cm[5]),
+    )
+
+
+def _origin_within_bounds(
+    origin: tuple[float, float], bounds: PdfBounds
+) -> bool:
+    """Use closed lower and open upper edges for deterministic crop ownership."""
+
+    x, y = origin
+    left, bottom, right, top = bounds
+    return left <= x < right and bottom <= y < top
+
+
+def _compose_pdf_matrices(local: Sequence[float], parent: Sequence[float]) -> PdfMatrix:
+    """Compose PDF affine matrices for a local point transformed into its parent."""
+
+    la, lb, lc, ld, le, lf = (float(value) for value in local)
+    pa, pb, pc, pd, pe, pf = (float(value) for value in parent)
+    return (
+        la * pa + lb * pc,
+        la * pb + lb * pd,
+        lc * pa + ld * pc,
+        lc * pb + ld * pd,
+        le * pa + lf * pc + pe,
+        le * pb + lf * pd + pf,
+    )
+
+
+def _blank_pdf_text_operands(operator: bytes, operands: list[object]) -> None:
+    """Suppress glyphs while retaining positioning operands for canonical extraction."""
+
+    def empty_like(value: object) -> str | bytes:
+        return b"" if isinstance(value, bytes) else ""
+
+    if operator in {b"Tj", b"'"} and operands:
+        operands[-1] = empty_like(operands[-1])
+    elif operator == b'"' and len(operands) >= 3:
+        operands[2] = empty_like(operands[2])
+    elif operator == b"TJ" and operands and isinstance(operands[0], list):
+        array = operands[0]
+        for index, value in enumerate(array):
+            if isinstance(value, (str, bytes)):
+                array[index] = empty_like(value)
+
+
+class PageBoundsPyPdfExtractor:
+    """Embedded-text adapter filtering chunks by visible page bounds.
+
+    This is intentionally separate from :class:`PyPdfExtractor`: default pypdf
+    extraction is part of existing page commitments and must remain byte-stable.
+    """
+
+    tool_name = "pypdf-page-bounds"
+
+    def __init__(self) -> None:
+        try:
+            import pypdf
+        except ImportError as exc:  # pragma: no cover - dependency is locked
+            raise IngestionFailure(
+                "PDF_TOOL_UNAVAILABLE", "The configured PDF extractor is unavailable."
+            ) from exc
+        self._pypdf = pypdf
+        self.tool_version = pypdf.__version__
+
+    @staticmethod
+    def _visible_bounds(page: object) -> PdfBounds:
+        media = page.mediabox  # type: ignore[attr-defined]
+        crop = page.cropbox  # type: ignore[attr-defined]
+        bounds = (
+            max(float(media.left), float(crop.left)),
+            max(float(media.bottom), float(crop.bottom)),
+            min(float(media.right), float(crop.right)),
+            min(float(media.top), float(crop.top)),
+        )
+        if bounds[0] >= bounds[2] or bounds[1] >= bounds[3]:
+            raise IngestionFailure(
+                "PDF_BOUNDS_INVALID", "The PDF page has invalid visible bounds."
+            )
+        return bounds
+
+    def extract(self, path: Path) -> tuple[ExtractedPage, ...]:
+        try:
+            reader = self._pypdf.PdfReader(path, strict=True)
+            if reader.is_encrypted:
+                raise IngestionFailure(
+                    "PDF_ENCRYPTED", "Encrypted PDF sources require a decrypted local copy."
+                )
+            pages: list[ExtractedPage] = []
+            for index, page in enumerate(reader.pages, start=1):
+                bounds = self._visible_bounds(page)
+                embedded_text = page.extract_text() or ""
+                form_bases: list[PdfMatrix] = [_IDENTITY_PDF_MATRIX]
+                form_resources: list[object] = [page["/Resources"].get_object()]
+                form_markers: list[bool] = []
+                font_sizes: list[float] = [12.0]
+                text_leading: list[float] = [0.0]
+                text_rise: list[float] = [0.0]
+                graphics_states: list[list[tuple[float, float, float]]] = [[]]
+
+                def visit_operand_before(
+                    operator: bytes,
+                    operands: list[object],
+                    cm: Sequence[float],
+                    tm: Sequence[float],
+                    _bounds: PdfBounds = bounds,
+                ) -> None:
+                    if operator == b"q":
+                        graphics_states[-1].append(
+                            (font_sizes[-1], text_leading[-1], text_rise[-1])
+                        )
+                        return
+                    if operator == b"Tf" and len(operands) >= 2:
+                        try:
+                            font_sizes[-1] = float(operands[1])
+                        except (TypeError, ValueError):
+                            pass
+                        return
+                    if operator in {b"TL", b"TD"} and operands:
+                        try:
+                            scale_x = math.sqrt(
+                                float(tm[0]) ** 2 + float(tm[2]) ** 2
+                            )
+                            leading_operand = (
+                                operands[0]
+                                if operator == b"TL"
+                                else -float(operands[1])
+                            )
+                            text_leading[-1] = (
+                                float(leading_operand) * font_sizes[-1] * scale_x
+                            )
+                        except (IndexError, TypeError, ValueError):
+                            text_leading[-1] = 0.0
+                        return
+                    if operator == b"Ts" and operands:
+                        try:
+                            text_rise[-1] = float(operands[0])
+                        except (TypeError, ValueError):
+                            text_rise[-1] = 0.0
+                        return
+                    if operator == b"Do":
+                        marker = False
+                        try:
+                            resources = form_resources[-1]
+                            xobjects = resources["/XObject"].get_object()  # type: ignore[index]
+                            xobject = xobjects[operands[0]].get_object()
+                            if xobject.get("/Subtype") != "/Image":
+                                form_matrix = tuple(
+                                    float(value)
+                                    for value in xobject.get(
+                                        "/Matrix", _IDENTITY_PDF_MATRIX
+                                    )
+                                )
+                                effective_parent = _compose_pdf_matrices(
+                                    cm, form_bases[-1]
+                                )
+                                form_bases.append(
+                                    _compose_pdf_matrices(
+                                        form_matrix, effective_parent
+                                    )
+                                )
+                                child_resources = xobject.get("/Resources")
+                                form_resources.append(
+                                    child_resources.get_object()
+                                    if child_resources is not None
+                                    else resources
+                                )
+                                font_sizes.append(font_sizes[-1])
+                                text_leading.append(text_leading[-1])
+                                text_rise.append(text_rise[-1])
+                                graphics_states.append([])
+                                marker = True
+                        except Exception:
+                            # pypdf owns malformed-XObject handling; keep its behavior.
+                            marker = False
+                        form_markers.append(marker)
+                        return
+                    if operator not in _PDF_TEXT_SHOW_OPERATORS:
+                        return
+
+                    effective_cm = _compose_pdf_matrices(cm, form_bases[-1])
+                    show_tm = tuple(float(value) for value in tm)
+                    if operator in {b"'", b'"'}:
+                        mutable_tm = list(show_tm)
+                        mutable_tm[4] -= text_leading[-1] * mutable_tm[2]
+                        mutable_tm[5] -= text_leading[-1] * mutable_tm[3]
+                        show_tm = tuple(mutable_tm)
+                    mutable_tm = list(show_tm)
+                    mutable_tm[4] += text_rise[-1] * mutable_tm[2]
+                    mutable_tm[5] += text_rise[-1] * mutable_tm[3]
+                    show_tm = tuple(mutable_tm)
+                    visible = _origin_within_bounds(
+                        _transform_pdf_text_origin(tm=show_tm, cm=effective_cm),
+                        _bounds,
+                    )
+                    if not visible:
+                        _blank_pdf_text_operands(operator, operands)
+
+                def visit_operand_after(
+                    operator: bytes,
+                    _operands: list[object],
+                    _cm: Sequence[float],
+                    _tm: Sequence[float],
+                ) -> None:
+                    if operator == b"Q":
+                        if graphics_states[-1]:
+                            font_sizes[-1], text_leading[-1], text_rise[-1] = (
+                                graphics_states[-1].pop()
+                            )
+                        return
+                    if operator == b"Do" and form_markers:
+                        if form_markers.pop():
+                            form_bases.pop()
+                            form_resources.pop()
+                            font_sizes.pop()
+                            text_leading.pop()
+                            text_rise.pop()
+                            graphics_states.pop()
+
+                canonical_visible_text = page.extract_text(
+                    visitor_operand_before=visit_operand_before,
+                    visitor_operand_after=visit_operand_after,
+                ) or ""
+                visible_text = canonical_visible_text
+                if embedded_text.strip() and not visible_text.strip():
+                    raise IngestionFailure(
+                        "PDF_TEXT_OUT_OF_BOUNDS",
+                        "Embedded PDF text exists but none lies within visible page bounds.",
+                    )
+                pages.append(ExtractedPage(page_number=index, text=visible_text))
+        except IngestionFailure:
+            raise
+        except Exception as exc:
+            raise IngestionFailure(
+                "PDF_CORRUPT", "The PDF could not be parsed as a supported document."
+            ) from exc
+        if not pages:
+            raise IngestionFailure("PDF_CORRUPT", "The PDF contains no pages.")
+        return tuple(pages)
 
 
 class PdftoppmRenderer:

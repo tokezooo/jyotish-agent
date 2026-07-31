@@ -1,0 +1,138 @@
+# Task 1 report — Narayana crop-aware fragments
+
+## Outcome
+
+- Added `PageBoundsPyPdfExtractor` as a separate, explicitly identified pypdf adapter. The default `PyPdfExtractor` implementation and existing Upadesa commitments remain unchanged.
+- Added deterministic visible-bounds filtering using the full affine text origin, CropBox/MediaBox intersection, and half-open upper boundaries.
+- Added typed failure `PDF_TEXT_OUT_OF_BOUNDS` when a non-empty embedded stream has no visible text; corrupt, encrypted, blank/OCR fallback, and invalid-bounds behavior remain fail-closed.
+- Added generated-temp synthetic two-up, affine rotation, boundary, deterministic, corrupt, encrypted, and blank-page tests. No PDF fixture is tracked.
+- Hash-bound Narayana pages 46–48 to three text-free, quarantined SourceFragments through `doctrine-text-v1` normalization and the crop-aware adapter.
+- Added one `chara_dasha.progression` and two `chara_dasha.antardasha` bindings, all `quarantined_conflict` with explicit discrepancies from the frozen simplified core.
+- Removed only the Narayana crop-aware unresolved-source entry. K. N. Rao remains `ocr_review_pending`; overlay activation, baseline inventory, frozen core, and release availability remain unchanged.
+- Replaced ambiguous page-number-only audit projection with source-qualified page coordinates.
+
+## TDD evidence
+
+### RED — page-bounds adapter
+
+Command:
+
+`python -m pytest -q tests/doctrine/test_page_bounds_pypdf_extractor.py`
+
+Result before implementation: collection failed because `PageBoundsPyPdfExtractor` and its coordinate helpers did not exist.
+
+### RED — Narayana ledger/audit
+
+Command:
+
+`python -m pytest -q tests/doctrine/test_jaimini_overlay_fragments_20260731.py`
+
+Result before ledger changes: `6 failed, 16 passed`. Failures identified the absent Narayana source fragments, absent antardasha bindings, stale unresolved-source entry, and stale source-qualified audit projection.
+
+### Focused GREEN
+
+- Adapter plus adjacent ingestion: `17 passed`.
+- Crop-aware fragments plus Jaimini overlay/release/project adjacency: `55 passed`.
+- Final audit replay after verification-count synchronization: `23 passed`.
+- Focused Ruff checks: passed.
+
+## Full verification
+
+- Python: `880 passed, 2 skipped in 177.26s`; both skips are the expected missing Swiss-ephemeris golden checks.
+- Ruff: `UV_CACHE_DIR=/tmp/jyotish-uv-cache /tmp/jyotish-uv/uvx --from ruff==0.12.7 ruff check src tests` — passed.
+- Bun: `58 pass, 0 fail`.
+- TypeScript: `bun run typecheck` / `tsc --noEmit` — passed.
+- Private-source tracking scan: `git ls-files private_sources '*.pdf'` returned no tracked files.
+- Release/project audit replay: passed; canonical project audit SHA-256 is `c29d69aeb9d228be494dc140ba22f8d12a3a4cacb12d9e1a40db5f72ec1d83ab`.
+
+## Commits
+
+- `c3365d1 feat(doctrine): add crop-aware PDF extraction`
+- `8d24966 feat(jaimini): bind Narayana crop-aware fragments`
+- `aa7641e docs(doctrine): record Narayana verification`
+
+## Remaining blockers
+
+- No source-admitted compiled Jaimini profile exists.
+- The licensed Nilakantha Subodhini English translation is still missing.
+- Upadesa and Narayana fragments remain quarantined, unreviewed, and uncompiled; production specialist review and overlay rule compilation are still missing.
+- K. N. Rao page-level OCR review remains unresolved.
+- Hand-worked and deep conversational E2E gates remain missing.
+- `full_jaimini_v1` remains `blocked_sources`, `available=false`; neither overlay activation nor product rule use is allowed.
+
+## Review wave 1 remediation
+
+Independent review found that reconstructing output from `visitor_text` callbacks was not text-preserving: Form XObject callbacks duplicated aggregate text and a `T*`/multiline stream could lose canonical spacing or a later line.
+
+RED regressions reproduced:
+
+- a Form XObject returned `FORM-TEXTFORM-TEXT` instead of the default `FORM-TEXT`;
+- a multiline/default-parity fixture lost canonical text or newline structure;
+- a same-`BT` visible text show followed by an off-page sibling exposed the risk of treating one text object as wholly visible.
+
+The corrected adapter now performs a separate unfiltered extraction for typed-empty detection, then runs pypdf canonical extraction while suppressing only off-page text-show operands. It evaluates each `Tj`/`TJ` independently, applies tracked `Tf`/`TL` state before shorthand `'`/`"` implicit `T*`, preserves pypdf ordering/spacing, and maintains nested Form XObject transformation/resource stacks. Default `PyPdfExtractor` remains unchanged.
+
+Corrected canonical normalization changed only the three Narayana commitments. Their text/content hashes, SourceFragment revision hashes, binding references/IDs, and the overlay ledger audit were regenerated through `EvidenceStore`; the corrected ledger SHA-256 is `0fa6a1d750897e969006a327fb83334b30cc05e7b593fd0b2667962dc007fce4`. Upadesa/default hashes, the baseline inventory, frozen core, release state, and project-domain evidence hashes remain unchanged.
+
+Review-wave verification:
+
+- exact extractor regressions and generated-only fixtures: `17 passed`;
+- focused plus adjacent ingestion/overlay/release/project suites: `62 passed in 7.54s`;
+- private Narayana pages 46–48 replayed to the corrected commitments;
+- Ruff 0.12.7 on the changed Python/test scope: passed;
+- project-release audit regeneration remained byte-consistent.
+
+Review-wave commit:
+
+- `2be8b95 fix(doctrine): preserve crop-aware PDF text`
+
+## Review wave 2 remediation
+
+Review found that pypdf's `TD` operator updates text leading as `TL(-ty)` before applying `Td`, while the bounds tracker only mirrored explicit `TL`. The stale leading caused both shorthand text operators (`'` and `"`) to evaluate their implicit `T*` at the previous line and retain an off-page sibling.
+
+Exact RED fixtures covered `Tm 0 -10 TD (VISIBLE) Tj` followed by each shorthand operator; both returned `VISIBLE\nSIBLING` before the fix. The tracker now derives `-ty`, applies pypdf's font-size and text-matrix x-scale calculation, and retains its typed fallback for malformed operands.
+
+Review-wave 2 verification:
+
+- exact `TD` shorthand regressions plus all extractor fixtures: `19 passed`;
+- focused plus adjacent ingestion/overlay/release/project suites: `64 passed in 7.80s`;
+- explicit `TL`, `T*`, Form/nested-Form, affine, per-show single-`BT`, and private Narayana replay regressions remain green;
+- Ruff 0.12.7 on the changed scope: passed.
+
+Review-wave 2 commit:
+
+- `be6a76f fix(doctrine): track TD leading for PDF shorthand`
+
+## Review wave 3 remediation
+
+Review found that the crop-aware state machine did not track the PDF `Ts` text-rise operator. A positive rise could leave physically off-crop text admitted, while a negative rise could incorrectly reject text moved into the crop.
+
+Exact RED probes used crop y=10..90: `20 Ts` with `Tm` y=85 retained `RISEN-OUT`, and `-20 Ts` with `Tm` y=95 raised `PDF_TEXT_OUT_OF_BOUNDS` instead of returning `LOWERED-IN`. The tracker now saves text rise with `q/Q`, propagates it through isolated Form state frames, and applies rise after shorthand implicit `T*` along the text-matrix y basis (`x += rise*tm[2]`, `y += rise*tm[3]`).
+
+Review-wave 3 verification:
+
+- exact positive/negative `Ts`, `q/Q` restoration, and Form-reset fixtures plus all extractor regressions: `23 passed`;
+- focused plus adjacent ingestion/overlay/release/project suites: `68 passed in 8.39s`;
+- `TD`/quotes, `TJ`, Form/nested-Form, `T*`, affine, per-show single-`BT`, and private Narayana replay remain green;
+- Ruff 0.12.7 on the changed scope: passed.
+
+Review-wave 3 commit:
+
+- `2816dd6 fix(doctrine): apply PDF text rise to bounds`
+
+## Review wave 4 remediation
+
+Review found that entering a Form XObject reset tracked font size, leading, and text rise to defaults, although a Form inherits the invoking PDF text state. This admitted a Form raised above the crop, rejected one lowered into the crop, and retained shorthand text that inherited an off-page parent leading.
+
+Exact RED probes covered parent `20 Ts` with Form y=85, parent `-20 Ts` with Form y=95, and parent `100 TL` with a quote operator inside the Form. The Form state frame now copies current font size, leading, and rise while retaining independent transform/resource/graphics stacks; the frame is popped after `Do`, so Form-local changes cannot leak back to the parent. A nested-Form inheritance fixture covers propagation through two Form levels.
+
+Review-wave 4 verification:
+
+- Form inheritance, nested inheritance, and post-`Do` isolation plus all extractor regressions: `27 passed`;
+- focused plus adjacent ingestion/overlay/release/project suites: `72 passed in 7.68s`;
+- `Ts`, `TD`/quotes, `TJ`, `T*`, affine, per-show single-`BT`, and private Narayana replay remain green;
+- Ruff 0.12.7 on the changed scope: passed.
+
+Review-wave 4 commit:
+
+- `9006917 fix(doctrine): inherit PDF text state in forms`

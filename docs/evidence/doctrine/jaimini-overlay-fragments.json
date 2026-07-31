@@ -1,41 +1,93 @@
 {
   "schema_version": "1.0",
-  "audit_id": "jaimini_overlay_fragments_2026_07_31",
-  "ledger_sha256": "ac9a1b7f357b142a887a1c2f47711d2a8f9ac9dea0157da595e4611ed494e672",
+  "audit_id": "jaimini_overlay_fragments_2026_08_01",
+  "ledger_sha256": "0fa6a1d750897e969006a327fb83334b30cc05e7b593fd0b2667962dc007fce4",
   "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
   "baseline_inventory_sha256": "e52d07b2849ad054f6612d6215a5e886c699c6d785f9996af97a5ee409ff8496",
   "fragment_source_ids": [
+    "jaimini_sanjay_rath_narayana_dasa_2004",
     "jaimini_sanjay_rath_upadesa_sutras_1997"
   ],
-  "normalized_page_numbers": [
-    16,
-    17,
-    18,
-    19,
-    20,
-    25,
-    26,
-    27,
-    28,
-    49
-  ],
-  "fragment_count": 10,
-  "binding_count": 12,
-  "anchored_unreviewed_binding_count": 9,
-  "conflict_binding_count": 3,
-  "admitted_binding_count": 0,
-  "unresolved_sources": [
+  "normalized_pages": [
     {
       "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
-      "blocker_code": "crop_aware_extraction_required"
+      "page_number": 46,
+      "printed_page": 46
     },
+    {
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "page_number": 47,
+      "printed_page": 47
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "page_number": 48,
+      "printed_page": 48
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "page_number": 16,
+      "printed_page": 3
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "page_number": 17,
+      "printed_page": 4
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "page_number": 18,
+      "printed_page": 5
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "page_number": 19,
+      "printed_page": 6
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "page_number": 20,
+      "printed_page": 7
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "page_number": 25,
+      "printed_page": 12
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "page_number": 26,
+      "printed_page": 13
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "page_number": 27,
+      "printed_page": 14
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "page_number": 28,
+      "printed_page": 15
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
+      "page_number": 49,
+      "printed_page": 36
+    }
+  ],
+  "fragment_count": 13,
+  "binding_count": 15,
+  "anchored_unreviewed_binding_count": 9,
+  "conflict_binding_count": 6,
+  "admitted_binding_count": 0,
+  "unresolved_sources": [
     {
       "source_id": "jaimini_kn_rao_chara_dasha_vani_scan_2010",
       "blocker_code": "ocr_review_pending"
     }
   ],
   "release_id": "full_jaimini_v1",
-  "release_evidence_sha256": "43a0aca70d43d8f20b184b2d13afc219d4e8b6e3681522fe24a0d9cf7ebba582",
+  "release_evidence_sha256": "76a1d005973214dcffe10c5ad4bff190513c5970720b896b11647290df8560c8",
   "release_admission_state": "blocked_sources",
   "preserved_release_blockers": [
     "blocker:compiled_profile",
