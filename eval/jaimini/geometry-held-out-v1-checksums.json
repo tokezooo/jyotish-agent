@@ -1,0 +1,7 @@
+{
+  "schema_version": "1.0",
+  "algorithm": "sha256",
+  "files": {
+    "geometry-held-out-v1.json": "55a3926af29190fb9f5aecf19616a851ef3f1bda2e4a621ae43c773222087fa8"
+  }
+}

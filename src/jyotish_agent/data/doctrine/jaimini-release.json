@@ -28,8 +28,8 @@
     },
     {
       "gate_id": "held_out_cases",
-      "status": "missing",
-      "evidence": null
+      "status": "passed",
+      "evidence": "LEA-530: eval/jaimini/geometry-held-out-v1.json (SHA-256 manifest) executed by jyotish_agent.jaimini_evaluation.evaluate_held_out_geometry(allow_held_out=True): 26/26 passed"
     },
     {
       "gate_id": "conversational_e2e_ru",
@@ -61,7 +61,6 @@
     "compiled_profile: no source-admitted production profile exists",
     "nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
     "source_review: acquired Jaimini overlay books have not completed fragment-level specialist review or rule compilation",
-    "held_out_cases: the 20 published worked interpretations are not independent expected outcomes",
     "specialist_review: no production rule/profile review"
   ],
   "external_review_missing": true,
