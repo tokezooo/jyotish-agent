@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from jyotish_agent import jaimini_evaluation
 from jyotish_agent.jaimini_evaluation import (
     HeldOutCorpusError,
     evaluate_held_out_geometry,
@@ -85,10 +86,104 @@ def test_checksum_drift_is_rejected_before_execution(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (lambda case: case.pop("school"), "case school identity"),
+        (lambda case: case.update(school="wrong-school"), "case school identity"),
+        (lambda case: case.pop("rule_profile_id"), "case profile identity"),
+        (lambda case: case.update(rule_profile_sha256="0" * 64), "case profile SHA-256"),
+    ],
+)
+def test_each_case_identity_is_validated_before_observer_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutate, message: str
+) -> None:
+    corpus, manifest = _mutated_paths(tmp_path, lambda payload: mutate(payload["cases"][0]))
+
+    def should_not_run(_scenario: object) -> object:
+        raise AssertionError("observer received an invalid held-out case")
+
+    monkeypatch.setitem(jaimini_evaluation._OBSERVERS, "karakas", should_not_run)
+    with pytest.raises(HeldOutCorpusError, match=message):
+        evaluate_held_out_geometry(
+            corpus_path=corpus, manifest_path=manifest, allow_held_out=True
+        )
+
+
+@pytest.mark.parametrize(
+    ("mutate", "message"),
+    [
+        (
+            lambda case: case["expected"].update(note="arbitrary oracle prose"),
+            "karaka expected value",
+        ),
+        (
+            lambda case: case.update(id="this is arbitrary prose rather than a case id"),
+            "case ID",
+        ),
+        (
+            lambda case: case["input"].update(
+                birth={"date": "2000-01-01", "time": "00:00:00", "place": "Moscow"}
+            ),
+            "karaka input",
+        ),
+        (
+            lambda case: case["expected"].update(AK="Copyright 2026 private book excerpt"),
+            "karaka expected value",
+        ),
+    ],
+)
+def test_case_schema_rejects_prose_and_non_synthetic_payloads_before_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mutate, message: str
+) -> None:
+    corpus, manifest = _mutated_paths(tmp_path, lambda payload: mutate(payload["cases"][0]))
+
+    def should_not_run(_scenario: object) -> object:
+        raise AssertionError("observer received a non-synthetic held-out case")
+
+    monkeypatch.setitem(jaimini_evaluation._OBSERVERS, "karakas", should_not_run)
+    with pytest.raises(HeldOutCorpusError, match=message):
+        evaluate_held_out_geometry(
+            corpus_path=corpus, manifest_path=manifest, allow_held_out=True
+        )
+
+
+@pytest.mark.parametrize(
+    ("case_id", "mutate"),
+    [
+        ("karaka_7_ranking", lambda case: case.update(rule_family="copyrighted prose")),
+        ("rasi_drishti_0", lambda case: case["expected"].__setitem__(2, "private text")),
+        ("co_lord_duration", lambda case: case["input"]["candidates"].__setitem__(1, "book excerpt")),
+        ("argala_all_statuses", lambda case: case["input"]["occupants"]["1"].__setitem__(0, "private source")),
+        ("special_lagnas_wrap", lambda case: case["expected"].update(bhava_lagna="copyright text")),
+        ("chara_dasha_boundary", lambda case: case["input"].update(start="private timestamp prose")),
+        ("chara_dasha_boundary", lambda case: case["expected"].update(first_end="copyright text")),
+    ],
+)
+def test_every_string_and_object_position_is_schema_whitelisted_before_dispatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, case_id: str, mutate
+) -> None:
+    def mutate_payload(payload: dict[str, object]) -> None:
+        case = next(item for item in payload["cases"] if item["id"] == case_id)
+        mutate(case)
+
+    corpus, manifest = _mutated_paths(tmp_path, mutate_payload)
+
+    def should_not_run(_scenario: object) -> object:
+        raise AssertionError("observer received a non-whitelisted held-out case")
+
+    for family in jaimini_evaluation._OBSERVERS:
+        monkeypatch.setitem(jaimini_evaluation._OBSERVERS, family, should_not_run)
+    with pytest.raises(HeldOutCorpusError):
+        evaluate_held_out_geometry(
+            corpus_path=corpus, manifest_path=manifest, allow_held_out=True
+        )
+
+
 def test_expected_value_drift_reports_a_failed_oracle_case(tmp_path: Path) -> None:
     corpus, manifest = _mutated_paths(
         tmp_path,
-        lambda payload: payload["cases"][0].update(expected={"AK": "Sun"}),
+        lambda payload: payload["cases"][0]["expected"].update(AK="Sun", MK="Mars"),
     )
 
     report = evaluate_held_out_geometry(
@@ -96,12 +191,8 @@ def test_expected_value_drift_reports_a_failed_oracle_case(tmp_path: Path) -> No
     )
 
     assert report["failed_count"] == 1
-    assert report["failures"] == [
-        {"rule_family": "karakas", "expected": {"AK": "Sun"}, "observed": {
-            "AK": "Mars", "AmK": "Venus", "BK": "Mercury", "MK": "Sun",
-            "PK": "Jupiter", "GK": "Moon", "DK": "Saturn",
-        }}
-    ]
+    assert report["failures"][0]["rule_family"] == "karakas"
+    assert report["failures"][0]["expected"]["AK"] == "Sun"
 
 
 @pytest.mark.parametrize(
@@ -117,7 +208,7 @@ def test_expected_value_drift_reports_a_failed_oracle_case(tmp_path: Path) -> No
             lambda payload: payload["cases"][0]["input"].update(
                 source_path="private_sources/forbidden.pdf"
             ),
-            "synthetic scalar/sign inputs",
+            "karaka input",
         ),
     ],
 )

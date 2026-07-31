@@ -10,6 +10,7 @@ import datetime as dt
 import hashlib
 import json
 import math
+import re
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -44,6 +45,12 @@ _REQUIRED_FAMILIES = {
     "chara_dasha",
 }
 _BODIES = {"Sun", "Moon", "Mars", "Mercury", "Jupiter", "Venus", "Saturn", "Rahu", "Ketu"}
+_KARAKA_LABELS = {
+    7: ("AK", "AmK", "BK", "MK", "PK", "GK", "DK"),
+    8: ("AK", "AmK", "BK", "MK", "PiK", "PK", "GK", "DK"),
+}
+_CASE_ID = re.compile(r"^[a-z][a-z0-9_]{2,80}$")
+_UTC_TIMESTAMP = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 
 
 def _json_object(path: Path, label: str) -> dict[str, Any]:
@@ -77,60 +84,59 @@ def _number(value: Any, label: str, *, upper: float | None = None) -> None:
         raise HeldOutCorpusError(f"{label} is outside the synthetic geometry range")
 
 
-def _assert_public_synthetic(value: Any) -> None:
-    """Reject path-like/private payloads before an oracle can inspect them."""
-    if isinstance(value, str):
-        if any(token in value.lower() for token in ("private_sources", ".pdf", "file://")):
-            raise HeldOutCorpusError("synthetic scalar/sign inputs cannot contain private payloads")
-        return
-    if value is None or isinstance(value, (bool, int, float)):
-        return
-    if isinstance(value, list):
-        for item in value:
-            _assert_public_synthetic(item)
-        return
-    if isinstance(value, dict):
-        for key, item in value.items():
-            _assert_public_synthetic(key)
-            _assert_public_synthetic(item)
-        return
-    raise HeldOutCorpusError("synthetic scalar/sign inputs must be JSON values")
-
-
 def _validate_case(case: Any) -> None:
     if not isinstance(case, dict):
         raise HeldOutCorpusError("case must be an object")
-    _require_keys(case, {"id", "rule_family", "input", "expected"}, "case")
-    if not isinstance(case["id"], str) or not case["id"]:
-        raise HeldOutCorpusError("case ID must be a non-empty string")
+    if case.get("school") != _SCHOOL:
+        raise HeldOutCorpusError("case school identity is missing or wrong")
+    if case.get("rule_profile_id") != "jaimini_core_v1":
+        raise HeldOutCorpusError("case profile identity is missing or wrong")
+    if case.get("rule_profile_sha256") != jaimini_rule_profile_sha256():
+        raise HeldOutCorpusError("case profile SHA-256 mismatch")
+    _require_keys(
+        case,
+        {
+            "id", "school", "rule_profile_id", "rule_profile_sha256", "rule_family",
+            "input", "expected",
+        },
+        "case",
+    )
+    if not isinstance(case["id"], str) or not _CASE_ID.fullmatch(case["id"]):
+        raise HeldOutCorpusError("case ID must be a lowercase identifier")
     family = case["rule_family"]
     if family not in _REQUIRED_FAMILIES:
         raise HeldOutCorpusError("case has an unknown rule family")
     scenario, expected = case["input"], case["expected"]
     if not isinstance(scenario, dict):
         raise HeldOutCorpusError("synthetic scalar/sign inputs must be objects")
-    _assert_public_synthetic(scenario)
-    _assert_public_synthetic(expected)
 
     if family == "karakas":
         if set(scenario) != {"scheme", "longitudes"}:
-            raise HeldOutCorpusError("synthetic scalar/sign inputs must use only declared fields")
+            raise HeldOutCorpusError("karaka input has an invalid schema")
         scheme, longitudes = scenario["scheme"], scenario["longitudes"]
-        if scheme not in {7, 8} or not isinstance(longitudes, dict):
+        if isinstance(scheme, bool) or scheme not in _KARAKA_LABELS or not isinstance(longitudes, dict):
             raise HeldOutCorpusError("karaka input is invalid")
         planets = _BODIES - {"Ketu"} if scheme == 8 else _BODIES - {"Rahu", "Ketu"}
         if set(longitudes) != planets:
             raise HeldOutCorpusError("karaka input must contain only the required planets")
         for body, longitude in longitudes.items():
             _number(longitude, f"karaka longitude {body}", upper=30)
-        if not isinstance(expected, dict) or not expected:
+        if not isinstance(expected, dict):
+            raise HeldOutCorpusError("karaka expected value is invalid")
+        if set(expected) == {"error"} and expected["error"] == "EXACT_KARAKA_TIE":
+            return
+        if (
+            set(expected) != set(_KARAKA_LABELS[scheme])
+            or not all(isinstance(value, str) and value in planets for value in expected.values())
+            or len(set(expected.values())) != len(expected)
+        ):
             raise HeldOutCorpusError("karaka expected value is invalid")
         return
 
     if family == "rasi_drishti":
         _require_keys(scenario, {"source_sign"}, "rasi drishti input")
         _sign(scenario["source_sign"], "source_sign")
-        if not isinstance(expected, list) or len(expected) != 3:
+        if not isinstance(expected, list) or len(expected) != 3 or len(set(expected)) != 3:
             raise HeldOutCorpusError("rasi drishti expected value is invalid")
         for sign in expected:
             _sign(sign, "rasi drishti target")
@@ -152,6 +158,7 @@ def _validate_case(case: Any) -> None:
         )
         if (
             not isinstance(candidates, list)
+            or not all(isinstance(candidate, str) for candidate in candidates)
             or set(candidates) not in ({"Mars", "Ketu"}, {"Saturn", "Rahu"})
             or len(candidates) != 2
             or not isinstance(durations, dict)
@@ -173,10 +180,21 @@ def _validate_case(case: Any) -> None:
         if not isinstance(occupants, dict) or not isinstance(expected, list):
             raise HeldOutCorpusError("argala input is invalid")
         for sign, bodies in occupants.items():
-            _sign(int(sign) if isinstance(sign, str) and sign.isdigit() else sign, "occupant sign")
-            if not isinstance(bodies, list) or any(body not in _BODIES for body in bodies):
+            if not isinstance(sign, str) or not re.fullmatch(r"(?:0|[1-9]|1[01])", sign):
+                raise HeldOutCorpusError("argala occupant sign is invalid")
+            if (
+                not isinstance(bodies, list)
+                or not bodies
+                or not all(isinstance(body, str) and body in _BODIES for body in bodies)
+                or len(bodies) != len(set(bodies))
+            ):
                 raise HeldOutCorpusError("argala occupants must contain only bodies")
-        if {item.get("house") for item in expected if isinstance(item, dict)} != {2, 4, 11, 5}:
+        if (
+            len(expected) != 4
+            or any(not isinstance(item, dict) or set(item) != {"house", "status"} for item in expected)
+            or [item["house"] for item in expected] != [2, 4, 11, 5]
+            or any(item["status"] not in {"absent", "unobstructed", "partial", "obstructed"} for item in expected)
+        ):
             raise HeldOutCorpusError("argala expected value is invalid")
         return
 
@@ -186,6 +204,8 @@ def _validate_case(case: Any) -> None:
         _number(scenario["minutes_since_sunrise"], "minutes_since_sunrise")
         if not isinstance(expected, dict) or set(expected) != {"bhava_lagna", "hora_lagna", "ghati_lagna"}:
             raise HeldOutCorpusError("special-lagna expected value is invalid")
+        for name, value in expected.items():
+            _number(value, f"special-lagna expected {name}", upper=360)
         return
 
     _require_keys(scenario, {"lagna_sign", "lord_signs", "gender", "start"}, "chara dasha input")
@@ -194,12 +214,32 @@ def _validate_case(case: Any) -> None:
         raise HeldOutCorpusError("chara dasha lords are invalid")
     for sign in scenario["lord_signs"]:
         _sign(sign, "chara dasha lord sign")
-    if scenario["gender"] not in {"female", "male"} or not isinstance(scenario["start"], str):
+    if (
+        scenario["gender"] not in {"female", "male"}
+        or not isinstance(scenario["start"], str)
+        or not _UTC_TIMESTAMP.fullmatch(scenario["start"])
+    ):
         raise HeldOutCorpusError("chara dasha input is invalid")
     if not isinstance(expected, dict) or set(expected) != {
         "signs", "years", "first_end", "first_end_in_first", "first_end_in_second"
     }:
         raise HeldOutCorpusError("chara dasha expected value is invalid")
+    if (
+        not isinstance(expected["signs"], list)
+        or len(expected["signs"]) != 12
+        or not isinstance(expected["years"], list)
+        or len(expected["years"]) != 12
+        or not isinstance(expected["first_end"], str)
+        or not _UTC_TIMESTAMP.fullmatch(expected["first_end"])
+        or type(expected["first_end_in_first"]) is not bool
+        or type(expected["first_end_in_second"]) is not bool
+    ):
+        raise HeldOutCorpusError("chara dasha expected value is invalid")
+    for sign in expected["signs"]:
+        _sign(sign, "chara dasha expected sign")
+    for years in expected["years"]:
+        if isinstance(years, bool) or not isinstance(years, int) or not 1 <= years <= 12:
+            raise HeldOutCorpusError("chara dasha expected years are invalid")
 
 
 def _validate_corpus(payload: dict[str, Any]) -> None:
