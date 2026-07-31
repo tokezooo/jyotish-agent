@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -13,6 +14,7 @@ from jyotish_agent.doctrine.ingestion import (
     IngestionConfig,
     IngestionFailure,
     OcrResult,
+    PdftoppmRenderer,
     PyPdfExtractor,
 )
 from jyotish_agent.doctrine.sources import SourceRecord
@@ -227,6 +229,43 @@ def test_real_pdf_adapter_returns_typed_encrypted_error(tmp_path: Path) -> None:
     assert raised.value.code == "PDF_ENCRYPTED"
     assert "secret" not in str(raised.value)
     assert str(path) not in str(raised.value)
+
+
+def test_pdftoppm_renderer_reads_singlefile_output_and_cleans_it(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    rendered_prefixes: list[Path] = []
+
+    def fake_run(
+        args: list[str],
+        *,
+        capture_output: bool,
+        check: bool,
+        text: bool = False,
+    ) -> subprocess.CompletedProcess[bytes] | subprocess.CompletedProcess[str]:
+        assert capture_output is True
+        assert check is False
+        if args[1:] == ["-v"]:
+            return subprocess.CompletedProcess(
+                args, 0, stdout="", stderr="pdftoppm version 25.06.0\n"
+            )
+        prefix = Path(args[-1])
+        rendered_prefixes.append(prefix)
+        assert prefix.name == "page"
+        assert prefix != Path("-")
+        prefix.with_suffix(".png").write_bytes(b"synthetic-png")
+        return subprocess.CompletedProcess(args, 0, stdout=b"", stderr=b"")
+
+    monkeypatch.setattr("jyotish_agent.doctrine.ingestion.subprocess.run", fake_run)
+    source = tmp_path / "source.pdf"
+    source.write_bytes(b"private-source-fixture")
+
+    rendered = PdftoppmRenderer().render(source, 3, dpi=240)
+
+    assert rendered == b"synthetic-png"
+    assert len(rendered_prefixes) == 1
+    assert not rendered_prefixes[0].parent.exists()
+    assert not (Path.cwd() / "-.png").exists()
 
 
 def test_ingestor_rejects_unsupported_file_before_extraction(tmp_path: Path) -> None:

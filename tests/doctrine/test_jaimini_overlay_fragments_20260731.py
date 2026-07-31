@@ -29,6 +29,10 @@ LEDGER_PATH = (
     ROOT / "src/jyotish_agent/data/doctrine/jaimini-overlay-fragments.json"
 )
 AUDIT_PATH = ROOT / "docs/evidence/doctrine/jaimini-overlay-fragments.json"
+KN_LEDGER_PATH = (
+    ROOT / "src/jyotish_agent/data/doctrine/jaimini-kn-rao-overlay-fragments.json"
+)
+KN_AUDIT_PATH = ROOT / "docs/evidence/doctrine/jaimini-kn-rao-ocr-review.json"
 RELEASE_PATH = ROOT / "docs/evidence/doctrine/jaimini-release.json"
 MANIFEST_PATH = ROOT / "src/jyotish_agent/data/doctrine/jaimini-sources.json"
 INVENTORY_PATH = ROOT / "src/jyotish_agent/data/doctrine/jaimini-rules.json"
@@ -36,6 +40,7 @@ OVERLAYS_PATH = ROOT / "src/jyotish_agent/data/doctrine/jaimini-overlays.json"
 CORE_PATH = ROOT / "src/jyotish_agent/data/jaimini/jaimini_core_v1.json"
 UPADESA_SOURCE_ID = "jaimini_sanjay_rath_upadesa_sutras_1997"
 NARAYANA_SOURCE_ID = "jaimini_sanjay_rath_narayana_dasa_2004"
+KN_RAO_SOURCE_ID = "jaimini_kn_rao_chara_dasha_vani_scan_2010"
 
 
 def _context_parts():
@@ -50,9 +55,9 @@ def _context_parts():
     )
 
 
-def _activation_contract():
+def _activation_contract(ledger_path: Path = LEDGER_PATH):
     return load_jaimini_overlay_activation_contract(
-        ledger_path=LEDGER_PATH,
+        ledger_path=ledger_path,
         manifest_path=MANIFEST_PATH,
         baseline_inventory_path=INVENTORY_PATH,
         overlay_registry_path=OVERLAYS_PATH,
@@ -61,6 +66,10 @@ def _activation_contract():
 
 def _ledger() -> JaiminiOverlayFragmentLedger:
     return _activation_contract().ledger
+
+
+def _kn_ledger() -> JaiminiOverlayFragmentLedger:
+    return _activation_contract(KN_LEDGER_PATH).ledger
 
 
 def test_overlay_fragment_ledger_is_hash_bound_and_context_valid() -> None:
@@ -80,6 +89,51 @@ def test_overlay_fragment_ledger_is_hash_bound_and_context_valid() -> None:
     assert all(fragment.admission_status == "quarantined" for fragment in ledger.fragments)
     assert all(fragment.excerpt_permission == "none" for fragment in ledger.fragments)
     assert all(fragment.permitted_excerpt is None for fragment in ledger.fragments)
+
+
+def test_kn_rao_overlay_fragment_ledger_is_separate_and_fail_closed() -> None:
+    ledger = _kn_ledger()
+
+    assert ledger.ledger_id == "jaimini_kn_rao_overlay_fragments_v1"
+    assert ledger.overlay_id == "kn_rao_practical"
+    assert ledger.school == "kn_rao_practical"
+    assert ledger.unresolved_sources == ()
+    assert {fragment.source_id for fragment in ledger.fragments} == {KN_RAO_SOURCE_ID}
+    assert [fragment.page_number for fragment in ledger.fragments] == [
+        32,
+        35,
+        39,
+        40,
+        43,
+        44,
+    ]
+    assert [fragment.printed_page for fragment in ledger.fragments] == [
+        33,
+        36,
+        40,
+        41,
+        44,
+        45,
+    ]
+    assert all(fragment.school == "kn_rao_practical" for fragment in ledger.fragments)
+    assert all(fragment.admission_status == "quarantined" for fragment in ledger.fragments)
+    assert all(fragment.excerpt_permission == "none" for fragment in ledger.fragments)
+    assert all(fragment.permitted_excerpt is None for fragment in ledger.fragments)
+    assert all(
+        binding.status == JaiminiRuleStatus.QUARANTINED_CONFLICT
+        and binding.discrepancy
+        for binding in ledger.bindings
+    )
+    assert {binding.rule_id for binding in ledger.bindings} == {
+        "chara_dasha.progression",
+        "chara_dasha.antardasha",
+        "chara_dasha.duration",
+        "co_lords.resolution",
+    }
+    assert ledger.activation_allowed is False
+    with pytest.raises(JaiminiOverlayFailure) as raised:
+        ledger.require_activation_ready()
+    assert raised.value.code == "OVERLAY_FRAGMENT_LEDGER_QUARANTINED"
 
 
 def test_overlay_bindings_cover_bounded_families_and_make_conflicts_explicit() -> None:
@@ -140,11 +194,20 @@ def test_fragment_and_binding_identities_fail_closed_on_substitution() -> None:
         JaiminiOverlayFragmentLedger.model_validate(payload)
 
 
-def test_unresolved_source_school_cannot_be_relabelled() -> None:
-    payload = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
-    payload["unresolved_sources"][0]["school"] = "sanjay_rath"
+def test_overlay_ledger_identity_and_school_cannot_be_substituted() -> None:
+    payload = json.loads(KN_LEDGER_PATH.read_text(encoding="utf-8"))
+    payload["overlay_id"] = "sanjay_rath"
+    with pytest.raises(ValueError, match="ledger identity"):
+        JaiminiOverlayFragmentLedger.model_validate(payload)
 
-    with pytest.raises(ValueError, match="school must match"):
+    payload = json.loads(KN_LEDGER_PATH.read_text(encoding="utf-8"))
+    payload["fragments"][0]["school"] = "sanjay_rath"
+    with pytest.raises(ValueError, match="cannot blend schools"):
+        JaiminiOverlayFragmentLedger.model_validate(payload)
+
+    payload = json.loads(KN_LEDGER_PATH.read_text(encoding="utf-8"))
+    payload.pop("unresolved_sources")
+    with pytest.raises(ValueError, match="unresolved_sources"):
         JaiminiOverlayFragmentLedger.model_validate(payload)
 
 
@@ -195,7 +258,7 @@ def test_context_validation_rejects_release_identity_mutations(
         (
             "source_id",
             "jaimini_kn_rao_chara_dasha_vani_scan_2010",
-            "declared Sanjay Rath",
+            "named overlay",
         ),
         ("school", "kn_rao_practical", "cannot blend schools"),
     ],
@@ -261,8 +324,16 @@ def test_safe_loader_cannot_return_without_context_validation(tmp_path: Path) ->
 def test_tracked_projection_contains_no_source_text_or_private_locator() -> None:
     ledger_payload = json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
     audit_payload = json.loads(AUDIT_PATH.read_text(encoding="utf-8"))
+    kn_ledger_payload = json.loads(KN_LEDGER_PATH.read_text(encoding="utf-8"))
+    kn_audit_payload = json.loads(KN_AUDIT_PATH.read_text(encoding="utf-8"))
     rendered = json.dumps(
-        {"ledger": ledger_payload, "audit": audit_payload}, sort_keys=True
+        {
+            "ledger": ledger_payload,
+            "audit": audit_payload,
+            "kn_ledger": kn_ledger_payload,
+            "kn_audit": kn_audit_payload,
+        },
+        sort_keys=True,
     ).casefold()
 
     assert "private_sources" not in rendered
@@ -274,16 +345,13 @@ def test_tracked_projection_contains_no_source_text_or_private_locator() -> None
         fragment["permitted_excerpt"] is None for fragment in ledger_payload["fragments"]
     )
     assert "text" not in ledger_payload
+    assert "text" not in kn_ledger_payload
+    assert "excerpt" not in kn_audit_payload
 
 
-def test_unresolved_sources_are_explicit_and_do_not_enter_fragment_evidence() -> None:
-    ledger = _ledger()
-    unresolved = {item.source_id: item for item in ledger.unresolved_sources}
-
-    assert set(unresolved) == {"jaimini_kn_rao_chara_dasha_vani_scan_2010"}
-    assert unresolved[
-        "jaimini_kn_rao_chara_dasha_vani_scan_2010"
-    ].blocker_code == "ocr_review_pending"
+def test_reviewed_kn_rao_source_is_absent_from_unresolved_queues() -> None:
+    assert _ledger().unresolved_sources == ()
+    assert _kn_ledger().unresolved_sources == ()
 
 
 def test_baseline_inventory_and_frozen_core_are_unchanged_from_merge_base() -> None:
@@ -379,6 +447,65 @@ def test_private_narayana_pages_replay_crop_aware_commitments_without_duplicates
     assert _normalize_text(default[46].text) != _normalize_text(bounded[46].text)
     assert _normalize_text(default[46].text) == _normalize_text(default[47].text)
     assert _normalize_text(bounded[46].text) != _normalize_text(bounded[47].text)
+
+
+def test_private_kn_rao_pages_replay_reviewed_ocr_commitments() -> None:
+    manifest = load_source_manifest(MANIFEST_PATH)
+    source = next(item for item in manifest.sources if item.source_id == KN_RAO_SOURCE_ID)
+    private_path = ROOT / "private_sources" / source.local_file
+    if not private_path.is_file():
+        pytest.skip("private K. N. Rao source is unavailable in this checkout")
+
+    extracted = PyPdfExtractor().extract(private_path)
+    ledger = _kn_ledger()
+    for fragment in ledger.fragments:
+        text = _normalize_text(extracted[fragment.page_number - 1].text)
+        anchors = _extract_anchors(text)
+        page_payload = {
+            "page_number": fragment.page_number,
+            "printed_page": fragment.printed_page,
+            "language": fragment.language,
+            "text": text,
+            "source_method": "embedded_text",
+            "confidence": 1.0,
+            "admission_status": "admitted",
+            "anchors": [anchor.model_dump(mode="json") for anchor in anchors],
+        }
+        assert hashlib.sha256(text.encode("utf-8")).hexdigest() == (
+            fragment.full_text_sha256
+        )
+        assert hashlib.sha256(canonical_json(page_payload).encode("utf-8")).hexdigest() == (
+            fragment.normalized_content_sha256
+        )
+
+
+def test_kn_rao_ocr_review_audit_is_hash_bound_and_not_an_admission() -> None:
+    ledger = _kn_ledger()
+    audit = json.loads(KN_AUDIT_PATH.read_text(encoding="utf-8"))
+    manifest = load_source_manifest(MANIFEST_PATH)
+    source = next(item for item in manifest.sources if item.source_id == KN_RAO_SOURCE_ID)
+
+    assert audit["source_id"] == KN_RAO_SOURCE_ID
+    assert audit["source_file_sha256"] == source.sha256
+    assert audit["source_manifest_sha256"] == manifest.manifest_sha256
+    assert audit["ledger_sha256"] == ledger.ledger_sha256
+    assert all(
+        page["agent_visual_review"] == "passed"
+        for page in audit["reviewed_pages"]
+    )
+    assert [page["pdf_page"] for page in audit["reviewed_pages"]] == [
+        32,
+        35,
+        39,
+        40,
+        43,
+        44,
+    ]
+    assert all(page["tesseract_confidence"] >= 0.80 for page in audit["reviewed_pages"])
+    assert all(page["token_sequence_ratio"] >= 0.80 for page in audit["reviewed_pages"])
+    assert audit["doctrine_admitted"] is False
+    assert audit["product_rule_use_allowed"] is False
+    assert audit["specialist_review_missing"] is True
 
 
 def test_privacy_safe_audit_is_bound_to_ledger_and_preserves_release_blockers() -> None:

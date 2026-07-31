@@ -8,6 +8,7 @@ import io
 import math
 import re
 import subprocess
+import tempfile
 import unicodedata
 from collections.abc import Sequence
 from pathlib import Path
@@ -429,24 +430,28 @@ class PdftoppmRenderer:
 
     def render(self, path: Path, page_number: int, *, dpi: int) -> bytes:
         try:
-            result = subprocess.run(
-                [
-                    self.executable,
-                    "-f", str(page_number),
-                    "-l", str(page_number),
-                    "-r", str(dpi),
-                    "-png", "-singlefile", str(path), "-",
-                ],
-                capture_output=True,
-                check=False,
-            )
+            with tempfile.TemporaryDirectory(prefix="jyotish-pdf-render-") as temp_dir:
+                output_prefix = Path(temp_dir) / "page"
+                result = subprocess.run(
+                    [
+                        self.executable,
+                        "-f", str(page_number),
+                        "-l", str(page_number),
+                        "-r", str(dpi),
+                        "-png", "-singlefile", str(path), str(output_prefix),
+                    ],
+                    capture_output=True,
+                    check=False,
+                )
+                output_path = output_prefix.with_suffix(".png")
+                image = output_path.read_bytes() if output_path.is_file() else b""
         except OSError as exc:
             raise IngestionFailure(
                 "OCR_UNAVAILABLE", "The configured PDF rasterizer is unavailable."
             ) from exc
-        if result.returncode != 0 or not result.stdout:
+        if result.returncode != 0 or not image:
             raise IngestionFailure("OCR_FAILED", "The PDF page could not be rasterized.")
-        return result.stdout
+        return image
 
 
 class TesseractOcrAdapter:
