@@ -125,6 +125,7 @@ passed
 - `c690d1c feat(jaimini): add quarantined source fragment ledger`
 - `8696a30 fix(jaimini): harden fragment quarantine gates`
 - `7377450 fix(jaimini): close overlay activation bypass`
+- `436762e fix(jaimini): seal overlay activation evidence`
 
 ## Important review fix round
 
@@ -159,6 +160,31 @@ the required safe loader did not exist. Final review-fix verification:
 
 ```text
 focused + adjacent doctrine suites: 41 passed in 2.62s
+ruff check src tests: All checks passed!
+git diff --check: passed
+```
+
+### Second Important fix wave
+
+- Changed active-path validation from `isinstance` to exact type identity.
+- Made `JaiminiOverlayActivationContract` non-subclassable and retained its
+  immutable surface.
+- Bound each validated contract to the loader-only token plus a deterministic
+  ledger/registry state hash. Every readiness check recomputes the state and
+  fails typed with `OVERLAY_ACTIVATION_CONTEXT_INVALID` for uninitialized,
+  forged, or stale exact-type instances.
+- Added adversarial coverage for rejected subclass definition,
+  `object.__new__` construction, and post-load validation-state substitution.
+- Bound the privacy-safe fragment audit to the tracked Jaimini release evidence
+  SHA, release ID, and admission state.
+- Replaced literal blocker assertions with the exact projection of missing gate
+  names and blocker codes from the tracked release audit. Promotion now equals
+  the tracked release `available` flag and remains false.
+
+Second-wave verification:
+
+```text
+focused + adjacent doctrine suites: 42 passed in 2.57s
 ruff check src tests: All checks passed!
 git diff --check: passed
 ```
