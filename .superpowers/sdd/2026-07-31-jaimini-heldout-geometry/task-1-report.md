@@ -62,3 +62,40 @@ Reviewed schema strictness, case-ID independence, exact canonical comparisons, o
 ## Concerns
 
 Full suite and Ruff require a working `uv`/lint runtime; the only full-suite failures were the two wheel tests that cannot find `uv`.
+
+## Fix round 1 — per-case identity and strict synthetic schema
+
+Addressed the two blocking review findings in commit `3a712ec`.
+
+- Every one of the 26 hand-authored cases now carries and must match its own
+  `school`, `rule_profile_id`, and `rule_profile_sha256`. Validation occurs for
+  the complete corpus before any observer is dispatched.
+- Replaced the text blacklist with family-specific exact schemas. Case IDs,
+  school/profile fields, field keys, scalar ranges, body/status enums, output
+  shapes, booleans, and UTC timestamp forms are all whitelisted. Arbitrary
+  prose, birth-profile-shaped objects, private/copyright strings, and extra
+  keys are rejected before execution or reporting.
+- Recomputed `geometry-held-out-v1.json` SHA-256 after adding the case-local
+  identity fields: `476f25c3ec4c3df1d56fe5a99bbe7d7ed2a422b6f1ee2b47d46dd9f3353794c0`.
+
+Fix-round RED command/result:
+
+```text
+PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine /Users/vlad/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3 -m pytest -q tests/test_jaimini_geometry_heldout.py
+8 failed, 12 passed
+```
+
+The failures demonstrated that missing/wrong case identity was accepted or
+reported only as a generic schema issue, and that prose-shaped expected values
+could reach the observer.
+
+Fix-round GREEN verification:
+
+```text
+tests/test_jaimini_geometry_heldout.py: 27 passed
+tests/test_jaimini_geometry_heldout.py tests/test_jaimini_core.py tests/doctrine/test_lea_530_jaimini_release.py tests/doctrine/test_project_release_audit.py: 55 passed
+git diff --check: passed
+```
+
+Release blockers remain unchanged; this round does not claim source admission,
+human worked cases, specialist review, or deep E2E completion.
