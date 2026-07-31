@@ -5,12 +5,12 @@
     {
       "domain": "jaimini",
       "release_id": "full_jaimini_v1",
-      "evidence_sha256": "4e841fb932622587f8d03d3c1be8b8a99ae1fe9bd00985ddec8cb0c17a50bea3",
+      "evidence_sha256": "fcd48ab98249bb54c20779e31db971884f2ea2b6e72069d61293fd7aeee1b5fe",
       "admission_state": "blocked_sources",
       "available": false,
       "gate_statuses": {
         "rule_fixtures": "passed",
-        "hand_worked_cases": "missing",
+        "hand_worked_cases": "passed",
         "school_conflict_cases": "passed",
         "metamorphic_tests": "passed",
         "held_out_cases": "passed",
@@ -88,7 +88,7 @@
     "full_python_suite": {
       "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine $CODEX_PYTHON -m pytest -q",
       "status": "passed",
-      "passed": 884,
+      "passed": 889,
       "failed": 0,
       "skipped": 2
     },
@@ -127,5 +127,5 @@
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "04fbb3b7fc84e357613af88380b17067e5eccb74bd6b23bd1ecaf119d4ab4540"
+  "audit_sha256": "bdf59fde8c344a621d57a4f34463f8bbf027da80b11c5036c46b1d32a9ac58c0"
 }

@@ -1,0 +1,202 @@
+{
+  "schema_version": "1.0",
+  "corpus_id": "jaimini_hand_worked_v1",
+  "authorship": "independently_hand_calculated",
+  "used_for_tuning": false,
+  "public_safe": true,
+  "school": "project-canonical-jaimini-v1",
+  "rule_profile_id": "jaimini_core_v1",
+  "rule_profile_sha256": "8a97c43e8438351ae73a59fed731cf5e48ef3c25c347ddf3570dea5818696b58",
+  "source_map_sha256": "5e494796568722aff34fdc6a9fc43634809928d5afb6c1771574119c04ea3095",
+  "cases": [
+    {
+      "id": "hw_aries_geometry",
+      "authorship": "independently_hand_calculated",
+      "runtime_derived_expected": false,
+      "derivation": [
+        "Same-sign arudha applies the tenth-sign exception, yielding zero-based sign 9.",
+        "Movable sign 0 sees non-adjacent fixed signs 4, 7, and 10.",
+        "Occupant counts yield partial, unobstructed, obstructed, and absent argala statuses in 2/4/11/5 order."
+      ],
+      "checks": [
+        {
+          "check_id": "hw_aries_arudha_same",
+          "rule_family": "arudha",
+          "input": {"house": 0, "lord": 0},
+          "expected": 9
+        },
+        {
+          "check_id": "hw_aries_rasi_drishti",
+          "rule_family": "rasi_drishti",
+          "input": {"source_sign": 0},
+          "expected": [4, 7, 10]
+        },
+        {
+          "check_id": "hw_aries_argala_counts",
+          "rule_family": "argala",
+          "input": {
+            "source_sign": 0,
+            "occupants": {
+              "1": ["Moon", "Mars"],
+              "11": ["Saturn"],
+              "3": ["Jupiter"],
+              "10": ["Venus"],
+              "2": ["Rahu"]
+            }
+          },
+          "expected": [
+            {"house": 2, "status": "partial"},
+            {"house": 4, "status": "unobstructed"},
+            {"house": 11, "status": "obstructed"},
+            {"house": 5, "status": "absent"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "hw_karakas_and_colord",
+      "authorship": "independently_hand_calculated",
+      "runtime_derived_expected": false,
+      "derivation": [
+        "Eight-karaka scores rank descending after reversing Rahu within its sign.",
+        "Equal duration and degree use the frozen fixed-order comparator, selecting Mars.",
+        "Fixed sign 1 sees non-adjacent movable signs 3, 6, and 9."
+      ],
+      "checks": [
+        {
+          "check_id": "hw_karakas_eight_rank",
+          "rule_family": "karakas",
+          "input": {
+            "scheme": 8,
+            "longitudes": {
+              "Sun": 12,
+              "Moon": 4,
+              "Mars": 27,
+              "Mercury": 16,
+              "Jupiter": 8,
+              "Venus": 22,
+              "Saturn": 1,
+              "Rahu": 28
+            }
+          },
+          "expected": {
+            "AK": "Mars",
+            "AmK": "Venus",
+            "BK": "Mercury",
+            "MK": "Sun",
+            "PiK": "Jupiter",
+            "PK": "Moon",
+            "GK": "Rahu",
+            "DK": "Saturn"
+          }
+        },
+        {
+          "check_id": "hw_colord_fixed_order",
+          "rule_family": "co_lord",
+          "input": {
+            "candidates": ["Mars", "Ketu"],
+            "durations": {"Mars": 7, "Ketu": 7},
+            "degrees": {"Mars": 3, "Ketu": 3}
+          },
+          "expected": "Mars"
+        },
+        {
+          "check_id": "hw_fixed_rasi_drishti",
+          "rule_family": "rasi_drishti",
+          "input": {"source_sign": 1},
+          "expected": [3, 6, 9]
+        }
+      ]
+    },
+    {
+      "id": "hw_lagnas_and_precedence",
+      "authorship": "independently_hand_calculated",
+      "runtime_derived_expected": false,
+      "derivation": [
+        "At 120 elapsed minutes the three rates advance 30, 60, and 150 degrees before modulo 360.",
+        "An ordinary two-sign lord distance projects the arudha from sign 2 to sign 4.",
+        "Greater rashi duration outranks degree, selecting Ketu."
+      ],
+      "checks": [
+        {
+          "check_id": "hw_special_lagnas_wrap",
+          "rule_family": "special_lagnas",
+          "input": {"sun_longitude": 350, "minutes_since_sunrise": 120},
+          "expected": {"bhava_lagna": 20, "hora_lagna": 50, "ghati_lagna": 140}
+        },
+        {
+          "check_id": "hw_arudha_ordinary",
+          "rule_family": "arudha",
+          "input": {"house": 0, "lord": 2},
+          "expected": 4
+        },
+        {
+          "check_id": "hw_colord_duration_precedence",
+          "rule_family": "co_lord",
+          "input": {
+            "candidates": ["Mars", "Ketu"],
+            "durations": {"Mars": 4, "Ketu": 7},
+            "degrees": {"Mars": 29, "Ketu": 1}
+          },
+          "expected": "Ketu"
+        }
+      ]
+    },
+    {
+      "id": "hw_chara_dasha_boundary",
+      "authorship": "independently_hand_calculated",
+      "runtime_derived_expected": false,
+      "derivation": [
+        "Male seed sign 2 progresses forward through all twelve signs.",
+        "A lord four signs ahead produces four years for even signs and eight years for odd reverse counts.",
+        "Four mean solar years from the UTC anchor end at 2003-12-31T23:16:48Z; half-open intervals assign that instant to the second period."
+      ],
+      "checks": [
+        {
+          "check_id": "hw_chara_dasha_male_boundary",
+          "rule_family": "chara_dasha",
+          "input": {
+            "lagna_sign": 2,
+            "lord_signs": [4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2, 3],
+            "gender": "male",
+            "start": "2000-01-01T00:00:00Z"
+          },
+          "expected": {
+            "signs": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1],
+            "years": [4, 8, 4, 8, 4, 8, 4, 8, 4, 8, 4, 8],
+            "first_end": "2003-12-31T23:16:48Z",
+            "first_end_in_first": false,
+            "first_end_in_second": true
+          }
+        }
+      ]
+    },
+    {
+      "id": "hw_exact_karaka_tie",
+      "authorship": "independently_hand_calculated",
+      "runtime_derived_expected": false,
+      "derivation": [
+        "Sun and Moon have identical within-sign arcseconds, so the frozen tie policy must stop for adjudication rather than reorder them."
+      ],
+      "checks": [
+        {
+          "check_id": "hw_karakas_exact_tie_error",
+          "rule_family": "karakas",
+          "input": {
+            "scheme": 7,
+            "longitudes": {
+              "Sun": 18,
+              "Moon": 18,
+              "Mars": 27,
+              "Mercury": 16,
+              "Jupiter": 8,
+              "Venus": 22,
+              "Saturn": 1
+            }
+          },
+          "expected": {"error": "EXACT_KARAKA_TIE"}
+        }
+      ]
+    }
+  ]
+}

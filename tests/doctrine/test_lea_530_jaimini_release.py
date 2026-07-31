@@ -61,9 +61,15 @@ def test_release_audit_is_honest_and_blocks_promotion_without_compiled_sources()
     assert audit.available is False
     assert audit.external_review_missing is True
     assert {gate.gate_id for gate in audit.gates if gate.status == "missing"} >= {
-        "hand_worked_cases",
         "deep_conversational_e2e",
     }
+    hand_worked = next(
+        gate for gate in audit.gates if gate.gate_id == "hand_worked_cases"
+    )
+    assert hand_worked.status == "passed"
+    assert hand_worked.evidence is not None
+    assert "hand-worked-v1.json" in hand_worked.evidence
+    assert "11/11" in hand_worked.evidence
     held_out = next(gate for gate in audit.gates if gate.gate_id == "held_out_cases")
     assert held_out.status == "passed"
     assert held_out.evidence is not None
