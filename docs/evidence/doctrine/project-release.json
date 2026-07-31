@@ -30,7 +30,7 @@
     {
       "domain": "prashna",
       "release_id": "full_prashna_v1",
-      "evidence_sha256": "4650bb728752375cb7171d64f3c559286495c07ac1d95d4db5f70fece531a117",
+      "evidence_sha256": "89cfb03bfbed0df49a481b16dcbca2ce52d0701e43c976a87c9a29b8d2abf9c6",
       "admission_state": "blocked_sources",
       "available": false,
       "gate_statuses": {
@@ -41,15 +41,14 @@
         "outcome_graph_and_privacy": "passed",
         "tajika_source_admission": "failed",
         "published_outcome_cases": "missing",
-        "held_out_questions": "missing",
+        "held_out_questions": "passed",
         "concierge_future_outcomes": "missing",
         "specialist_review": "missing"
       },
       "blockers": [
         "published_outcome_cases: one additional complete traceable case is required",
         "tajika_source_admission: OCR, translation, and specialist review are incomplete",
-        "compiled_profile: no production source-admitted Prashna profile exists",
-        "held_out_questions: no independent held-out set has been evaluated"
+        "compiled_profile: no production source-admitted Prashna profile exists"
       ]
     },
     {
@@ -88,7 +87,7 @@
     "full_python_suite": {
       "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine $CODEX_PYTHON -m pytest -q",
       "status": "passed",
-      "passed": 889,
+      "passed": 895,
       "failed": 0,
       "skipped": 2
     },
@@ -121,11 +120,10 @@
     "prashna: published_outcome_cases: one additional complete traceable case is required",
     "prashna: tajika_source_admission: OCR, translation, and specialist review are incomplete",
     "prashna: compiled_profile: no production source-admitted Prashna profile exists",
-    "prashna: held_out_questions: no independent held-out set has been evaluated",
     "muhurta: independent_held_out_evaluation: no independently designed outcome corpus and evaluator result exists",
     "muhurta: specialist_review: external rule-pack review is missing",
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "bdf59fde8c344a621d57a4f34463f8bbf027da80b11c5036c46b1d32a9ac58c0"
+  "audit_sha256": "beb58b028902f5a090146b5f1f44016b82d08e875feaea8a7d45d5ea32b0df19"
 }

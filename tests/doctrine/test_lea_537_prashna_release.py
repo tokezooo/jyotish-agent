@@ -80,14 +80,21 @@ def test_release_audit_distinguishes_completed_checks_from_future_follow_up() ->
     assert audit.completed_evidence
     assert audit.future_outcome_follow_up
     assert audit.metrics.published_outcome_case_count == 1
-    assert audit.metrics.held_out_question_count == 0
-    assert audit.metrics.material_error_rate is None
-    assert audit.metrics.no_answer_rate is None
+    assert audit.metrics.held_out_question_count == 12
+    assert audit.metrics.material_error_rate == 0.0
+    assert audit.metrics.no_answer_rate == 0.125
     assert {gate.gate_id for gate in audit.gates if gate.status == "missing"} >= {
         "published_outcome_cases",
-        "held_out_questions",
         "concierge_future_outcomes",
     }
+    held_out = next(
+        gate for gate in audit.gates if gate.gate_id == "held_out_questions"
+    )
+    assert held_out.status == "passed"
+    assert held_out.evidence is not None
+    assert "questions-held-out-v1.json" in held_out.evidence
+    assert "12/12" in held_out.evidence
+    assert all("held_out" not in blocker for blocker in audit.blockers)
 
 
 def test_ru_en_mode_matrix_is_additive_and_fails_closed_with_audit(tmp_path) -> None:
