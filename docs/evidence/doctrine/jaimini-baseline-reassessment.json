@@ -1,0 +1,88 @@
+{
+  "schema_version": "1.0",
+  "evidence_id": "jaimini_baseline_reassessment_2026_08_01",
+  "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+  "source_file_sha256": "06953f710d7a52e548fd7b7badeeef0c163debd02b8b08178c3833905aaa76ce",
+  "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+  "baseline_inventory_sha256": "a7e0a1fe04766f0f15b36ab6f2fd711decdc799d3b3b972aabb75b3c1f38bb0c",
+  "baseline_fragment_ledger_sha256": "cea743b74166a64b5af75e1a31900e13333ae51ff8471fd4069e6d918a911b53",
+  "title": "Sri Jaiminisutras: English Translation with Full Notes and Original Texts in Sanskrit and Transliteration",
+  "translator_editor": "B. Suryanarain Rao; revised and edited by B. V. Raman",
+  "edition": "Third edition, Raman Publications, 1949",
+  "baseline_disposition": "nilakantha_mediated_translation",
+  "standalone_subodhini_edition_acquired": false,
+  "review_method": {
+    "renderer": "pdftoppm",
+    "renderer_version": "26.04.0",
+    "dpi": 180,
+    "ocr": "tesseract",
+    "ocr_version": "5.5.2",
+    "psm": 6,
+    "language": "eng",
+    "visual_review": "required_and_completed_for_identity_pages"
+  },
+  "identity_findings": [
+    "The title page identifies an English translation with notes, Sanskrit text, transliteration, editor, edition, publisher, and year.",
+    "The foreword identifies the volume as the third revised edition of B. Suryanarain Rao's English translation.",
+    "The preface identifies the author's work as an English translation and explains that the source commentaries are condensed into notes.",
+    "The first-pada colophon attributes the underlying commentaries to Neelakanta under the name Subodha and also records consultation of other commentators."
+  ],
+  "identity_page_commitments": [
+    {
+      "pdf_page": 1,
+      "printed_page": null,
+      "purpose": "title_edition_publisher_year",
+      "normalized_page_sha256": "65b6d96aa23d5dfa692e3627e355c53be0c3551ebfbaf14dc891cad20e95a80a",
+      "visual_reviewed": true
+    },
+    {
+      "pdf_page": 2,
+      "printed_page": null,
+      "purpose": "third_revised_edition_foreword",
+      "normalized_page_sha256": "de0e3dfecacda7e3db6a0873710e5f81afa6a88e6c8e42f56af041b6e22bbeb5",
+      "visual_reviewed": true
+    },
+    {
+      "pdf_page": 6,
+      "printed_page": null,
+      "purpose": "commentary_condensation_limit",
+      "normalized_page_sha256": "301b846ef1229cf18c067baa0b65ca977cbc9fdae2eea3cc7f79b919db874b33",
+      "visual_reviewed": true
+    },
+    {
+      "pdf_page": 7,
+      "printed_page": null,
+      "purpose": "translator_self_identification",
+      "normalized_page_sha256": "0d65ba184c4ff6b04ecdfa385451d464ea7d86142369ed99b4bab44f83fc6581",
+      "visual_reviewed": true
+    },
+    {
+      "pdf_page": 56,
+      "printed_page": 39,
+      "purpose": "neelakanta_subodha_attribution_and_mediation_limit",
+      "normalized_page_sha256": "a7e7d7c7bc641859d987aceb7262efd9157ede33e397ed8ec22b523d3548a8a0",
+      "visual_reviewed": true
+    }
+  ],
+  "page_offset": -17,
+  "offset_checks": [
+    {"pdf_page": 20, "printed_page": 3},
+    {"pdf_page": 23, "printed_page": 6},
+    {"pdf_page": 56, "printed_page": 39}
+  ],
+  "limitations": [
+    "This is a Nilakantha-mediated English baseline, not the preferred modern standalone Subodhini edition.",
+    "The translator condenses commentary into notes and explicitly consults additional commentators, so school purity must be assessed rule by rule.",
+    "The scan is poor quality; OCR commitments remain quarantined until visual and specialist review.",
+    "The preferred modern standalone translation remains a useful cross-check acquisition, but it is no longer a corpus-readiness blocker."
+  ],
+  "requirement_effect": {
+    "nilakantha_subodhini_translation": "covered_with_explicit_mediation_limit",
+    "independent_translation": "covered_by_separate_sanjay_rath_source",
+    "published_worked_charts": "covered_by_twenty_hash_bound_page_anchors"
+  },
+  "corpus_acquisition_ready": true,
+  "doctrine_admitted": false,
+  "product_rule_use_allowed": false,
+  "release_promoted": false
+}

@@ -55,8 +55,14 @@ def test_catalog_declares_every_required_role_and_topic_without_false_acquisitio
         "rasi_drishti",
         "chara_dasha",
     } <= set(catalog.required_topics)
-    missing = {item.requirement for item in catalog.requirements if not item.source_ids}
-    assert missing == {JaiminiCorpusRequirement.NILAKANTHA_SUBODHINI_TRANSLATION}
+    assert all(item.source_ids for item in catalog.requirements)
+    by_requirement = {item.requirement: item for item in catalog.requirements}
+    assert by_requirement[
+        JaiminiCorpusRequirement.NILAKANTHA_SUBODHINI_TRANSLATION
+    ].source_ids == ("jaimini_sutras_b_suryanarain_rao_1949",)
+    assert by_requirement[
+        JaiminiCorpusRequirement.INDEPENDENT_TRANSLATION
+    ].source_ids == ("jaimini_sanjay_rath_upadesa_sutras_1997",)
 
 
 def test_coverage_requires_verified_bytes_and_does_not_count_missing_books(
@@ -74,7 +80,7 @@ def test_coverage_requires_verified_bytes_and_does_not_count_missing_books(
     assert report.verified_source_ids == tuple(
         sorted(source.source_id for source in manifest.sources)
     )
-    assert report.ready is False
+    assert report.ready is True
     assert (
         JaiminiCorpusRequirement.SANSKRIT_UPADESA_SUTRAS in report.covered_requirements
     )
@@ -83,8 +89,9 @@ def test_coverage_requires_verified_bytes_and_does_not_count_missing_books(
     )
     assert (
         JaiminiCorpusRequirement.NILAKANTHA_SUBODHINI_TRANSLATION
-        in report.missing_requirements
+        in report.covered_requirements
     )
+    assert report.missing_requirements == ()
     assert report.verified_worked_chart_count == 20
     assert report.missing_worked_chart_count == 0
 
@@ -132,11 +139,11 @@ def test_coverage_projection_is_deterministic_private_and_matches_tracked_audit(
             encoding="utf-8"
         )
     )
-    assert tracked["ready"] is False
-    assert tracked["missing_requirements"] == ["nilakantha_subodhini_translation"]
+    assert tracked["ready"] is True
+    assert tracked["missing_requirements"] == []
     assert tracked["verified_worked_chart_count"] == 20
     assert tracked["missing_worked_chart_count"] == 0
-    assert tracked["acquisition_blockers"]
+    assert tracked["acquisition_blockers"] == []
 
 
 def test_real_private_sources_verify_when_available() -> None:

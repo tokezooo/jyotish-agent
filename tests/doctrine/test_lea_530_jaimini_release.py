@@ -74,7 +74,8 @@ def test_release_audit_is_honest_and_blocks_promotion_without_compiled_sources()
     assert held_out.status == "passed"
     assert held_out.evidence is not None
     assert "geometry-held-out-v1.json" in held_out.evidence
-    assert any("nilakantha_subodhini_translation" in item for item in audit.blockers)
+    assert not any("nilakantha_subodhini_translation" in item for item in audit.blockers)
+    assert any("twelve Nilakantha-mediated baseline fragments" in item for item in audit.blockers)
 
 
 def test_quick_full_deep_and_inspection_ru_en_are_additive_fail_closed_surfaces(

@@ -354,10 +354,9 @@ def test_reviewed_kn_rao_source_is_absent_from_unresolved_queues() -> None:
     assert _kn_ledger().unresolved_sources == ()
 
 
-def test_baseline_inventory_and_frozen_core_are_unchanged_from_merge_base() -> None:
-    # Exact identities captured before the overlay-fragment slice began.
+def test_baseline_reassessment_updates_inventory_without_mutating_frozen_core() -> None:
     assert hashlib.sha256(INVENTORY_PATH.read_bytes()).hexdigest() == (
-        "54d90c69b18878d3b7276007a2ff44500ae73eb6f811b4fe6c9ce08ab2df05f1"
+        "911b6ad2fa403572e3b0a1d8313c37c5e0b052055354d589b4e4fa08fa52a6aa"
     )
     assert hashlib.sha256(CORE_PATH.read_bytes()).hexdigest() == (
         "8a97c43e8438351ae73a59fed731cf5e48ef3c25c347ddf3570dea5818696b58"

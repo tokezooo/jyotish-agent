@@ -66,6 +66,39 @@ def test_anchored_candidate_has_exact_page_sutra_and_content_commitment() -> Non
     assert candidate.ambiguity is not None
 
 
+def test_existing_nilakantha_mediated_volume_anchors_bounded_rule_families() -> None:
+    inventory = _inventory()
+    anchored = {item.rule_id: item for item in inventory.candidates if item.anchor}
+
+    assert set(anchored) == {
+        "argala.count_obstruction",
+        "argala.houses",
+        "arudha.exception",
+        "chara_dasha.antardasha",
+        "chara_dasha.duration",
+        "co_lords.resolution",
+        "karakamsa.d9_atmakaraka",
+        "karakas.rahu_reversal",
+        "karakas.scheme",
+        "karakas.tie_policy",
+        "rasi_drishti.modal_sign_aspects",
+        "special_lagnas.selected_rates",
+    }
+    assert {
+        rule_id
+        for rule_id, candidate in anchored.items()
+        if candidate.status == JaiminiRuleStatus.QUARANTINED_CONFLICT
+    } == {
+        "co_lords.resolution",
+        "karakas.tie_policy",
+        "special_lagnas.selected_rates",
+    }
+    assert all(
+        candidate.source_id == "jaimini_sutras_b_suryanarain_rao_1949"
+        for candidate in anchored.values()
+    )
+
+
 def test_unanchored_candidates_are_quarantined_with_explicit_discrepancies() -> None:
     inventory = _inventory()
     unanchored = [item for item in inventory.candidates if item.anchor is None]
@@ -78,10 +111,17 @@ def test_unanchored_candidates_are_quarantined_with_explicit_discrepancies() -> 
     discrepancy_audit = json.loads(DISCREPANCIES_PATH.read_text(encoding="utf-8"))
     assert discrepancy_audit["inventory_sha256"] == inventory.inventory_sha256
     assert discrepancy_audit["admitted_rule_count"] == 0
-    assert discrepancy_audit["quarantined_rule_count"] == len(unanchored)
+    conflicts = [
+        item
+        for item in inventory.candidates
+        if item.status == JaiminiRuleStatus.QUARANTINED_CONFLICT
+    ]
+    assert discrepancy_audit["quarantined_rule_count"] == len(unanchored) + len(
+        conflicts
+    )
     assert {item["rule_id"] for item in discrepancy_audit["discrepancies"]} == {
         item.rule_id for item in unanchored
-    }
+    } | {item.rule_id for item in conflicts}
 
 
 def test_inventory_identity_is_deterministic_and_order_independent() -> None:

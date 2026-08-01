@@ -79,9 +79,10 @@ def test_verified_acquisitions_close_book_gaps_without_promoting_release() -> No
     } <= set(verification.verified_source_ids)
 
     coverage = build_jaimini_corpus_coverage(manifest, verification, catalog)
-    assert coverage.ready is False
+    assert coverage.ready is True
     assert coverage.verified_worked_chart_count == 20
     assert coverage.missing_worked_chart_count == 0
-    assert set(coverage.missing_requirements) == {
-        JaiminiCorpusRequirement.NILAKANTHA_SUBODHINI_TRANSLATION,
-    }
+    assert coverage.missing_requirements == ()
+    assert JaiminiCorpusRequirement.NILAKANTHA_SUBODHINI_TRANSLATION in (
+        coverage.covered_requirements
+    )
