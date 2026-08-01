@@ -13,7 +13,7 @@
     {
       "gate_id": "radicality_and_anchor_suite",
       "status": "passed",
-      "evidence": "Readable, conflicting, unavailable, retry, and clarification gates pass."
+      "evidence": "Four private-experimental baseline criteria have exact page and fragment hashes; readable, conflicting, unavailable, retry, and clarification gates pass."
     },
     {
       "gate_id": "taxonomy_ru_en",
@@ -43,7 +43,7 @@
     {
       "gate_id": "held_out_questions",
       "status": "passed",
-      "evidence": "LEA-537: eval/prashna/questions-held-out-v1.json (SHA-256 a6ffacfba6fda9ce0b48b4601732b0627b861dbfa37d4bfdee5d0048c025fc0e) executed by evaluate_prashna_held_out_questions(allow_held_out=True): 12/12 passed; material-error rate 0.0; safe-supported no-answer rate 0.125; source mode synthetic_test_fixture_only"
+      "evidence": "LEA-537: eval/prashna/questions-held-out-v1.json (SHA-256 ea337e395aadd08f7e7498293e3e3e388c79aa33ca130250aa333ee29a744303) executed by evaluate_prashna_held_out_questions(allow_held_out=True): 12/12 passed; material-error rate 0.0; safe-supported no-answer rate 0.125; source mode synthetic_test_fixture_only"
     },
     {
       "gate_id": "concierge_future_outcomes",
@@ -64,6 +64,7 @@
   },
   "completed_evidence": [
     "Automated source identity, anchor, taxonomy, geometry, graph, renderer, and privacy suites are implemented.",
+    "Four Prasna Marga baseline radicality criteria are admitted for safe low-risk private experimentation with exact text offsets and fragment hashes; external specialist review remains missing.",
     "Bounded Tajika candidate passages on PDF pages 45-47 are image-hash-bound and visually localized without admitting source text or product rules.",
     "Two published known-outcome cases are page-anchored and reproduced offline: one safe work-status case is admitted and one relationship case remains excluded from product use.",
     "Twelve independently authored RU/EN held-out questions pass deterministic route and synthetic gated-outcome scoring without claiming source admission."

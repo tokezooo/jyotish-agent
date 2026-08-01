@@ -33,6 +33,13 @@ def _graph() -> PrashnaOutcomeGraph:
                     "printed_page": index,
                     "page_sha256": str(index) * 64,
                     "source_locator": "fixture",
+                    "fragment_start_offset": 0,
+                    "fragment_end_offset": 1,
+                    "fragment_text_sha256": f"{index + 4:x}" * 64,
+                    "fragment_word_count": 1,
+                    "fragment_normalization": "whitespace_collapse_v1",
+                    "admission_status": "private_experimental",
+                    "specialist_review_status": "missing",
                 }
                 for index, criterion in enumerate(
                     (

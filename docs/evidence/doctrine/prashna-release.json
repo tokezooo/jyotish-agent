@@ -6,13 +6,13 @@
   "admission_state": "blocked_sources",
   "gates": [
     {"gate_id": "source_manifest", "status": "passed", "evidence": "Six declared local sources verify by SHA-256."},
-    {"gate_id": "radicality_and_anchor_suite", "status": "passed", "evidence": "Readable, conflicting, unavailable, retry, and clarification gates pass."},
+    {"gate_id": "radicality_and_anchor_suite", "status": "passed", "evidence": "Four private-experimental baseline criteria have exact page and fragment hashes; readable, conflicting, unavailable, retry, and clarification gates pass."},
     {"gate_id": "taxonomy_ru_en", "status": "passed", "evidence": "Four safe profiles and adversarial ambiguity cases pass in RU and EN."},
     {"gate_id": "geometry_property_suite", "status": "passed", "evidence": "Hand checks, wrap, retrograde, station, boundary, replay, and substitution pass."},
     {"gate_id": "outcome_graph_and_privacy", "status": "passed", "evidence": "Three mandatory gates, conflicts, no-answer, renderer identity, and secret-input cases pass."},
     {"gate_id": "tajika_source_admission", "status": "failed", "evidence": "A bounded OCR review hash-binds candidate passages on PDF pages 45-47; they remain quarantined pending transcription, translation, and specialist review."},
     {"gate_id": "published_outcome_cases", "status": "passed", "evidence": "2/2 published cases have exact question time/place, page-paired judgment and timing, and traceable observed outcomes; the safe teaching case is admitted and the marriage case remains excluded."},
-    {"gate_id": "held_out_questions", "status": "passed", "evidence": "LEA-537: eval/prashna/questions-held-out-v1.json (SHA-256 a6ffacfba6fda9ce0b48b4601732b0627b861dbfa37d4bfdee5d0048c025fc0e) executed by evaluate_prashna_held_out_questions(allow_held_out=True): 12/12 passed; material-error rate 0.0; safe-supported no-answer rate 0.125; source mode synthetic_test_fixture_only"},
+    {"gate_id": "held_out_questions", "status": "passed", "evidence": "LEA-537: eval/prashna/questions-held-out-v1.json (SHA-256 ea337e395aadd08f7e7498293e3e3e388c79aa33ca130250aa333ee29a744303) executed by evaluate_prashna_held_out_questions(allow_held_out=True): 12/12 passed; material-error rate 0.0; safe-supported no-answer rate 0.125; source mode synthetic_test_fixture_only"},
     {"gate_id": "concierge_future_outcomes", "status": "missing", "evidence": null},
     {"gate_id": "specialist_review", "status": "missing", "evidence": null}
   ],
@@ -24,6 +24,7 @@
   },
   "completed_evidence": [
     "Automated source identity, anchor, taxonomy, geometry, graph, renderer, and privacy suites are implemented.",
+    "Four Prasna Marga baseline radicality criteria are admitted for safe low-risk private experimentation with exact text offsets and fragment hashes; external specialist review remains missing.",
     "Bounded Tajika candidate passages on PDF pages 45-47 are image-hash-bound and visually localized without admitting source text or product rules.",
     "Two published known-outcome cases are page-anchored and reproduced offline: one safe work-status case is admitted and one relationship case remains excluded from product use.",
     "Twelve independently authored RU/EN held-out questions pass deterministic route and synthetic gated-outcome scoring without claiming source admission."

@@ -6,7 +6,7 @@
   "public_safe": true,
   "source_admission_mode": "synthetic_test_fixture_only",
   "corpus_manifest_sha256": "7f320ba34fadc878ee028826a04d4b0b17b980614e4be212a262fdd552e5378b",
-  "radicality_profile_sha256": "4f77da632b0f3e67ebb9a234a757a3130eeff62ee56ded1f9caf596ef3bdbf6c",
+  "radicality_profile_sha256": "259221f4861fc31727e00772520d27f81a1d09816b538cb885d9ae84eb3b20ea",
   "cases": [
     {
       "id": "pq_work_en_favorable",

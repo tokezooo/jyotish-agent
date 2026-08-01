@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "audit_id": "prashna_radicality_fragment_review_v1",
+  "source_manifest_sha256": "7f320ba34fadc878ee028826a04d4b0b17b980614e4be212a262fdd552e5378b",
+  "profile_sha256": "259221f4861fc31727e00772520d27f81a1d09816b538cb885d9ae84eb3b20ea",
+  "criterion_ids": [
+    "anchor_exact",
+    "question_not_test",
+    "question_once",
+    "question_proper_form"
+  ],
+  "review_scope": "Four baseline radicality criteria only; safe low-risk private experimental use, with no Tajika overlay or public release claim.",
+  "fragment_contract": {
+    "coordinate_space": "PyPdfExtractor page text UTF-8 character offsets",
+    "normalization": "whitespace_collapse_v1",
+    "source_text_persisted": false,
+    "page_and_fragment_hash_required": true
+  },
+  "source_pages": [
+    {
+      "source_id": "prasna_marga_bv_raman_part_1_1991",
+      "pdf_page": 33,
+      "printed_page": 33,
+      "criteria": ["question_not_test"]
+    },
+    {
+      "source_id": "prasna_marga_bv_raman_part_1_1991",
+      "pdf_page": 34,
+      "printed_page": 34,
+      "criteria": ["anchor_exact"]
+    },
+    {
+      "source_id": "prasna_marga_bv_raman_part_1_1991",
+      "pdf_page": 35,
+      "printed_page": 35,
+      "criteria": ["question_proper_form"]
+    },
+    {
+      "source_id": "daivajna_vallabha_2003_scan",
+      "pdf_page": 2,
+      "printed_page": 2,
+      "criteria": ["question_once"]
+    }
+  ],
+  "tracked_source_text": false,
+  "admission_state": "private_experimental",
+  "product_rule_use_allowed": "safe_low_risk_only",
+  "external_specialist_review_missing": true
+}
