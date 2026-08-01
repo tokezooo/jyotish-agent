@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 import datetime as dt
+import json
 from dataclasses import dataclass
 from itertools import combinations
 
@@ -9,8 +9,11 @@ import pytest
 
 from jyotish_agent import interpretations, names, signing
 from jyotish_agent import jaimini as domain
-from jyotish_agent.jaimini_models import JaiminiInput
-from jyotish_agent.jaimini_models import ExactJaiminiBirthInput, JaiminiPlace
+from jyotish_agent.jaimini_models import (
+    ExactJaiminiBirthInput,
+    JaiminiInput,
+    JaiminiPlace,
+)
 from jyotish_agent.timezone_resolution import TimezoneResolutionError
 
 
@@ -43,6 +46,7 @@ class Snapshot:
 def _snapshot(
     *, lagna: int = 0, d9_lagna: int = 8, tie: bool = False,
     sunrise_available: bool = True, rahu_degrees: float | None = None,
+    sun_longitude: float = 100.0, minutes_since_sunrise: float = 120.0,
 ) -> Snapshot:
     d1 = (Position(None, lagna, 10.0),) + tuple(
         Position(index, (index * 2 + 1) % 12, 29.0 - index)
@@ -68,8 +72,8 @@ def _snapshot(
         )
     return Snapshot(
         Config(), d1, d9,
-        100.0 if sunrise_available else None,
-        120.0 if sunrise_available else None,
+        sun_longitude if sunrise_available else None,
+        minutes_since_sunrise if sunrise_available else None,
     )
 
 
@@ -227,6 +231,19 @@ def test_include_trace_controls_bounded_rule_inputs(monkeypatch):
     assert "jaimini.trace.argala.AL.2_vs_12.contributors" in trace
     assert "jaimini.trace.relationships.7.node.AL.D9.sign_index" in trace
     assert "jaimini.trace.relationships.8.node.AL.D9.sign_index" in trace
+    assert trace["jaimini.trace.special_lagnas.variant"] == "regular_non_savayava"
+    assert (
+        trace["jaimini.trace.special_lagnas.anchor_policy"]
+        == "latest_sunrise_at_or_before_birth"
+    )
+    assert (
+        trace["jaimini.trace.special_lagnas.sunrise_definition"]
+        == "swiss_apparent_upper_limb_with_refraction"
+    )
+    assert (
+        trace["jaimini.trace.special_lagnas.elapsed_basis"]
+        == "aware_utc_minutes_between_anchor_and_birth"
+    )
     assert len(shown.trace) <= 256
 
 
@@ -292,15 +309,29 @@ def test_relationship_graph_is_qualified_by_karaka_scheme(
     assert len(json.dumps(first.model_dump(mode="json")).encode()) < 512 * 1024
 
 
-def test_missing_sunrise_primitive_and_exact_karaka_tie_are_typed(monkeypatch):
+def test_missing_sunrise_primitive_degrades_only_special_lagnas(monkeypatch):
     monkeypatch.setattr(
         domain, "capture_birth_snapshots", lambda *_a, **_k: (_snapshot(sunrise_available=False),)
     )
     missing = domain.JaiminiFacade().calculate(_request())
-    assert missing.status == "incomplete"
-    assert missing.next_action == "retry_calculation"
-    assert missing.limitations[0].code == "SPECIAL_LAGNA_PRIMITIVE_UNAVAILABLE"
+    assert missing.status == "completed"
+    facts = {
+        fact.fact_id: fact.value
+        for section in missing.sections
+        for fact in section.facts
+    }
+    assert facts["jaimini.karakas.7.DK"] == "Saturn"
+    assert "jaimini.arudha.UL" in facts
+    assert "jaimini.relationships.7.node.DK.body" in facts
+    assert "jaimini.chara_dasha.1.start" in facts
+    assert not any(key.startswith("jaimini.special_lagnas.") for key in facts)
+    assert any(
+        item.code == "SPECIAL_LAGNA_PRIMITIVE_UNAVAILABLE"
+        for item in missing.limitations
+    )
 
+
+def test_exact_karaka_tie_remains_typed_incomplete(monkeypatch):
     monkeypatch.setattr(
         domain, "capture_birth_snapshots", lambda *_a, **_k: (_snapshot(tie=True),)
     )
@@ -310,6 +341,65 @@ def test_missing_sunrise_primitive_and_exact_karaka_tie_are_typed(monkeypatch):
     assert tied.limitations[0].code == "KARAKA_TIE_REQUIRES_ADJUDICATION"
     assert "Sun" not in tied.limitations[0].message
     assert "Moon" not in tied.limitations[0].message
+
+
+def test_approximate_range_across_sunrise_marks_special_lagnas_unstable(monkeypatch):
+    monkeypatch.setattr(
+        domain,
+        "capture_birth_snapshots",
+        lambda *_a, **_k: (
+            _snapshot(sun_longitude=90.0, minutes_since_sunrise=1_435.0),
+            _snapshot(sun_longitude=100.0, minutes_since_sunrise=0.0),
+            _snapshot(sun_longitude=100.0, minutes_since_sunrise=5.0),
+        ),
+    )
+
+    result = domain.JaiminiFacade().calculate(_request(approximate=True))
+    assert result.status == "completed"
+    facts = {
+        fact.fact_id: fact
+        for section in result.sections
+        for fact in section.facts
+    }
+    assert facts["jaimini.special_lagnas.bhava_lagna.degrees"].stability == "unstable"
+    assert facts["jaimini.special_lagnas.hora_lagna.degrees"].stability == "unstable"
+    assert facts["jaimini.special_lagnas.ghati_lagna.degrees"].stability == "unstable"
+    assert facts["jaimini.karakas.7.DK"].stability == "stable"
+    assert any(item.code == "BIRTH_TIME_SENSITIVE" for item in result.limitations)
+
+
+def test_approximate_partial_sunrise_omits_only_special_facts_and_trace(monkeypatch):
+    monkeypatch.setattr(
+        domain,
+        "capture_birth_snapshots",
+        lambda *_a, **_k: (
+            _snapshot(),
+            _snapshot(sunrise_available=False),
+            _snapshot(),
+        ),
+    )
+
+    result = domain.JaiminiFacade().calculate(
+        _request(approximate=True, include_trace=True)
+    )
+    assert result.status == "completed"
+    facts = {
+        fact.fact_id: fact
+        for section in result.sections
+        for fact in section.facts
+    }
+    assert "jaimini.arudha.UL" in facts
+    assert "jaimini.chara_dasha.1.start" in facts
+    assert not any(key.startswith("jaimini.special_lagnas.") for key in facts)
+    assert result.trace is not None
+    assert not any(
+        fact.fact_id.startswith("jaimini.trace.special_lagnas.")
+        for fact in result.trace
+    )
+    assert any(
+        item.code == "SPECIAL_LAGNA_PRIMITIVE_UNAVAILABLE"
+        for item in result.limitations
+    )
 
 
 def test_birth_anchor_resolves_dst_fold_gap_and_asserted_offset():

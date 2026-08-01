@@ -81,8 +81,8 @@ def test_baseline_fragment_ledger_is_hash_bound_text_free_and_context_valid() ->
     assert ledger.source_id == SOURCE_ID
     assert ledger.doctrine_admitted is False
     assert ledger.product_rule_use_allowed is False
-    assert len(ledger.fragments) == 13
-    assert len(ledger.bindings) == 16
+    assert len(ledger.fragments) == 17
+    assert len(ledger.bindings) == 20
     assert {binding.rule_id for binding in ledger.bindings} == {
         candidate.rule_id for candidate in inventory.candidates
     }

@@ -357,7 +357,7 @@ def test_retrieval_evidence_binds_approval_provenance_and_seed_replays(tmp_path:
     assert persisted["fragment_reviewed_at"] == fragment_review["reviewed_at"]
 
     seed_store = ResearchStore(tmp_path / "seed")
-    assert seed_store.seed_builtin_corpus() == 30
+    assert seed_store.seed_builtin_corpus() == 35
     before = seed_store.list_corpus_review_history()
-    assert seed_store.seed_builtin_corpus() == 30
+    assert seed_store.seed_builtin_corpus() == 35
     assert seed_store.list_corpus_review_history() == before

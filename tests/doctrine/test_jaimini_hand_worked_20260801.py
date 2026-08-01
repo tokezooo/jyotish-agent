@@ -44,9 +44,9 @@ def test_hand_worked_corpus_runs_literal_multi_rule_cases() -> None:
 
     assert result == {
         "corpus_id": "jaimini_hand_worked_v1",
-        "corpus_sha256": "cafa1778659323c261798a3065ddbb8f64947538cc0a5412744b69b672c96a0a",
-        "rule_profile_sha256": "8a97c43e8438351ae73a59fed731cf5e48ef3c25c347ddf3570dea5818696b58",
-        "source_map_sha256": "5e494796568722aff34fdc6a9fc43634809928d5afb6c1771574119c04ea3095",
+        "corpus_sha256": "a98665714d3c7b7d9bb5edb5e8ae0264c5f4aa6702a99f733f90e6e61bcbf0da",
+        "rule_profile_sha256": "ea5aea06b15b98df63ca32c290f4ebc7ae1d2d494171aa4730bb25c467dda5bb",
+        "source_map_sha256": "8186c2c05ec3671420ed9393073f15a06eb915ab2dfd8cc398b2b576f1bf02b1",
         "status": "passed",
         "case_count": 5,
         "check_count": 11,

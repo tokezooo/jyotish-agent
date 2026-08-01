@@ -309,12 +309,36 @@ def test_source_map_checksums_profile_and_fails_interpretation_closed():
 
     assert source_map.rule_profile_sha256 == hashlib.sha256(profile_bytes).hexdigest()
     assert source_map.review.status == "pending"
-    assert source_map.review.reviewer is None
+    assert source_map.review.reviewer == "Codex evidence review"
+    assert source_map.review.reviewer_role == "source_governance_reviewer"
     assert source_map.calculation_status == "available"
     assert source_map.interpretation_status == "unavailable"
     assert source_map.rules
-    assert all(rule.source_status == "pending" for rule in source_map.rules)
-    assert all(rule.fragment_id is None for rule in source_map.rules)
+    approved = {
+        "special_lagnas.regular_anchor_policy",
+        "special_lagnas.regular_rates",
+        "special_lagnas.regular_savayava_separation",
+        "special_lagnas.sun_epoch",
+        "special_lagnas.sunrise_definition",
+    }
+    approved_rules = {
+        rule.rule_id
+        for rule in source_map.rules
+        if rule.source_status == "approved"
+    }
+    assert approved_rules == approved
+    assert all(
+        rule.fragment_id is not None and rule.fragment_sha256 is not None
+        for rule in source_map.rules
+        if rule.rule_id in approved
+    )
+    assert all(
+        rule.source_status == "pending"
+        and rule.fragment_id is None
+        and rule.fragment_sha256 is None
+        for rule in source_map.rules
+        if rule.rule_id not in approved
+    )
 
 
 @pytest.mark.parametrize(

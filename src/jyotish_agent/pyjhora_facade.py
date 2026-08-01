@@ -12,15 +12,22 @@ That is what makes the golden-fixture test meaningful.
 
 from __future__ import annotations
 
-import re
 import math
+import re
 import threading
 from dataclasses import dataclass
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta, timezone
 from typing import Callable, Generic, TypeVar
+from zoneinfo import ZoneInfo
 
 from . import ENGINE_VERSION, names
-from .config import ENGINE_LOCK, CalculationConfig, ConfigError, apply_config, ephemeris_mode
+from .config import (
+    ENGINE_LOCK,
+    CalculationConfig,
+    ConfigError,
+    apply_config,
+    ephemeris_mode,
+)
 from .yogas import detect_yogas
 
 
@@ -49,6 +56,11 @@ class BirthProfile:
     latitude: float
     longitude: float
     timezone: float  # offset in hours, e.g. 5.5 for IST
+    # Jaimini's regular special-lagna anchor needs civil-date adjacency and
+    # elapsed absolute time.  Ordinary natal callers may omit these and retain
+    # the historical fixed-offset behaviour.
+    timezone_name: str | None = None
+    utc_instant: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -311,11 +323,12 @@ def _run_muhurta_boundary_day(
     _ENGINE_SESSION_LOCAL.active = True
     try:
         with ENGINE_LOCK:
-            from . import config as runtime_config
+            from zoneinfo import ZoneInfo
+
             from jhora import utils
             from jhora.panchanga import drik
 
-            from zoneinfo import ZoneInfo
+            from . import config as runtime_config
 
             applied = apply_config(config)
             zone = ZoneInfo(zone_id)
@@ -522,16 +535,132 @@ def _immutable_positions(chart) -> tuple[_EnginePosition, ...]:
     )
 
 
-def _special_lagna_primitive(drik, jd, place, profile: BirthProfile) -> tuple[float | None, float | None]:
-    """Capture sunrise-anchored inputs; caller owns the configured engine lock."""
-    birth_hour = profile.time[0] + profile.time[1] / 60 + profile.time[2] / 3600
-    sunrise = drik.sunrise(jd, place)
-    if not sunrise or birth_hour < float(sunrise[0]):
+_JAIMINI_SUNRISE_DEFINITION = "swiss_apparent_upper_limb_with_refraction"
+_SECONDS_PER_DAY = 86_400
+_RISE_SEARCH_ADVANCE_SECONDS = 1
+_MAX_RISE_TRANS_CALLS_PER_CIVIL_DAY = 4
+
+
+def _utc_julian_day(swe, instant: datetime) -> float:
+    """Convert an aware instant to Swiss Ephemeris' UT Julian-day scale."""
+    if instant.tzinfo is None or instant.utcoffset() is None:
+        raise ValueError("instant must be timezone-aware")
+    value = instant.astimezone(UTC)
+    hour = (
+        value.hour
+        + value.minute / 60
+        + value.second / 3600
+        + value.microsecond / 3_600_000_000
+    )
+    return float(swe.julday(value.year, value.month, value.day, hour, swe.GREG_CAL))
+
+
+def _utc_from_julian_day(swe, value: float) -> datetime:
+    """Convert a Swiss UT Julian day to an aware UTC datetime."""
+    year, month, day, hour = swe.revjul(float(value), swe.GREG_CAL)
+    return datetime(year, month, day, tzinfo=UTC) + timedelta(hours=float(hour))
+
+
+def _birth_utc(profile: BirthProfile) -> datetime:
+    if profile.utc_instant is not None:
+        if (
+            profile.utc_instant.tzinfo is None
+            or profile.utc_instant.utcoffset() is None
+        ):
+            raise ValueError("BirthProfile.utc_instant must be timezone-aware")
+        return profile.utc_instant.astimezone(UTC)
+    fixed_zone = timezone(timedelta(hours=profile.timezone))
+    return datetime(*profile.date, *profile.time, tzinfo=fixed_zone).astimezone(UTC)
+
+
+def _jaimini_apparent_sunrise_jd_utc(
+    swe,
+    place,
+    profile: BirthProfile,
+    birth_utc: datetime,
+) -> float | None:
+    """Return the latest adjacent apparent upper-limb sunrise at/before birth.
+
+    This is intentionally Jaimini-specific.  PyJHora ``drik.sunrise`` freezes a
+    centre-of-disc, no-refraction Hindu-rising policy.  Regular BL/HL/GL instead
+    use Swiss Ephemeris' rising event with neither ``BIT_DISC_CENTER`` nor
+    ``BIT_NO_REFRACTION`` set: the apparent upper limb.  Only the birth civil date
+    and its immediately preceding civil date are eligible; sunset is never queried.
+    """
+    zone = (
+        ZoneInfo(profile.timezone_name)
+        if profile.timezone_name is not None
+        else timezone(timedelta(hours=profile.timezone))
+    )
+    birth_local_date = birth_utc.astimezone(zone).date()
+    candidates: list[float] = []
+    for civil_date in (birth_local_date - timedelta(days=1), birth_local_date):
+        try:
+            day_start, day_end = _civil_day_utc_bounds(civil_date, zone)
+        except CivilDateUnavailableError:
+            continue
+        cursor = _utc_julian_day(swe, day_start) - 1 / _SECONDS_PER_DAY
+        for _call in range(_MAX_RISE_TRANS_CALLS_PER_CIVIL_DAY):
+            result, times = swe.rise_trans(
+                cursor,
+                swe.SUN,
+                rsmi=swe.CALC_RISE,
+                geopos=(place.longitude, place.latitude, 0.0),
+                atpress=0.0,
+                attemp=15.0,
+                # Rise geometry is apparent/tropical.  PyJHora PLANET_FLAGS also
+                # carries SIDEREAL, TRUEPOS, NONUT and NOGDEFL, which materially
+                # shifts the event and contradicts the upper-limb policy.  Keep
+                # those configured flags only for the anchor's solar longitude.
+                flags=swe.FLG_SWIEPH,
+            )
+            if result != 0:
+                break
+            candidate = float(times[0])
+            candidate_utc = _utc_from_julian_day(swe, candidate)
+            if candidate_utc >= day_end or candidate_utc > birth_utc:
+                break
+            if day_start <= candidate_utc:
+                candidates.append(candidate)
+            # Swiss may include an event exactly at its input instant.  Move a
+            # physical second beyond every returned event so the next call must
+            # make progress, while the small hard call bound fails closed if the
+            # engine nevertheless repeats or returns a pathological sequence.
+            next_cursor = candidate + _RISE_SEARCH_ADVANCE_SECONDS / _SECONDS_PER_DAY
+            if next_cursor <= cursor:
+                raise EngineOutputError("Swiss rise search did not advance")
+            cursor = next_cursor
+        else:
+            raise EngineOutputError("Swiss rise search exceeded its bounded call limit")
+    return max(candidates) if candidates else None
+
+
+def _special_lagna_primitive(
+    drik,
+    jd,
+    place,
+    profile: BirthProfile,
+    *,
+    _swe=None,
+) -> tuple[float | None, float | None]:
+    """Capture canonical regular BL/HL/GL inputs under the configured engine lock."""
+    if _swe is None:
+        import swisseph as swe
+    else:
+        swe = _swe
+    birth_utc = _birth_utc(profile)
+    sunrise_jd_utc = _jaimini_apparent_sunrise_jd_utc(
+        swe, place, profile, birth_utc
+    )
+    if sunrise_jd_utc is None:
         return None, None
-    sunrise_jd_utc = float(sunrise[2]) - profile.timezone / 24
+    sunrise_utc = _utc_from_julian_day(swe, sunrise_jd_utc)
+    elapsed_seconds = (birth_utc - sunrise_utc).total_seconds()
+    if elapsed_seconds < -0.000001:
+        raise EngineOutputError("Jaimini sunrise anchor is after birth")
     return (
-        _round_deg(drik.solar_longitude(sunrise_jd_utc)),
-        round((birth_hour - float(sunrise[0])) * 60, 6),
+        _round_deg(drik.solar_longitude(sunrise_jd_utc)) % 360.0,
+        round(max(0.0, elapsed_seconds) / 60, 6),
     )
 
 
@@ -1112,10 +1241,10 @@ def _run_engine_session(
                 )
                 for name, factor in kernel_charts.items()
             }
-            # Jaimini special-lagna primitive, captured under the same configured
-            # engine lock as D1/D9.  For a pre-sunrise birth the frozen profile's
-            # "minutes since sunrise" anchor is not satisfied; surface unavailable
-            # rather than silently switching to the previous civil date.
+            # Jaimini regular special-lagna primitive, captured under the same
+            # configured engine lock as D1/D9.  Its adapter selects the latest
+            # apparent upper-limb sunrise at/before birth from the birth or previous
+            # local civil date and measures elapsed aware UTC time.
             try:
                 (
                     sun_longitude_at_sunrise,
@@ -1123,7 +1252,7 @@ def _run_engine_session(
                 ) = _special_lagna_primitive(drik, jd, place, profile)
             except Exception:
                 # Optional domain primitive: the Jaimini facade converts absence
-                # into a typed privacy-safe incomplete result.
+                # into a typed limitation while retaining independent facts.
                 sun_longitude_at_sunrise = None
                 minutes_since_sunrise = None
             panchanga = _panchanga(jd, place)

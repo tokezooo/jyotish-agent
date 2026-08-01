@@ -1,10 +1,10 @@
 {
   "schema_version": "1.0",
-  "inventory_sha256": "887dfa20f2b6c2d99a191dbbfc05f7e0c84633c976983e499fcb8c9fcb6e5a5a",
+  "inventory_sha256": "2f0eeb254bce32a40a84d85ef3a4acd138b26ca124eb6d2bc70640db20e22cbd",
   "admitted_rule_count": 0,
-  "anchored_rule_count": 16,
+  "anchored_rule_count": 20,
   "anchored_unreviewed_rule_count": 9,
-  "quarantined_rule_count": 7,
+  "quarantined_rule_count": 11,
   "unanchored_rule_count": 0,
   "discrepancies": [
     {
@@ -24,8 +24,24 @@
       "reason": "The source commentary merges exact ties and fills resulting vacancies, while the current engine intentionally fails closed."
     },
     {
-      "rule_id": "special_lagnas.selected_rates",
-      "reason": "The bounded commentary fragment defines selected special lagnas but does not establish every rate used by the current engine."
+      "rule_id": "special_lagnas.regular_anchor_policy",
+      "reason": "The bounded baseline describes time after sunrise but does not establish the latest-sunrise rule or the preceding-civil-date anchor before local sunrise."
+    },
+    {
+      "rule_id": "special_lagnas.regular_rates",
+      "reason": "The bounded baseline gives sign-count treatments for Hora and Ghatika but does not establish the selected continuous 15/30/75-degree BL/HL/GL rate set."
+    },
+    {
+      "rule_id": "special_lagnas.regular_savayava_separation",
+      "reason": "The bounded baseline does not identify the regular-versus-Savayava algorithm boundary."
+    },
+    {
+      "rule_id": "special_lagnas.sun_epoch",
+      "reason": "The bounded baseline counts from the solar-month sign and does not establish the Sun's exact longitude at the selected sunrise."
+    },
+    {
+      "rule_id": "special_lagnas.sunrise_definition",
+      "reason": "The bounded baseline uses sunrise without choosing first visible upper limb with refraction over solar-disc center."
     },
     {
       "rule_id": "svamsa.d9_lagna",
@@ -52,6 +68,14 @@
       "sutra": "1.2.1",
       "visual_reviewed": true,
       "disposition": "split_baseline_meaning_from_engine_fact"
+    },
+    {
+      "rule_ids": ["special_lagnas.regular_anchor_policy", "special_lagnas.regular_rates", "special_lagnas.regular_savayava_separation", "special_lagnas.sun_epoch", "special_lagnas.sunrise_definition"],
+      "pdf_page": 52,
+      "printed_page": 35,
+      "sutra": "1.1.32.notes.special_lagnas",
+      "visual_reviewed": true,
+      "disposition": "split_bounded_special_lagna_claims_and_preserve_quarantine"
     },
     {
       "rule_ids": ["chara_dasha.duration", "time.boundaries"],

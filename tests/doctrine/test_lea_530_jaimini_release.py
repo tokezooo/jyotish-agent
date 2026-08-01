@@ -143,7 +143,11 @@ def test_release_audit_admits_only_the_restricted_private_profile() -> None:
     assert set(profile.quarantined_rule_ids) == {
         "karakas.tie_policy",
         "svamsa.d9_lagna",
-        "special_lagnas.selected_rates",
+        "special_lagnas.regular_anchor_policy",
+        "special_lagnas.regular_rates",
+        "special_lagnas.regular_savayava_separation",
+        "special_lagnas.sun_epoch",
+        "special_lagnas.sunrise_definition",
         "co_lords.resolution",
         "chara_dasha.progression",
         "chara_dasha.gender_semantics",
