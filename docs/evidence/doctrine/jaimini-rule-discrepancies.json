@@ -1,30 +1,10 @@
 {
   "schema_version": "1.0",
-  "inventory_sha256": "e52d07b2849ad054f6612d6215a5e886c699c6d785f9996af97a5ee409ff8496",
+  "inventory_sha256": "a7e0a1fe04766f0f15b36ab6f2fd711decdc799d3b3b972aabb75b3c1f38bb0c",
   "admitted_rule_count": 0,
-  "anchored_unreviewed_rule_count": 1,
-  "quarantined_rule_count": 15,
+  "anchored_unreviewed_rule_count": 9,
+  "quarantined_rule_count": 7,
   "discrepancies": [
-    {
-      "rule_id": "argala.count_obstruction",
-      "reason": "Exact sutra and reviewed fragment have not been located."
-    },
-    {
-      "rule_id": "argala.houses",
-      "reason": "Exact sutra and reviewed fragment have not been located."
-    },
-    {
-      "rule_id": "arudha.exception",
-      "reason": "Exact sutra and reviewed fragment have not been located."
-    },
-    {
-      "rule_id": "chara_dasha.antardasha",
-      "reason": "Exact sutra and reviewed fragment have not been located."
-    },
-    {
-      "rule_id": "chara_dasha.duration",
-      "reason": "Exact sutra and reviewed fragment have not been located."
-    },
     {
       "rule_id": "chara_dasha.gender_semantics",
       "reason": "No reviewed anchor establishes the current input semantics."
@@ -35,27 +15,15 @@
     },
     {
       "rule_id": "co_lords.resolution",
-      "reason": "Exact sutra and reviewed fragment have not been located."
-    },
-    {
-      "rule_id": "karakamsa.d9_atmakaraka",
-      "reason": "Exact sutra and reviewed fragment have not been located."
-    },
-    {
-      "rule_id": "karakas.rahu_reversal",
-      "reason": "Exact sutra and reviewed fragment have not been located."
-    },
-    {
-      "rule_id": "karakas.scheme",
-      "reason": "Exact sutra and reviewed fragment have not been located."
+      "reason": "The bounded fragment establishes initial co-lord priorities, but the source continues with additional tie-breaks and other schools differ."
     },
     {
       "rule_id": "karakas.tie_policy",
-      "reason": "No source anchor establishes the current threshold or tie behavior."
+      "reason": "The source commentary merges exact ties and fills resulting vacancies, while the current engine intentionally fails closed."
     },
     {
       "rule_id": "special_lagnas.selected_rates",
-      "reason": "No reviewed anchor establishes all current rates."
+      "reason": "The bounded commentary fragment defines selected special lagnas but does not establish every rate used by the current engine."
     },
     {
       "rule_id": "svamsa.d9_lagna",

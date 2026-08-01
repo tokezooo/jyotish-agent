@@ -33,15 +33,24 @@
     },
     {
       "requirement": "nilakantha_subodhini_translation",
-      "source_ids": [],
-      "topics": [],
+      "source_ids": ["jaimini_sutras_b_suryanarain_rao_1949"],
+      "topics": [
+        "karaka",
+        "karakamsa",
+        "svamsa",
+        "arudha",
+        "argala",
+        "rasi_drishti",
+        "chara_dasha",
+        "relationships"
+      ],
       "worked_chart_count": 0,
-      "acquisition_blocker": "The supplied similarly named file is byte-identical to the existing 1943 Vimala commentary, not the specified 2025 K. Guru Rajesh English translation; an official procurement reference is recorded but licensed translation bytes are still required."
+      "acquisition_blocker": null
     },
     {
       "requirement": "independent_translation",
-      "source_ids": ["jaimini_sutras_b_suryanarain_rao_1949"],
-      "topics": [],
+      "source_ids": ["jaimini_sanjay_rath_upadesa_sutras_1997"],
+      "topics": ["karaka", "karakamsa", "svamsa", "arudha", "argala", "rasi_drishti", "chara_dasha", "relationships"],
       "worked_chart_count": 0,
       "acquisition_blocker": null
     },

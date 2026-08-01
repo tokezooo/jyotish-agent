@@ -246,6 +246,174 @@ class JaiminiRuleInventory(FrozenModel):
         return hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
 
 
+class JaiminiBaselineFragmentBinding(FrozenModel):
+    """Bind a baseline candidate to text-free, content-addressed source evidence."""
+
+    binding_id: str = Field(pattern=r"^bind_[0-9a-f]{24}$")
+    fragment: FragmentRef
+    rule_id: str = Field(pattern=r"^[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+$")
+    status: JaiminiRuleStatus
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        fragment: FragmentRef,
+        rule_id: str,
+        status: JaiminiRuleStatus,
+    ) -> "JaiminiBaselineFragmentBinding":
+        payload = {
+            "fragment": fragment.model_dump(mode="json"),
+            "rule_id": rule_id,
+            "status": status.value,
+        }
+        return cls(binding_id=f"bind_{_hash_jaimini_payload(payload)[:24]}", **payload)
+
+    @model_validator(mode="after")
+    def _quarantined_and_content_addressed(
+        self,
+    ) -> "JaiminiBaselineFragmentBinding":
+        if self.status not in {
+            JaiminiRuleStatus.ANCHORED_UNREVIEWED,
+            JaiminiRuleStatus.QUARANTINED_CONFLICT,
+        }:
+            raise ValueError("baseline fragment bindings must remain quarantined")
+        payload = self.model_dump(mode="json", exclude={"binding_id"})
+        expected = f"bind_{_hash_jaimini_payload(payload)[:24]}"
+        if self.binding_id != expected:
+            raise ValueError("baseline fragment binding identity is not content-addressed")
+        return self
+
+
+class JaiminiBaselineFragmentLedger(FrozenModel):
+    """Inspection-safe evidence for the Nilakantha-mediated baseline inventory."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    ledger_id: Literal["jaimini_nilakantha_mediated_baseline_fragments_v1"]
+    school: Literal["nilakantha_baseline"]
+    source_id: Literal["jaimini_sutras_b_suryanarain_rao_1949"]
+    source_manifest_sha256: Sha256
+    baseline_inventory_sha256: Sha256
+    doctrine_admitted: Literal[False]
+    product_rule_use_allowed: Literal[False]
+    fragments: tuple[SourceFragment, ...] = Field(min_length=1)
+    bindings: tuple[JaiminiBaselineFragmentBinding, ...] = Field(min_length=1)
+    source_limitations: tuple[str, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _coherent_quarantine(self) -> "JaiminiBaselineFragmentLedger":
+        fragment_ids = [fragment.fragment_id for fragment in self.fragments]
+        if len(fragment_ids) != len(set(fragment_ids)):
+            raise ValueError("baseline fragment IDs must be unique")
+        binding_ids = [binding.binding_id for binding in self.bindings]
+        if len(binding_ids) != len(set(binding_ids)):
+            raise ValueError("baseline binding IDs must be unique")
+        if len({binding.rule_id for binding in self.bindings}) != len(self.bindings):
+            raise ValueError("baseline rule candidates require one bounded fragment each")
+
+        references = {
+            (
+                fragment.fragment_id,
+                fragment.revision,
+                fragment.revision_sha256,
+            )
+            for fragment in self.fragments
+        }
+        for binding in self.bindings:
+            reference = (
+                binding.fragment.fragment_id,
+                binding.fragment.revision,
+                binding.fragment.revision_sha256,
+            )
+            if reference not in references:
+                raise ValueError("baseline binding references missing fragment evidence")
+
+        if any(
+            fragment.source_id != self.source_id
+            or fragment.school != self.school
+            or fragment.source_manifest_sha256 != self.source_manifest_sha256
+            for fragment in self.fragments
+        ):
+            raise ValueError("baseline fragment ledger cannot blend source identities")
+        if any(
+            fragment.admission_status != "quarantined"
+            or fragment.excerpt_permission != "none"
+            or fragment.permitted_excerpt is not None
+            for fragment in self.fragments
+        ):
+            raise ValueError("baseline fragments must be text-free and quarantined")
+        for fragment in self.fragments:
+            _validate_source_fragment_identity(fragment)
+        for limitation in self.source_limitations:
+            _reject_private_locator(limitation)
+        return self
+
+    @property
+    def ledger_sha256(self) -> str:
+        payload = self.model_dump(mode="json")
+        payload["fragments"] = sorted(
+            payload["fragments"], key=lambda item: item["fragment_id"]
+        )
+        payload["bindings"] = sorted(
+            payload["bindings"], key=lambda item: item["binding_id"]
+        )
+        payload["source_limitations"] = sorted(payload["source_limitations"])
+        return _hash_jaimini_payload(payload)
+
+    def validate_context(
+        self,
+        *,
+        manifest: SourceManifest,
+        baseline_inventory: JaiminiRuleInventory,
+    ) -> None:
+        if manifest.manifest_sha256 != self.source_manifest_sha256:
+            raise ValueError("active source manifest does not match baseline ledger")
+        if baseline_inventory.inventory_sha256 != self.baseline_inventory_sha256:
+            raise ValueError("baseline inventory does not match fragment ledger")
+
+        sources = {source.source_id: source for source in manifest.sources}
+        source = sources.get(self.source_id)
+        if source is None or source.school_role.value != "root_text":
+            raise ValueError("baseline source is absent or incorrectly classified")
+        fragments = {
+            (fragment.fragment_id, fragment.revision, fragment.revision_sha256): fragment
+            for fragment in self.fragments
+        }
+        candidates = {
+            candidate.rule_id: candidate for candidate in baseline_inventory.candidates
+        }
+
+        for fragment in self.fragments:
+            if fragment.source_file_sha256 != source.sha256:
+                raise ValueError("baseline fragment source bytes do not match manifest")
+            if (
+                fragment.page_number < 1
+                or fragment.printed_page < 1
+                or fragment.printed_page != fragment.page_number + source.page_offset
+            ):
+                raise ValueError("baseline fragment page coordinates do not match manifest")
+
+        for binding in self.bindings:
+            fragment = fragments[
+                binding.fragment.fragment_id,
+                binding.fragment.revision,
+                binding.fragment.revision_sha256,
+            ]
+            candidate = candidates.get(binding.rule_id)
+            if candidate is None or candidate.anchor is None:
+                raise ValueError("baseline binding references an unanchored rule candidate")
+            if candidate.status != binding.status:
+                raise ValueError("baseline binding status differs from inventory")
+            if (
+                candidate.anchor.pdf_page != fragment.page_number
+                or candidate.anchor.printed_page != fragment.printed_page
+                or candidate.anchor.sutra != fragment.anchor_label
+                or candidate.anchor.fragment_sha256
+                != fragment.normalized_content_sha256
+            ):
+                raise ValueError("baseline inventory fragment commitment is inconsistent")
+
+
 class JaiminiOverlayFragmentBinding(FrozenModel):
     """A non-quoting overlay claim bound to an inspection-safe fragment identity."""
 

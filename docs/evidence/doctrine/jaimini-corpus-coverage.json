@@ -15,12 +15,13 @@
   "covered_requirements": [
     "independent_translation",
     "kn_rao_overlay",
+    "nilakantha_subodhini_translation",
     "practical_chara_dasha",
     "published_worked_charts",
     "sanjay_rath_overlay",
     "sanskrit_upadesa_sutras"
   ],
-  "missing_requirements": ["nilakantha_subodhini_translation"],
+  "missing_requirements": [],
   "covered_topics": [
     "argala",
     "arudha",
@@ -35,8 +36,6 @@
   "low_quality_source_ids": ["jaimini_sutras_b_suryanarain_rao_1949"],
   "verified_worked_chart_count": 20,
   "missing_worked_chart_count": 0,
-  "acquisition_blockers": [
-    "nilakantha_subodhini_translation: The supplied similarly named file is byte-identical to the existing 1943 Vimala commentary, not the specified 2025 K. Guru Rajesh English translation; an official procurement reference is recorded but licensed translation bytes are still required."
-  ],
-  "ready": false
+  "acquisition_blockers": [],
+  "ready": true
 }

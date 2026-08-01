@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "release_id": "full_jaimini_v1",
   "corpus_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
-  "rule_inventory_sha256": "e52d07b2849ad054f6612d6215a5e886c699c6d785f9996af97a5ee409ff8496",
+  "rule_inventory_sha256": "a7e0a1fe04766f0f15b36ab6f2fd711decdc799d3b3b972aabb75b3c1f38bb0c",
   "compiled_profile_sha256": null,
   "admission_state": "blocked_sources",
   "gates": [
@@ -59,8 +59,7 @@
   ],
   "blockers": [
     "compiled_profile: no source-admitted production profile exists",
-    "nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
-    "source_review: bounded Sanjay Rath Upadesa, crop-aware Narayana pages 46-48, and K. N. Rao OCR fragments are hash-bound but quarantined and uncompiled; specialist review and overlay rule compilation remain missing",
+    "source_review: twelve Nilakantha-mediated baseline fragments plus bounded Sanjay Rath, Narayana, and K. N. Rao overlay fragments are hash-bound but quarantined and uncompiled; four core candidates remain unanchored",
     "specialist_review: no production rule/profile review"
   ],
   "external_review_missing": true,

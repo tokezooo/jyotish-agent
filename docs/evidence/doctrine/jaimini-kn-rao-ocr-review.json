@@ -5,7 +5,7 @@
   "source_file_sha256": "6e534cba2963209f3cb8898e357e9773d1dee27f6189a6b5b43ef2065739fb36",
   "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
   "ledger_id": "jaimini_kn_rao_overlay_fragments_v1",
-  "ledger_sha256": "1fed0ef923170e97d80374f1d22017755ea08fe1a01e9856f4da1a6a54c10b03",
+  "ledger_sha256": "d10d1d42232d4a2706ef6dfb685fa56a3370826c58c6ef9c43be76a8d009f1af",
   "review_scope": "Bounded technical OCR review only; no doctrine admission or activation.",
   "embedded_extractor": {
     "name": "pypdf",

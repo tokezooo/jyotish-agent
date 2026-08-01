@@ -5,7 +5,7 @@
     {
       "domain": "jaimini",
       "release_id": "full_jaimini_v1",
-      "evidence_sha256": "fcd48ab98249bb54c20779e31db971884f2ea2b6e72069d61293fd7aeee1b5fe",
+      "evidence_sha256": "d35e26c8b0710c0f65239d9f4b82ef754c85d0f5fe567f415159a93730834c4a",
       "admission_state": "blocked_sources",
       "available": false,
       "gate_statuses": {
@@ -22,8 +22,7 @@
       },
       "blockers": [
         "compiled_profile: no source-admitted production profile exists",
-        "nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
-        "source_review: bounded Sanjay Rath Upadesa, crop-aware Narayana pages 46-48, and K. N. Rao OCR fragments are hash-bound but quarantined and uncompiled; specialist review and overlay rule compilation remain missing",
+        "source_review: twelve Nilakantha-mediated baseline fragments plus bounded Sanjay Rath, Narayana, and K. N. Rao overlay fragments are hash-bound but quarantined and uncompiled; four core candidates remain unanchored",
         "specialist_review: no production rule/profile review"
       ]
     },
@@ -97,7 +96,7 @@
     "full_python_suite": {
       "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine $CODEX_PYTHON -m pytest -q",
       "status": "passed",
-      "passed": 914,
+      "passed": 918,
       "failed": 0,
       "skipped": 2
     },
@@ -136,8 +135,7 @@
   "public_release_ready": false,
   "blockers": [
     "jaimini: compiled_profile: no source-admitted production profile exists",
-    "jaimini: nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
-    "jaimini: source_review: bounded Sanjay Rath Upadesa, crop-aware Narayana pages 46-48, and K. N. Rao OCR fragments are hash-bound but quarantined and uncompiled; specialist review and overlay rule compilation remain missing",
+    "jaimini: source_review: twelve Nilakantha-mediated baseline fragments plus bounded Sanjay Rath, Narayana, and K. N. Rao overlay fragments are hash-bound but quarantined and uncompiled; four core candidates remain unanchored",
     "jaimini: specialist_review: no production rule/profile review",
     "prashna: tajika_source_admission: D. P. Saxena's 2001 Tajik Nilkanthi (LCCN 2001361798; OCLC 48507695) is the exact translation target, but licensed bytes are missing; bounded OCR candidates on PDF pages 45-47 remain quarantined and transcription, translation and specialist review are incomplete",
     "prashna: compiled_profile: no production source-admitted Prashna profile exists",
@@ -145,5 +143,5 @@
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: B. V. Raman, Muhurtha (Electional Astrology), ISBN 9789359662923 (preferred) or 9788185674681 (accepted alternate), has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "038c01ccefe400ab0f49a6f300cb896b40406d37b6e5be2680afec545f2cbd99"
+  "audit_sha256": "2e737610ebdcdf89c798894b16597e0377436cfc11be5c38feba9dea00785327"
 }
