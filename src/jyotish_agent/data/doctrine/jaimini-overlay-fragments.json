@@ -98,6 +98,116 @@
       "admission_status": "quarantined"
     },
     {
+      "fragment_id": "frag_98b9acaa9121a99d06fcf08d",
+      "revision": 1,
+      "revision_sha256": "60bad78c727f3194dffdc594c5e2b7086cf69b7426e4c9de875f5c438050c99e",
+      "draft_sha256": "68286fe8f9cb8d9d04f12b5f7eea95aba426df0cabdfb9f85c908826b7904be6",
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "a7d9e860d28ee20ed1c420f1c84d6ec850ffb68bf225fb60d77e53f2925a9a66",
+      "page_number": 49,
+      "printed_page": 49,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-49",
+      "language": "en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "chara_dasha_exceptions",
+      "full_text_sha256": "548cff54a5fe72e3fbffa0be70b003b3685b19cf3dc4120219430fa08958c6c3",
+      "normalized_content_sha256": "ff052f3f57dc590c9d6d756a0f2b6aed57e8a221ab9880fb19122a8e09ffd2c7",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_ed6ee6568e40232761fa9c28",
+      "revision": 1,
+      "revision_sha256": "730f856ded765736f70249c6e8deb994cf3f20c380c841efd40eed20804dc127",
+      "draft_sha256": "6e3539fc32dd6f6cecce997d5445e7d155439a83486003f4b0475bd9e793a1d1",
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "a7d9e860d28ee20ed1c420f1c84d6ec850ffb68bf225fb60d77e53f2925a9a66",
+      "page_number": 50,
+      "printed_page": 50,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-50",
+      "language": "en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "chara_dasha_progression_table",
+      "full_text_sha256": "c6316ad7dc4bc4a46f1bd6fa76c54eb81a99a56823ffc0892aa0719d5a5c3710",
+      "normalized_content_sha256": "57c44cbc7a013477f27745da4dce7d8b2421b259aef1a19fdb7071227bb9210f",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_97062d291075b0c6a7dd13bf",
+      "revision": 1,
+      "revision_sha256": "9c3fb617b5a86d8db5057ebd7aa3f7fa2c2c18f90d22ad12bd69ec0a2d1a658d",
+      "draft_sha256": "19bf9e6201228eeb779caea4c43e2a640d5a33530236b09c67924644cffc5638",
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "a7d9e860d28ee20ed1c420f1c84d6ec850ffb68bf225fb60d77e53f2925a9a66",
+      "page_number": 51,
+      "printed_page": 51,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-51",
+      "language": "en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "chara_dasha_exceptions_tables",
+      "full_text_sha256": "bf12013fa06918d8c486ad47af56860a1a991b08bd492f18c6ec77352588a70c",
+      "normalized_content_sha256": "d28f8ec936d518de6c6729743b2bf680a3fdfeed98c8be26ddf98056c8ba8ac9",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_2d4a4b1be7e2df012220ebb5",
+      "revision": 1,
+      "revision_sha256": "5064baefdaebe2a60398f6ab096e58cd1fe2318a8b5da26f701df4d427bdf886",
+      "draft_sha256": "de7356921356ac0c80bdbc87005f039301f3f811cf442853f72b4d8b3a207de1",
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "a7d9e860d28ee20ed1c420f1c84d6ec850ffb68bf225fb60d77e53f2925a9a66",
+      "page_number": 52,
+      "printed_page": 52,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-52",
+      "language": "en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "chara_dasha_antardasha_tables",
+      "full_text_sha256": "c485887870ffd8375c173d730bc423c35d054b4b3ee81c6524c65fde89af3a17",
+      "normalized_content_sha256": "88b5dfb7a1448bbb121d4b606aedce94bc338bd27014c2155b1ad759a91109dd",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
+      "fragment_id": "frag_c629299a84c2950881fd10c9",
+      "revision": 1,
+      "revision_sha256": "dfcecb69c5a21f5f2bfc6d7be6499087888d418435c644a6d48d88a77dfeac73",
+      "draft_sha256": "e518629162d1cb4c2b53c213602e7918c909a044fbdd947a00c591aae2bbb84e",
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "a7d9e860d28ee20ed1c420f1c84d6ec850ffb68bf225fb60d77e53f2925a9a66",
+      "page_number": 53,
+      "printed_page": 53,
+      "anchor_kind": "page",
+      "anchor_label": "pdf-page-53",
+      "language": "en",
+      "content_role": "school_interpretation",
+      "school": "sanjay_rath",
+      "scope": "chara_dasha_antardasha_and_trend",
+      "full_text_sha256": "12d9c67d36333762aad900bc8e052eed4be78b2fbaf19a218bd079eca7f3942a",
+      "normalized_content_sha256": "071adf894eeb8d4128755e1a2971725d7a8071b6e98030dfb48d4d1427b82779",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
       "fragment_id": "frag_985345c3b82aea1eb6f65dc1",
       "revision": 1,
       "revision_sha256": "bcfbf41bc4e677e5bef6656811dfd669a736ad22b1fd5d42bfd458ec2101752f",
@@ -491,6 +601,84 @@
       "paraphrase": "Commits the continuation page for practical subdivision ordering conditions.",
       "status": "quarantined_conflict",
       "discrepancy": "The source continuation adds subdivision direction conditions not represented by the frozen core."
+    },
+    {
+      "binding_id": "bind_36b138d96c9e5378e40607d2",
+      "fragment": {
+        "fragment_id": "frag_98b9acaa9121a99d06fcf08d",
+        "revision": 1,
+        "revision_sha256": "60bad78c727f3194dffdc594c5e2b7086cf69b7426e4c9de875f5c438050c99e"
+      },
+      "rule_id": "chara_dasha.progression",
+      "rule_family": "chara_dasha",
+      "paraphrase": "Commits the continuation page defining Saturn and Ketu exceptions to major-period direction and ordering.",
+      "status": "quarantined_conflict",
+      "discrepancy": "The overlay exceptions can replace the frozen core parity sequence for specific placements."
+    },
+    {
+      "binding_id": "bind_da0d86d3bbc13aa5587c83ad",
+      "fragment": {
+        "fragment_id": "frag_98b9acaa9121a99d06fcf08d",
+        "revision": 1,
+        "revision_sha256": "60bad78c727f3194dffdc594c5e2b7086cf69b7426e4c9de875f5c438050c99e"
+      },
+      "rule_id": "chara_dasha.antardasha",
+      "rule_family": "chara_dasha",
+      "paraphrase": "Commits the continuation page defining Saturn and Ketu exceptions to subdivision direction.",
+      "status": "quarantined_conflict",
+      "discrepancy": "The overlay exceptions alter subdivision direction beyond the frozen core rule."
+    },
+    {
+      "binding_id": "bind_2f0dec42b630efffc678cd9a",
+      "fragment": {
+        "fragment_id": "frag_ed6ee6568e40232761fa9c28",
+        "revision": 1,
+        "revision_sha256": "730f856ded765736f70249c6e8deb994cf3f20c380c841efd40eed20804dc127"
+      },
+      "rule_id": "chara_dasha.progression",
+      "rule_family": "chara_dasha",
+      "paraphrase": "Commits the complete general twelve-sign progression matrix and its ordering patterns.",
+      "status": "quarantined_conflict",
+      "discrepancy": "The overlay matrix uses modality-dependent jumps that the frozen core sequence does not encode."
+    },
+    {
+      "binding_id": "bind_8c8b33182fc60a333817c96f",
+      "fragment": {
+        "fragment_id": "frag_97062d291075b0c6a7dd13bf",
+        "revision": 1,
+        "revision_sha256": "9c3fb617b5a86d8db5057ebd7aa3f7fa2c2c18f90d22ad12bd69ec0a2d1a658d"
+      },
+      "rule_id": "chara_dasha.progression",
+      "rule_family": "chara_dasha",
+      "paraphrase": "Commits the Saturn-start and Ketu-start major-period exception matrices.",
+      "status": "quarantined_conflict",
+      "discrepancy": "The overlay placement exceptions produce sequences not represented by the frozen core."
+    },
+    {
+      "binding_id": "bind_03194c9ed330c0e7d0c82990",
+      "fragment": {
+        "fragment_id": "frag_2d4a4b1be7e2df012220ebb5",
+        "revision": 1,
+        "revision_sha256": "5064baefdaebe2a60398f6ab096e58cd1fe2318a8b5da26f701df4d427bdf886"
+      },
+      "rule_id": "chara_dasha.antardasha",
+      "rule_family": "chara_dasha",
+      "paraphrase": "Commits the general and Ketu-conditioned subdivision matrices.",
+      "status": "quarantined_conflict",
+      "discrepancy": "The overlay subdivision matrices differ from the frozen core next-sign sequence."
+    },
+    {
+      "binding_id": "bind_9bf910f52a5a0f0367326725",
+      "fragment": {
+        "fragment_id": "frag_c629299a84c2950881fd10c9",
+        "revision": 1,
+        "revision_sha256": "dfcecb69c5a21f5f2bfc6d7be6499087888d418435c644a6d48d88a77dfeac73"
+      },
+      "rule_id": "chara_dasha.antardasha",
+      "rule_family": "chara_dasha",
+      "paraphrase": "Commits the continuation that completes the Ketu-conditioned subdivision matrix.",
+      "status": "quarantined_conflict",
+      "discrepancy": "The completed overlay exception sequence differs from the frozen core ordering."
     }
   ],
   "unresolved_sources": []
