@@ -1,17 +1,19 @@
 {
   "schema_version": "1.0",
-  "inventory_sha256": "a7e0a1fe04766f0f15b36ab6f2fd711decdc799d3b3b972aabb75b3c1f38bb0c",
+  "inventory_sha256": "887dfa20f2b6c2d99a191dbbfc05f7e0c84633c976983e499fcb8c9fcb6e5a5a",
   "admitted_rule_count": 0,
+  "anchored_rule_count": 16,
   "anchored_unreviewed_rule_count": 9,
   "quarantined_rule_count": 7,
+  "unanchored_rule_count": 0,
   "discrepancies": [
     {
       "rule_id": "chara_dasha.gender_semantics",
-      "reason": "No reviewed anchor establishes the current input semantics."
+      "reason": "The anchored passage makes progression depend on sign parity and sign exceptions; it does not establish the current male/female seed branch."
     },
     {
       "rule_id": "chara_dasha.progression",
-      "reason": "Exact sutra and reviewed fragment have not been located."
+      "reason": "The baseline sets odd/even counting with explicit sign exceptions; the current engine's generic odd-forward/even-reverse sequence does not encode every exception."
     },
     {
       "rule_id": "co_lords.resolution",
@@ -27,11 +29,37 @@
     },
     {
       "rule_id": "svamsa.d9_lagna",
-      "reason": "Exact sutra and reviewed fragment have not been located."
+      "reason": "The baseline uses swamsa for the Atmakaraka's Navamsa; the current engine's independent D9-lagna fact is a distinct calculation not supported by this passage."
     },
     {
       "rule_id": "time.boundaries",
-      "reason": "No doctrine source should be claimed for the engineering time convention."
+      "reason": "The source determines integer Rasi Dasa years from the sign-to-lord count; it does not establish the engine's day conversion, rounding, or half-open interval convention."
+    }
+  ],
+  "manual_spot_checks": [
+    {
+      "rule_ids": ["chara_dasha.progression", "chara_dasha.gender_semantics"],
+      "pdf_page": 45,
+      "printed_page": 28,
+      "sutra": "1.1.25-1.1.27.notes.progression",
+      "visual_reviewed": true,
+      "disposition": "quarantined_conflict"
+    },
+    {
+      "rule_ids": ["svamsa.d9_lagna", "karakamsa.d9_atmakaraka"],
+      "pdf_page": 56,
+      "printed_page": 39,
+      "sutra": "1.2.1",
+      "visual_reviewed": true,
+      "disposition": "split_baseline_meaning_from_engine_fact"
+    },
+    {
+      "rule_ids": ["chara_dasha.duration", "time.boundaries"],
+      "pdf_page": 46,
+      "printed_page": 29,
+      "sutra": "1.1.28",
+      "visual_reviewed": true,
+      "disposition": "split_doctrine_from_engineering_convention"
     }
   ]
 }

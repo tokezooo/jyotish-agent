@@ -4,8 +4,8 @@
   "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
   "source_file_sha256": "06953f710d7a52e548fd7b7badeeef0c163debd02b8b08178c3833905aaa76ce",
   "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
-  "baseline_inventory_sha256": "a7e0a1fe04766f0f15b36ab6f2fd711decdc799d3b3b972aabb75b3c1f38bb0c",
-  "baseline_fragment_ledger_sha256": "cea743b74166a64b5af75e1a31900e13333ae51ff8471fd4069e6d918a911b53",
+  "baseline_inventory_sha256": "887dfa20f2b6c2d99a191dbbfc05f7e0c84633c976983e499fcb8c9fcb6e5a5a",
+  "baseline_fragment_ledger_sha256": "1ffa2719932d537a4a6947eb0d054e46a45b9e1a1d0abc29153a596805991d37",
   "title": "Sri Jaiminisutras: English Translation with Full Notes and Original Texts in Sanskrit and Transliteration",
   "translator_editor": "B. Suryanarain Rao; revised and edited by B. V. Raman",
   "edition": "Third edition, Raman Publications, 1949",
@@ -68,6 +68,7 @@
   "offset_checks": [
     {"pdf_page": 20, "printed_page": 3},
     {"pdf_page": 23, "printed_page": 6},
+    {"pdf_page": 45, "printed_page": 28},
     {"pdf_page": 56, "printed_page": 39}
   ],
   "limitations": [

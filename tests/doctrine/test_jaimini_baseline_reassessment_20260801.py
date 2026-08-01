@@ -81,8 +81,11 @@ def test_baseline_fragment_ledger_is_hash_bound_text_free_and_context_valid() ->
     assert ledger.source_id == SOURCE_ID
     assert ledger.doctrine_admitted is False
     assert ledger.product_rule_use_allowed is False
-    assert len(ledger.fragments) == 12
-    assert len(ledger.bindings) == 12
+    assert len(ledger.fragments) == 13
+    assert len(ledger.bindings) == 16
+    assert {binding.rule_id for binding in ledger.bindings} == {
+        candidate.rule_id for candidate in inventory.candidates
+    }
     assert all(fragment.admission_status == "quarantined" for fragment in ledger.fragments)
     assert all(fragment.excerpt_permission == "none" for fragment in ledger.fragments)
     assert all(fragment.permitted_excerpt is None for fragment in ledger.fragments)
@@ -114,3 +117,13 @@ def test_baseline_fragment_identity_and_inventory_binding_fail_closed() -> None:
             manifest=manifest,
             baseline_inventory=substituted,
         )
+
+
+def test_baseline_fragment_ledger_rejects_missing_candidate_binding() -> None:
+    ledger = _ledger()
+    manifest = load_source_manifest(MANIFEST_PATH)
+    inventory = _inventory()
+    incomplete = ledger.model_copy(update={"bindings": ledger.bindings[:-1]})
+
+    with pytest.raises(ValueError, match="bind every inventory candidate"):
+        incomplete.validate_context(manifest=manifest, baseline_inventory=inventory)
