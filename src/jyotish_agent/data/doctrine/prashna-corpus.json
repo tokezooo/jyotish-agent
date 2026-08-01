@@ -18,8 +18,7 @@
   ],
   "missing_doctrine": [
     "Tajika applying/separating passages still require OCR, translation, and human review.",
-    "Prasna Marga radicality rules still require exact fragment admission.",
-    "A second published case with a traceable observed outcome is not yet acquired."
+    "Prasna Marga radicality rules still require exact fragment admission."
   ],
   "requirements": [
     {
@@ -56,9 +55,12 @@
     {
       "requirement": "published_cases",
       "school": "published_outcome_cases",
-      "source_ids": ["prasna_marga_bv_raman_part_2_1992"],
+      "source_ids": [
+        "prasna_marga_bv_raman_part_2_1992",
+        "journal_astrology_saxena_teaching_2020"
+      ],
       "doctrine_topics": ["outcome_validation"],
-      "acquisition_blocker": "At least two complete, traceable outcome cases are required."
+      "acquisition_blocker": null
     }
   ]
 }

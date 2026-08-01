@@ -15,6 +15,21 @@
       "observed_outcome": "alliance_broke_off",
       "outcome_traceable": true,
       "admissibility": "excluded_high_stakes"
+    },
+    {
+      "case_id": "saxena_2019_teaching_session_interrupted",
+      "source_id": "journal_astrology_saxena_teaching_2020",
+      "question": "Whether the author would continue teaching during the January-May 2020 session",
+      "question_at": "2019-12-15T13:30:00+05:30",
+      "place_label": "Delhi, India",
+      "question_class": "work_project_status",
+      "source_pdf_pages": [2, 3],
+      "source_printed_pages": [2, 3],
+      "judgment": "mixed",
+      "timing": "The question concerned the January-May 2020 session; the published judgment stated doubt rather than a narrower event window.",
+      "observed_outcome": "teaching_continued_until_2020_03_08_then_classes_suspended",
+      "outcome_traceable": true,
+      "admissibility": "admitted_safe"
     }
   ]
 }

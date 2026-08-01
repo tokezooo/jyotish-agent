@@ -79,14 +79,19 @@ def test_release_audit_distinguishes_completed_checks_from_future_follow_up() ->
     assert audit.external_review_missing is True
     assert audit.completed_evidence
     assert audit.future_outcome_follow_up
-    assert audit.metrics.published_outcome_case_count == 1
+    assert audit.metrics.published_outcome_case_count == 2
     assert audit.metrics.held_out_question_count == 12
     assert audit.metrics.material_error_rate == 0.0
     assert audit.metrics.no_answer_rate == 0.125
     assert {gate.gate_id for gate in audit.gates if gate.status == "missing"} >= {
-        "published_outcome_cases",
         "concierge_future_outcomes",
     }
+    published_cases = next(
+        gate for gate in audit.gates if gate.gate_id == "published_outcome_cases"
+    )
+    assert published_cases.status == "passed"
+    assert published_cases.evidence is not None
+    assert "2/2" in published_cases.evidence
     held_out = next(
         gate for gate in audit.gates if gate.gate_id == "held_out_questions"
     )

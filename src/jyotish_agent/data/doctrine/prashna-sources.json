@@ -100,6 +100,26 @@
       "scan_quality": "fair",
       "ocr_required": true,
       "ocr_status": "required"
+    },
+    {
+      "source_id": "journal_astrology_saxena_teaching_2020",
+      "title": "A Question About My Teaching",
+      "author_or_commentator": "G. N. Saxena",
+      "translator_editor": null,
+      "edition": "Journal of Astrology web article, published 16 October 2020; https://www.journalofastrology.com/article.php?article_id=590&category_id=1&lang=en; local PDF snapshot captured 1 August 2026",
+      "publisher": "Journal of Astrology / Stellar Publications LLC",
+      "year": 2020,
+      "isbn": null,
+      "languages": ["en"],
+      "domain": "prashna",
+      "school_role": "worked_examples",
+      "license_class": "copyrighted_local",
+      "local_file": "prashna/journal-of-astrology-saxena-teaching-2020.pdf",
+      "sha256": "503fb46ee537b9a5ed2cf0afdb596ca90d73a6b5f499a833dec919edacdd42cc",
+      "page_offset": 0,
+      "scan_quality": "born_digital",
+      "ocr_required": false,
+      "ocr_status": "not_required"
     }
   ]
 }

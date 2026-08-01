@@ -1,8 +1,9 @@
 {
   "schema_version": "1.0",
-  "manifest_sha256": "6a38ff34650f7619b49dbc74359e809a25f077e8defe555ab2a9793a47c29b93",
+  "manifest_sha256": "7f320ba34fadc878ee028826a04d4b0b17b980614e4be212a262fdd552e5378b",
   "verified_source_ids": [
     "daivajna_vallabha_2003_scan",
+    "journal_astrology_saxena_teaching_2020",
     "prasna_marga_bv_raman_part_1_1991",
     "prasna_marga_bv_raman_part_2_1992",
     "satpancasika_sanskritdocuments_2016",
@@ -12,12 +13,13 @@
   "covered_requirements": [
     "daivajna_vallabha",
     "prasna_marga_baseline",
+    "published_cases",
     "satpancasika",
     "tajika_aspect_overlay"
   ],
-  "missing_requirements": ["published_cases"],
-  "verified_published_case_count": 1,
-  "missing_published_case_count": 1,
+  "missing_requirements": [],
+  "verified_published_case_count": 2,
+  "missing_published_case_count": 0,
   "safe_question_classes": [
     "communication_noncritical",
     "lost_object_noncritical",
@@ -34,12 +36,9 @@
     "relationship_marriage"
   ],
   "missing_doctrine": [
-    "A second published case with a traceable observed outcome is not yet acquired.",
     "Prasna Marga radicality rules still require exact fragment admission.",
     "Tajika applying/separating passages still require OCR, translation, and human review."
   ],
-  "acquisition_blockers": [
-    "published_cases: 1 additional published case(s) with question time, place, judgment, timing, and observed outcome are required."
-  ],
-  "ready": false
+  "acquisition_blockers": [],
+  "ready": true
 }

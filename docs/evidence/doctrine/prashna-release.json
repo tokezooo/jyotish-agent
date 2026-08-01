@@ -1,38 +1,36 @@
 {
   "schema_version": "1.0",
   "release_id": "full_prashna_v1",
-  "corpus_manifest_sha256": "6a38ff34650f7619b49dbc74359e809a25f077e8defe555ab2a9793a47c29b93",
+  "corpus_manifest_sha256": "7f320ba34fadc878ee028826a04d4b0b17b980614e4be212a262fdd552e5378b",
   "compiled_profile_sha256": null,
   "admission_state": "blocked_sources",
   "gates": [
-    {"gate_id": "source_manifest", "status": "passed", "evidence": "Five declared local sources verify by SHA-256."},
+    {"gate_id": "source_manifest", "status": "passed", "evidence": "Six declared local sources verify by SHA-256."},
     {"gate_id": "radicality_and_anchor_suite", "status": "passed", "evidence": "Readable, conflicting, unavailable, retry, and clarification gates pass."},
     {"gate_id": "taxonomy_ru_en", "status": "passed", "evidence": "Four safe profiles and adversarial ambiguity cases pass in RU and EN."},
     {"gate_id": "geometry_property_suite", "status": "passed", "evidence": "Hand checks, wrap, retrograde, station, boundary, replay, and substitution pass."},
     {"gate_id": "outcome_graph_and_privacy", "status": "passed", "evidence": "Three mandatory gates, conflicts, no-answer, renderer identity, and secret-input cases pass."},
     {"gate_id": "tajika_source_admission", "status": "failed", "evidence": "The Sanskrit scan still requires OCR, translation, and specialist review."},
-    {"gate_id": "published_outcome_cases", "status": "missing", "evidence": null},
-    {"gate_id": "held_out_questions", "status": "passed", "evidence": "LEA-537: eval/prashna/questions-held-out-v1.json (SHA-256 1183cc44789e80381907c187ccc6cb1092eabcf3f739d3c2a02d1bd396b34129) executed by evaluate_prashna_held_out_questions(allow_held_out=True): 12/12 passed; material-error rate 0.0; safe-supported no-answer rate 0.125; source mode synthetic_test_fixture_only"},
+    {"gate_id": "published_outcome_cases", "status": "passed", "evidence": "2/2 published cases have exact question time/place, page-paired judgment and timing, and traceable observed outcomes; the safe teaching case is admitted and the marriage case remains excluded."},
+    {"gate_id": "held_out_questions", "status": "passed", "evidence": "LEA-537: eval/prashna/questions-held-out-v1.json (SHA-256 a6ffacfba6fda9ce0b48b4601732b0627b861dbfa37d4bfdee5d0048c025fc0e) executed by evaluate_prashna_held_out_questions(allow_held_out=True): 12/12 passed; material-error rate 0.0; safe-supported no-answer rate 0.125; source mode synthetic_test_fixture_only"},
     {"gate_id": "concierge_future_outcomes", "status": "missing", "evidence": null},
     {"gate_id": "specialist_review", "status": "missing", "evidence": null}
   ],
   "metrics": {
-    "published_outcome_case_count": 1,
+    "published_outcome_case_count": 2,
     "held_out_question_count": 12,
     "material_error_rate": 0.0,
     "no_answer_rate": 0.125
   },
   "completed_evidence": [
     "Automated source identity, anchor, taxonomy, geometry, graph, renderer, and privacy suites are implemented.",
-    "One published known-outcome case is page-anchored and reproduced offline while excluded from product use.",
+    "Two published known-outcome cases are page-anchored and reproduced offline: one safe work-status case is admitted and one relationship case remains excluded from product use.",
     "Twelve independently authored RU/EN held-out questions pass deterministic route and synthetic gated-outcome scoring without claiming source admission."
   ],
   "future_outcome_follow_up": [
-    "Acquire at least one additional complete published known-outcome case.",
     "Follow eventual outcomes from opt-in concierge sessions where feasible."
   ],
   "blockers": [
-    "published_outcome_cases: one additional complete traceable case is required",
     "tajika_source_admission: OCR, translation, and specialist review are incomplete",
     "compiled_profile: no production source-admitted Prashna profile exists"
   ],

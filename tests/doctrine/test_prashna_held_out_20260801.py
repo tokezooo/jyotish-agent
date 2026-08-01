@@ -44,8 +44,8 @@ def test_prashna_held_out_questions_cover_safe_and_adversarial_routes() -> None:
 
     assert result == {
         "corpus_id": "prashna_questions_held_out_v1",
-        "corpus_sha256": "1183cc44789e80381907c187ccc6cb1092eabcf3f739d3c2a02d1bd396b34129",
-        "corpus_manifest_sha256": "6a38ff34650f7619b49dbc74359e809a25f077e8defe555ab2a9793a47c29b93",
+        "corpus_sha256": "a6ffacfba6fda9ce0b48b4601732b0627b861dbfa37d4bfdee5d0048c025fc0e",
+        "corpus_manifest_sha256": "7f320ba34fadc878ee028826a04d4b0b17b980614e4be212a262fdd552e5378b",
         "radicality_profile_sha256": "4f77da632b0f3e67ebb9a234a757a3130eeff62ee56ded1f9caf596ef3bdbf6c",
         "source_admission_mode": "synthetic_test_fixture_only",
         "status": "passed",
