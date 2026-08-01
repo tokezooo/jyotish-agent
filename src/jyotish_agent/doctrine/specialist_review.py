@@ -14,6 +14,7 @@ from ..research_store import canonical_json
 from .models import FrozenModel
 from .muhurta_pack import (
     load_muhurta_admitted_rule_pack,
+    load_muhurta_modern_overlay_ledger,
     load_muhurta_profile_catalog,
     muhurta_compiled_profile_sha256,
 )
@@ -46,11 +47,14 @@ class MuhurtaReviewerRole(StrEnum):
 
 
 class MuhurtaReviewSubject(FrozenModel):
-    subject_type: Literal["rule", "profile"]
+    subject_type: Literal["rule", "profile", "overlay_comparison"]
     subject_id: str = Field(
-        pattern=r"^(?:muhurta\.[A-Za-z0-9_.-]+|profile:[a-z][a-z0-9_]+)$"
+        pattern=(
+            r"^(?:muhurta\.[A-Za-z0-9_.-]+|profile:[a-z][a-z0-9_]+|"
+            r"overlay:[a-z][a-z0-9_]+:[a-z][a-z0-9_]+)$"
+        )
     )
-    current_status: Literal["private_experimental", "available"]
+    current_status: Literal["private_experimental", "available", "quarantined"]
     rule_ids: tuple[str, ...] = Field(min_length=1)
     source_ids: tuple[SourceId, ...] = Field(min_length=1)
     source_locators: tuple[str, ...] = Field(min_length=1)
@@ -78,6 +82,10 @@ class MuhurtaReviewSubject(FrozenModel):
             raise ValueError("rule review subject has an invalid ID")
         if self.subject_type == "profile" and not self.subject_id.startswith("profile:"):
             raise ValueError("profile review subject has an invalid ID")
+        if self.subject_type == "overlay_comparison" and not self.subject_id.startswith(
+            "overlay:"
+        ):
+            raise ValueError("overlay comparison subject has an invalid ID")
         if any(
             ref.startswith(("/", "private_sources/"))
             or "\\" in ref
@@ -93,19 +101,22 @@ class MuhurtaReviewSubject(FrozenModel):
 
 class MuhurtaSpecialistReviewHandoff(FrozenModel):
     schema_version: Literal["1.0"] = "1.0"
-    handoff_id: Literal["muhurta_classical_baseline_specialist_v1"]
+    handoff_id: Literal["muhurta_private_release_specialist_v2"]
     release_id: Literal["expanded_muhurta_v1"]
-    scope: Literal["classical_baseline_v1_private_experimental"]
+    scope: Literal[
+        "classical_baseline_v1_plus_quarantined_bv_raman_comparison"
+    ]
     source_manifest_sha256: Sha256
     compiled_profile_sha256: Sha256
     profile_catalog_sha256: Sha256
     admitted_rule_pack_sha256: Sha256
+    overlay_ledger_sha256: Sha256
     response_schema_ref: Literal[
         "docs/evidence/doctrine/muhurta-specialist-review-response.schema.json"
     ]
     response_schema_sha256: Sha256
-    subject_count: Literal[8]
-    subjects: tuple[MuhurtaReviewSubject, ...] = Field(min_length=8, max_length=8)
+    subject_count: Literal[9]
+    subjects: tuple[MuhurtaReviewSubject, ...] = Field(min_length=9, max_length=9)
     decision_options: tuple[Literal["approved", "amended", "rejected"], ...]
     review_requirements: tuple[str, ...] = Field(min_length=1)
     excluded_scope: tuple[str, ...] = Field(min_length=1)
@@ -123,6 +134,14 @@ class MuhurtaSpecialistReviewHandoff(FrozenModel):
             raise ValueError("specialist handoff requires exactly two admitted rules")
         if sum(subject.subject_type == "profile" for subject in self.subjects) != 6:
             raise ValueError("specialist handoff requires exactly six activity profiles")
+        if (
+            sum(
+                subject.subject_type == "overlay_comparison"
+                for subject in self.subjects
+            )
+            != 1
+        ):
+            raise ValueError("specialist handoff requires one overlay comparison")
         if tuple(self.subjects) != tuple(sorted(self.subjects, key=_subject_sort_key)):
             raise ValueError("specialist handoff subjects must use deterministic order")
         if self.decision_options != ("approved", "amended", "rejected"):
@@ -139,9 +158,12 @@ class MuhurtaSpecialistReviewHandoff(FrozenModel):
 
 
 class MuhurtaSpecialistDecision(FrozenModel):
-    subject_type: Literal["rule", "profile"]
+    subject_type: Literal["rule", "profile", "overlay_comparison"]
     subject_id: str = Field(
-        pattern=r"^(?:muhurta\.[A-Za-z0-9_.-]+|profile:[a-z][a-z0-9_]+)$"
+        pattern=(
+            r"^(?:muhurta\.[A-Za-z0-9_.-]+|profile:[a-z][a-z0-9_]+|"
+            r"overlay:[a-z][a-z0-9_]+:[a-z][a-z0-9_]+)$"
+        )
     )
     subject_sha256: Sha256
     decision: Literal["approved", "amended", "rejected"]
@@ -170,7 +192,7 @@ class MuhurtaSpecialistReviewResponse(FrozenModel):
     source_access_attested: Literal[True]
     contains_source_text: Literal[False]
     decisions: tuple[MuhurtaSpecialistDecision, ...] = Field(
-        min_length=1, max_length=8
+        min_length=1, max_length=9
     )
 
     @model_validator(mode="after")
@@ -196,11 +218,11 @@ class MuhurtaSpecialistReviewReport(FrozenModel):
     response_sha256: Sha256
     reviewer_identity_sha256: Sha256
     reviewer_role: MuhurtaReviewerRole
-    subject_count: Literal[8]
-    reviewed_count: int = Field(ge=0, le=8)
-    approved_count: int = Field(ge=0, le=8)
-    amended_count: int = Field(ge=0, le=8)
-    rejected_count: int = Field(ge=0, le=8)
+    subject_count: Literal[9]
+    reviewed_count: int = Field(ge=0, le=9)
+    approved_count: int = Field(ge=0, le=9)
+    amended_count: int = Field(ge=0, le=9)
+    rejected_count: int = Field(ge=0, le=9)
     gate_status: Literal["passed", "failed", "missing"]
     specialist_review_complete: bool
     blockers: tuple[str, ...]
@@ -229,6 +251,7 @@ def build_muhurta_specialist_review_handoff() -> MuhurtaSpecialistReviewHandoff:
     manifest = SourceManifest.model_validate(_resource_json("muhurta-sources.json"))
     profiles = load_muhurta_profile_catalog()
     rule_pack = load_muhurta_admitted_rule_pack()
+    overlay_ledger = load_muhurta_modern_overlay_ledger()
     source_ids = {source.source_id for source in manifest.sources}
 
     rule_subjects: list[MuhurtaReviewSubject] = []
@@ -305,16 +328,45 @@ def build_muhurta_specialist_review_handoff() -> MuhurtaSpecialistReviewHandoff:
             )
         )
 
-    subjects = tuple(sorted((*rule_subjects, *profile_subjects), key=_subject_sort_key))
+    overlay_comparison = overlay_ledger.comparisons[0]
+    overlay_subject = _subject(
+        subject_type="overlay_comparison",
+        subject_id="overlay:bv_raman_modern_overlay_v1:rahu_kala",
+        current_status="quarantined",
+        rule_ids=(overlay_comparison.baseline_rule_id,),
+        source_ids=("bv_raman_muhurtha_1969", "kalaprakasika_1982"),
+        source_locators=(
+            "bv_raman_muhurtha_1969:pdf:182:printed:178",
+            "kalaprakasika_1982:pdf:208:printed:176",
+        ),
+        evidence_refs=(
+            "src/jyotish_agent/data/doctrine/"
+            "muhurta-modern-overlay-fragments.json#/comparisons/0",
+        ),
+        review_questions=(
+            MuhurtaReviewQuestion.SOURCE_ALIGNMENT,
+            MuhurtaReviewQuestion.RULE_SEMANTICS,
+            MuhurtaReviewQuestion.EXCEPTIONS_AND_SCOPE,
+            MuhurtaReviewQuestion.SAFETY_BOUNDARY,
+        ),
+        artifact=overlay_comparison.model_dump(mode="json"),
+    )
+    subjects = tuple(
+        sorted(
+            (*rule_subjects, overlay_subject, *profile_subjects),
+            key=_subject_sort_key,
+        )
+    )
     payload = {
         "schema_version": "1.0",
-        "handoff_id": "muhurta_classical_baseline_specialist_v1",
+        "handoff_id": "muhurta_private_release_specialist_v2",
         "release_id": "expanded_muhurta_v1",
-        "scope": "classical_baseline_v1_private_experimental",
+        "scope": "classical_baseline_v1_plus_quarantined_bv_raman_comparison",
         "source_manifest_sha256": manifest.manifest_sha256,
         "compiled_profile_sha256": muhurta_compiled_profile_sha256(),
         "profile_catalog_sha256": _hash_payload(profiles.model_dump(mode="json")),
         "admitted_rule_pack_sha256": _hash_payload(rule_pack.model_dump(mode="json")),
+        "overlay_ledger_sha256": overlay_ledger.ledger_sha256,
         "response_schema_ref": (
             "docs/evidence/doctrine/"
             "muhurta-specialist-review-response.schema.json"
@@ -328,11 +380,13 @@ def build_muhurta_specialist_review_handoff() -> MuhurtaSpecialistReviewHandoff:
         "review_requirements": (
             "Review each exact local source page named by the subject locators.",
             "Judge source alignment, rule semantics, exceptions, applicability, and safety.",
+            "Review the quarantined Raman-to-Kalaprakasika Rahukalam comparison without treating it as an activated rule.",
             "Record one decision for every subject and identify the qualified reviewer.",
             "Treat amended subjects as pending implementation and re-review, not approval.",
         ),
         "excluded_scope": (
-            "B. V. Raman modern overlay until exact licensed source bytes are supplied.",
+            "Activation of the B. V. Raman overlay before specialist review and independent rights confirmation.",
+            "Yamagandam overlay parity because no exact Raman page has been located.",
             "High-stakes medical, longevity, legal, and financial activities.",
             "Copyrighted source text and local private-source paths.",
         ),
@@ -414,9 +468,9 @@ def evaluate_muhurta_specialist_review(
 
 def _subject(
     *,
-    subject_type: Literal["rule", "profile"],
+    subject_type: Literal["rule", "profile", "overlay_comparison"],
     subject_id: str,
-    current_status: Literal["private_experimental", "available"],
+    current_status: Literal["private_experimental", "available", "quarantined"],
     rule_ids: tuple[str, ...],
     source_ids: tuple[SourceId, ...],
     source_locators: tuple[str, ...],
@@ -442,7 +496,8 @@ def _subject(
 
 
 def _subject_sort_key(subject: MuhurtaReviewSubject) -> tuple[int, str]:
-    return (0 if subject.subject_type == "rule" else 1, subject.subject_id)
+    order = {"rule": 0, "overlay_comparison": 1, "profile": 2}
+    return (order[subject.subject_type], subject.subject_id)
 
 
 def _resource_json(name: str) -> object:

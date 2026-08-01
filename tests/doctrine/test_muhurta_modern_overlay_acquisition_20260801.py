@@ -63,6 +63,29 @@ def test_muhurta_overlay_identity_is_exact_and_admission_gap_is_explicit() -> No
     }
     assert audit["acquisition_state"] == "private_bytes_present_identity_verified"
     assert audit["private_bytes_verified"] is True
+    assert audit["page_mapping_status"] == "bounded_comparison_complete"
+    assert audit["comparison_ledger_sha256"] == (
+        "b4e90857fb0bc6401fa8eb9519220da14408e095d9d6979dc27e6174496f8c0e"
+    )
+    assert audit["mapped_comparisons"] == [
+        {
+            "baseline_rule_id": "muhurta.interval.rahu_kala",
+            "overlay_pdf_pages": [182],
+            "overlay_printed_pages": [178],
+            "baseline_source_id": "kalaprakasika_1982",
+            "baseline_pdf_pages": [208],
+            "baseline_printed_pages": [176],
+            "relation": "agrees_with",
+            "review_status": "anchored_unreviewed",
+        }
+    ]
+    assert audit["unresolved_overlay_coverage"] == [
+        {
+            "baseline_rule_id": "muhurta.interval.yamaganda",
+            "status": "overlay_page_not_located",
+            "search_scope": "full_document_ocr_and_index",
+        }
+    ]
     assert audit["redistribution_allowed"] is False
     assert audit["source_admitted"] is False
     assert audit["overlay_enabled"] is False
@@ -87,7 +110,7 @@ def test_corpus_covers_overlay_inventory_but_release_keeps_review_blocker() -> N
     assert coverage["ready"] is True
     assert gate["status"] == "passed"
     assert "1969 fourth-edition" in gate["evidence"]
-    assert any("1969 fourth edition" in item for item in release["future_follow_up"])
+    assert any("page-mapped" in item for item in release["future_follow_up"])
     assert any("modern_overlay_review" in item for item in release["public_release_blockers"])
     assert release["admission_state"] == "private_experimental"
     assert release["available"] is True

@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "audit_id": "muhurta_modern_overlay_acquisition_v1",
   "reviewed_at": "2026-08-01",
-  "review_scope": "Project-local source identity and byte verification for a private copyrighted overlay; no doctrine admission, source-text tracking, or claim of independently verified licensing.",
+  "review_scope": "Project-local source identity, byte verification, and bounded page comparison for a private copyrighted overlay; no doctrine admission, source-text tracking, or claim of independently verified licensing.",
   "local_overlay_match_count": 1,
   "acquired_edition": {
     "source_id": "bv_raman_muhurtha_1969",
@@ -57,11 +57,32 @@
   ],
   "acquisition_state": "private_bytes_present_identity_verified",
   "acceptable_next_evidence": [
-    "Page-mapped extraction and comparison against the immutable classical baseline.",
-    "Human specialist review before optional overlay admission.",
+    "Human specialist review of the page-mapped Rahukalam comparison and unresolved Yamagandam coverage before optional overlay admission.",
     "Independent rights confirmation before any redistribution or non-private use."
   ],
   "private_bytes_verified": true,
+  "page_mapping_status": "bounded_comparison_complete",
+  "comparison_ledger_ref": "src/jyotish_agent/data/doctrine/muhurta-modern-overlay-fragments.json",
+  "comparison_ledger_sha256": "b4e90857fb0bc6401fa8eb9519220da14408e095d9d6979dc27e6174496f8c0e",
+  "mapped_comparisons": [
+    {
+      "baseline_rule_id": "muhurta.interval.rahu_kala",
+      "overlay_pdf_pages": [182],
+      "overlay_printed_pages": [178],
+      "baseline_source_id": "kalaprakasika_1982",
+      "baseline_pdf_pages": [208],
+      "baseline_printed_pages": [176],
+      "relation": "agrees_with",
+      "review_status": "anchored_unreviewed"
+    }
+  ],
+  "unresolved_overlay_coverage": [
+    {
+      "baseline_rule_id": "muhurta.interval.yamaganda",
+      "status": "overlay_page_not_located",
+      "search_scope": "full_document_ocr_and_index"
+    }
+  ],
   "redistribution_allowed": false,
   "source_admitted": false,
   "overlay_enabled": false,

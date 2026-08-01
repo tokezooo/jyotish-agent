@@ -66,6 +66,10 @@ def test_ru_en_reports_include_top_alternatives_near_misses_and_named_overlay() 
         assert report.overlay_comparison.baseline_profile == "classical_baseline_v1"
         assert report.overlay_comparison.overlay_profile == "bv_raman_modern_overlay_v1"
         assert report.overlay_comparison.overlay_status == "unavailable"
+        assert "overlay" in report.overlay_comparison.explanation
+        expected_marker = "получен" if locale == "ru" else "acquired"
+        assert expected_marker in report.overlay_comparison.explanation
+        assert "lawful acquisition" not in report.overlay_comparison.explanation
         assert report.booking_performed is False
         assert validate_muhurta_visible_report(report) == []
 

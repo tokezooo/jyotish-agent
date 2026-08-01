@@ -1,15 +1,16 @@
 {
   "schema_version": "1.0",
-  "handoff_id": "muhurta_classical_baseline_specialist_v1",
+  "handoff_id": "muhurta_private_release_specialist_v2",
   "release_id": "expanded_muhurta_v1",
-  "scope": "classical_baseline_v1_private_experimental",
+  "scope": "classical_baseline_v1_plus_quarantined_bv_raman_comparison",
   "source_manifest_sha256": "991dc4050a79aa7691d9f356e60e87cdcbe1ac3f66029af4b0babdb2fec89116",
-  "compiled_profile_sha256": "d15fe736bb32c5da1cfbcc0adfec24b8d0405c5b4fc78cd19916c1495cc5438e",
+  "compiled_profile_sha256": "9b38b79c47f61cb627fc5269af726701ad050c1ba1a390d009231ada2e83f1e4",
   "profile_catalog_sha256": "f8a3613ab04a0dd3056fe26777e56670e40e4c20f5853c4892a6c266b648784b",
   "admitted_rule_pack_sha256": "0bce81b3d699d0e3151c74c0c513aeb6c2f73bd2a81087ffbd7ca1b73a9484f4",
+  "overlay_ledger_sha256": "b4e90857fb0bc6401fa8eb9519220da14408e095d9d6979dc27e6174496f8c0e",
   "response_schema_ref": "docs/evidence/doctrine/muhurta-specialist-review-response.schema.json",
-  "response_schema_sha256": "67b1835488c50f52becb4ab1a1ac135c206ba5c490f9ce6bedd9fa1bd7a50b1a",
-  "subject_count": 8,
+  "response_schema_sha256": "091ae40c1de47dd942d9c5258403f224ada1209de1b1b7af320a3e79395c3c63",
+  "subject_count": 9,
   "subjects": [
     {
       "subject_type": "rule",
@@ -60,6 +61,33 @@
       ],
       "artifact_sha256": "d03b67f90a5c85a05599784b5c388a38a27d2d632ad6dab5ea693433cf9512f0",
       "subject_sha256": "3c9ddf8268f322506aaf55faa520cead45e4a2d8bad808aae129468e55288f36"
+    },
+    {
+      "subject_type": "overlay_comparison",
+      "subject_id": "overlay:bv_raman_modern_overlay_v1:rahu_kala",
+      "current_status": "quarantined",
+      "rule_ids": [
+        "muhurta.interval.rahu_kala"
+      ],
+      "source_ids": [
+        "bv_raman_muhurtha_1969",
+        "kalaprakasika_1982"
+      ],
+      "source_locators": [
+        "bv_raman_muhurtha_1969:pdf:182:printed:178",
+        "kalaprakasika_1982:pdf:208:printed:176"
+      ],
+      "evidence_refs": [
+        "src/jyotish_agent/data/doctrine/muhurta-modern-overlay-fragments.json#/comparisons/0"
+      ],
+      "review_questions": [
+        "source_alignment",
+        "rule_semantics",
+        "exceptions_and_scope",
+        "safety_boundary"
+      ],
+      "artifact_sha256": "3233b8dba2a495d8797b30b63f4e53e2006415acb0ade3dee8bfa9838809a6e2",
+      "subject_sha256": "7c90faa824af4600c89a5542408335db6edd37b8e13008a2d8ac8c91418917bd"
     },
     {
       "subject_type": "profile",
@@ -238,16 +266,18 @@
   "review_requirements": [
     "Review each exact local source page named by the subject locators.",
     "Judge source alignment, rule semantics, exceptions, applicability, and safety.",
+    "Review the quarantined Raman-to-Kalaprakasika Rahukalam comparison without treating it as an activated rule.",
     "Record one decision for every subject and identify the qualified reviewer.",
     "Treat amended subjects as pending implementation and re-review, not approval."
   ],
   "excluded_scope": [
-    "B. V. Raman modern overlay until exact licensed source bytes are supplied.",
+    "Activation of the B. V. Raman overlay before specialist review and independent rights confirmation.",
+    "Yamagandam overlay parity because no exact Raman page has been located.",
     "High-stakes medical, longevity, legal, and financial activities.",
     "Copyrighted source text and local private-source paths."
   ],
   "external_review_status": "missing",
   "ready_for_external_review": true,
   "privacy_projection": "metadata_hashes_and_locators_only",
-  "handoff_sha256": "9055a034166424e15bdb4f4564708c29826143e80b26519541097c125f2dbfda"
+  "handoff_sha256": "dd92ae6315c7fdd8a09fc9ffde5d7bc0ba5a79f69177ba38658a2d7cf009498e"
 }
