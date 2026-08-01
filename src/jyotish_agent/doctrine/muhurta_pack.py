@@ -1141,12 +1141,24 @@ def load_muhurta_release_audit(*, verify_source_bytes: bool = True) -> MuhurtaRe
     if audit.compiled_profile_sha256 != muhurta_compiled_profile_sha256():
         raise ValueError("MUHURTA_COMPILED_PROFILE_SUBSTITUTED")
     if audit.available and verify_source_bytes:
+        required_ids = {
+            rule.source_id for rule in load_muhurta_admitted_rule_pack().rules
+        }
+        runtime_sources = tuple(
+            source for source in manifest.sources if source.source_id in required_ids
+        )
+        if {source.source_id for source in runtime_sources} != required_ids:
+            raise ValueError("MUHURTA_ADMITTED_SOURCE_MISSING")
+        runtime_manifest = SourceManifest(
+            schema_version=manifest.schema_version,
+            sources=runtime_sources,
+        )
         root = Path(
             os.environ.get(
                 "JYOTISH_PRIVATE_SOURCES_ROOT",
                 str(Path.cwd() / "private_sources"),
             )
         )
-        if not SourceVerifier.verify(manifest, root).ok:
+        if not SourceVerifier.verify(runtime_manifest, root).ok:
             raise ValueError("MUHURTA_SOURCE_BYTES_UNVERIFIED")
     return audit

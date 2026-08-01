@@ -44,9 +44,9 @@ def test_muhurta_independent_held_out_corpus_is_executable() -> None:
     assert callable(evaluate)
     assert evaluate(allow_held_out=True) == {
         "corpus_id": "muhurta_independent_held_out_v1",
-        "corpus_sha256": "90bb92e7aef06be67ba38d93ffdc5477383aca11547987049bcbe0c9a198b0b1",
-        "corpus_manifest_sha256": "e6643be2f730e67b2cd6b80f64cfe46894240bb112a0ff26cae22a0c390c2e07",
-        "compiled_profile_sha256": "ecba14ace48d508b0a4789262cc67a4078c72bdd244e6d0a629499b67b7e8f81",
+        "corpus_sha256": "17b9f8c573c360024eb7d616664addadfae23de03e4dcc570dbc2428cb37b151",
+        "corpus_manifest_sha256": "991dc4050a79aa7691d9f356e60e87cdcbe1ac3f66029af4b0babdb2fec89116",
+        "compiled_profile_sha256": "d15fe736bb32c5da1cfbcc0adfec24b8d0405c5b4fc78cd19916c1495cc5438e",
         "source_admission_mode": "synthetic_inputs_against_admitted_private_baseline",
         "status": "passed",
         "case_count": 19,

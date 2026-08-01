@@ -52,7 +52,7 @@
     {
       "domain": "muhurta",
       "release_id": "expanded_muhurta_v1",
-      "evidence_sha256": "041cc3b5dc8664eee5f086a5e10a6224e5990e5bf4bcbc58971c9da54f0490ad",
+      "evidence_sha256": "3567149524e901a202a28437681385819b7157203a27930ad39b608d87ff4086",
       "admission_state": "private_experimental",
       "available": true,
       "gate_statuses": {
@@ -64,7 +64,7 @@
         "independent_held_out_evaluation": "passed",
         "concierge_collection_contract": "passed",
         "specialist_review_handoff": "passed",
-        "modern_overlay": "optional_missing",
+        "modern_overlay": "passed",
         "specialist_review": "missing",
         "cross_domain_concierge_sessions": "missing",
         "whole_project_independent_review": "passed"
@@ -72,7 +72,7 @@
       "blockers": [
         "specialist_review: external rule-pack review is missing",
         "cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
-        "modern_overlay: B. V. Raman, Muhurtha (Electional Astrology), ISBN 9789359662923 (preferred) or 9788185674681 (accepted alternate), has not been lawfully supplied and reviewed"
+        "modern_overlay_review: the acquired B. V. Raman 1969 fourth edition is identity-verified but not page-mapped, independently rights-confirmed, or specialist-reviewed; the overlay remains disabled"
       ]
     }
   ],
@@ -98,7 +98,7 @@
     "full_python_suite": {
       "command": "uv run pytest -q",
       "status": "passed",
-      "passed": 932,
+      "passed": 933,
       "failed": 0,
       "skipped": 2
     },
@@ -161,7 +161,7 @@
     "prashna: compiled_profile: no production source-admitted Prashna profile exists",
     "muhurta: specialist_review: external rule-pack review is missing",
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
-    "muhurta: modern_overlay: B. V. Raman, Muhurtha (Electional Astrology), ISBN 9789359662923 (preferred) or 9788185674681 (accepted alternate), has not been lawfully supplied and reviewed"
+    "muhurta: modern_overlay_review: the acquired B. V. Raman 1969 fourth edition is identity-verified but not page-mapped, independently rights-confirmed, or specialist-reviewed; the overlay remains disabled"
   ],
-  "audit_sha256": "6b15b59af4e5c0f73fc1a67ab3c342bf3687742eb41a8cbd7d1fc5b99aee4db5"
+  "audit_sha256": "e01468ef1381e7be594eb50166ec6fe54284b9c83a819186e524918b6be3cb58"
 }

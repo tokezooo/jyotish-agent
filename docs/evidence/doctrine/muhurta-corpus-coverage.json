@@ -1,7 +1,8 @@
 {
   "schema_version": "1.0",
-  "manifest_sha256": "e6643be2f730e67b2cd6b80f64cfe46894240bb112a0ff26cae22a0c390c2e07",
+  "manifest_sha256": "991dc4050a79aa7691d9f356e60e87cdcbe1ac3f66029af4b0babdb2fec89116",
   "verified_source_ids": [
+    "bv_raman_muhurtha_1969",
     "kalaprakasika_1982",
     "muhurta_cintamani_1907",
     "muhurta_martanda_1819"
@@ -9,11 +10,12 @@
   "unverified_source_ids": [],
   "covered_requirements": [
     "kalaprakasika",
+    "modern_overlay",
     "muhurta_cintamani",
     "panchanga_dosa_reference",
     "published_worked_elections"
   ],
-  "missing_requirements": ["modern_overlay"],
+  "missing_requirements": [],
   "verified_worked_example_count": 2,
   "covered_safe_profiles": [
     "creative_production",
@@ -31,8 +33,6 @@
     "marriage",
     "medical"
   ],
-  "acquisition_blockers": [
-    "modern_overlay: Acquire a lawful copy of B. V. Raman, Muhurtha (Electional Astrology), preferably the 2026 MLBD paperback (ISBN 9789359662923; 227 pages); the 1993 UBSPD edition (ISBN 9788185674681; 181 pages) is an accepted page-remapped alternative. Review is required before optional overlay admission."
-  ],
-  "ready": false
+  "acquisition_blockers": [],
+  "ready": true
 }

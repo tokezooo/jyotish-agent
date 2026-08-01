@@ -46,8 +46,8 @@ def test_catalog_declares_every_required_layer_without_blending() -> None:
     ).school_role == "commentary"
     modern = catalog.requirement(MuhurtaCorpusRequirement.MODERN_OVERLAY)
     assert modern.school_role == "overlay"
-    assert modern.source_ids == ()
-    assert modern.acquisition_blocker is not None
+    assert modern.source_ids == ("bv_raman_muhurtha_1969",)
+    assert modern.acquisition_blocker is None
 
 
 def test_published_examples_are_traceable_and_not_outcome_claims() -> None:
@@ -59,7 +59,7 @@ def test_published_examples_are_traceable_and_not_outcome_claims() -> None:
     assert all(not item.observed_outcome_claimed for item in examples.examples)
 
 
-def test_verified_public_domain_bytes_leave_only_modern_overlay_blocked(
+def test_verified_corpus_bytes_cover_every_required_layer(
     tmp_path: Path,
 ) -> None:
     manifest, verification = _fixture_verification(tmp_path)
@@ -67,8 +67,9 @@ def test_verified_public_domain_bytes_leave_only_modern_overlay_blocked(
     examples = MuhurtaWorkedExampleCatalog.model_validate_json(EXAMPLES.read_text())
     report = build_muhurta_corpus_coverage(manifest, verification, catalog, examples)
 
-    assert not report.ready
-    assert report.missing_requirements == (MuhurtaCorpusRequirement.MODERN_OVERLAY,)
+    assert report.ready
+    assert report.missing_requirements == ()
+    assert MuhurtaCorpusRequirement.MODERN_OVERLAY in report.covered_requirements
     assert report.verified_worked_example_count == 2
     assert "medical" in report.unsupported_high_stakes_profiles
     assert "marriage" in report.unsupported_high_stakes_profiles
@@ -81,7 +82,13 @@ def test_offsets_rights_locality_and_private_projection() -> None:
     assert by_id["muhurta_cintamani_1907"].page_offset == -4
     assert by_id["kalaprakasika_1982"].page_offset == -32
     assert by_id["muhurta_martanda_1819"].page_offset == -5
-    assert all(source.license_class.value == "public_domain" for source in manifest.sources)
+    assert by_id["bv_raman_muhurtha_1969"].page_offset == -4
+    assert by_id["bv_raman_muhurtha_1969"].license_class.value == "copyrighted_local"
+    assert all(
+        source.license_class.value == "public_domain"
+        for source in manifest.sources
+        if source.source_id != "bv_raman_muhurtha_1969"
+    )
 
     catalog = MuhurtaCorpusCatalog.model_validate_json(CATALOG.read_text())
     examples = MuhurtaWorkedExampleCatalog.model_validate_json(EXAMPLES.read_text())
