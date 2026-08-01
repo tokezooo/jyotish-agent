@@ -1,0 +1,55 @@
+{
+  "schema_version": "1.0",
+  "audit_id": "muhurta_modern_overlay_acquisition_v1",
+  "reviewed_at": "2026-08-01",
+  "review_scope": "Project-local source index and Telegram download filename inventory plus publisher and library catalog verification; no unlicensed download.",
+  "local_overlay_match_count": 0,
+  "preferred_target_edition": {
+    "title": "Muhurtha (Electional Astrology)",
+    "author": "B. V. Raman",
+    "publisher": "Motilal Banarsidass Publishing House",
+    "year": 2026,
+    "edition": "1st MLBD edition",
+    "pages": 227,
+    "language": "en",
+    "binding": "paperback",
+    "isbn_10": "9359662925",
+    "isbn_13": "9789359662923"
+  },
+  "accepted_alternate_edition": {
+    "title": "Muhurtha (Electional Astrology)",
+    "author": "B. V. Raman",
+    "publisher": "UBS Publishers Distributors",
+    "year": 1993,
+    "pages": 181,
+    "language": "en",
+    "isbn_10": "818567468X",
+    "isbn_13": "9788185674681",
+    "oclc": "314072888",
+    "open_library_id": "OL9860226M"
+  },
+  "catalog_evidence": [
+    {
+      "catalog": "Motilal Banarsidass Publishing House",
+      "url": "https://www.mlbd.in/products/muhurtha-electional-astrology-by-b-v-raman-9789359662923-9359662925-9789359661070-9359661074",
+      "finding": "The publisher lists the 2026 English paperback as 227 pages with ISBN 9789359662923."
+    },
+    {
+      "catalog": "Open Library",
+      "url": "https://openlibrary.org/books/OL9860226M/Muhurtha_%28Electional_Astrology%29",
+      "finding": "The catalog identifies the 1993 English UBSPD edition as 181 pages with ISBN 9788185674681 and OCLC 314072888."
+    }
+  ],
+  "acquisition_state": "missing_licensed_bytes",
+  "acceptable_next_evidence": [
+    "A lawfully supplied scan or PDF of either named edition.",
+    "A SHA-256 identity record and edition-specific page manifest.",
+    "Page-mapped extraction and comparison against the immutable classical baseline.",
+    "Human specialist review before optional overlay admission."
+  ],
+  "unlicensed_download_attempted": false,
+  "source_admitted": false,
+  "overlay_enabled": false,
+  "baseline_release_affected": false,
+  "high_stakes_profiles_remain_blocked": true
+}

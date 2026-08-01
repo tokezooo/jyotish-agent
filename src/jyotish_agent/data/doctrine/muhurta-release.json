@@ -2,7 +2,7 @@
   "schema_version": "1.0",
   "release_id": "expanded_muhurta_v1",
   "corpus_manifest_sha256": "e6643be2f730e67b2cd6b80f64cfe46894240bb112a0ff26cae22a0c390c2e07",
-  "compiled_profile_sha256": "4552d6fa9c5c9b99849927586731dccb71bbd88695149d899f07ffef008c78d2",
+  "compiled_profile_sha256": "ecba14ace48d508b0a4789262cc67a4078c72bdd244e6d0a629499b67b7e8f81",
   "admission_state": "private_experimental",
   "available": true,
   "public_release_ready": false,
@@ -13,7 +13,7 @@
     {"gate_id": "private_baseline_profile", "status": "passed", "evidence": "The immutable private baseline admits only Yamaganda and Rahu-kala intervals anchored to Kalaprakasika PDF page 208 / printed page 176."},
     {"gate_id": "profile_rule_fixture_suite", "status": "passed", "evidence": "RU/EN routing, hard/soft eligibility, DST, personalization, ranking, privacy, and report fixtures pass."},
     {"gate_id": "private_runtime_e2e", "status": "passed", "evidence": "The internal read-only engine returns ranked calendar-ready windows in direct E2E tests; MCP and HTTP remain fail-closed while required release gates are missing."},
-    {"gate_id": "independent_held_out_evaluation", "status": "passed", "evidence": "LEA-544: eval/muhurta/independent-held-out-v1.json (SHA-256 e1197e9f8a87083981768defad2ca92da8570248614b137d9fade671b6217df8) executed by evaluate_muhurta_held_out_cases(allow_held_out=True): 19/19 passed; material-error rate 0.0; synthetic inputs against the admitted private baseline."},
+    {"gate_id": "independent_held_out_evaluation", "status": "passed", "evidence": "LEA-544: eval/muhurta/independent-held-out-v1.json (SHA-256 90bb92e7aef06be67ba38d93ffdc5477383aca11547987049bcbe0c9a198b0b1) executed by evaluate_muhurta_held_out_cases(allow_held_out=True): 19/19 passed; material-error rate 0.0; synthetic inputs against the resealed admitted private baseline."},
     {"gate_id": "modern_overlay", "status": "optional_missing", "evidence": null},
     {"gate_id": "specialist_review", "status": "missing", "evidence": null},
     {"gate_id": "cross_domain_concierge_sessions", "status": "missing", "evidence": null},
@@ -28,16 +28,17 @@
     "The private baseline, deterministic runtime, ranking, reports, and privacy projections are automated and packaged.",
     "High-stakes activity routing, DST folds, half-open intervals, score manipulation, and prose tampering are covered.",
     "Independent whole-project code review completed with no Critical or Important findings.",
-    "Nineteen independently hand-authored held-out cases cover RU/EN routing, all six safe profiles, DST and skipped-date behavior, constraints, ranking, and natal uncertainty with zero material errors."
+    "Nineteen independently hand-authored held-out cases cover RU/EN routing, all six safe profiles, DST and skipped-date behavior, constraints, ranking, and natal uncertainty with zero material errors.",
+    "The optional modern overlay acquisition target is catalog-verified to exact B. V. Raman editions without admitting source bytes or changing the classical baseline."
   ],
   "future_follow_up": [
     "Run 10-20 opt-in concierge sessions across Jaimini, Prashna, and Muhurta and record domain value scores.",
     "Obtain specialist review of the private Muhurta rule pack.",
-    "Acquire and review the named modern B. V. Raman overlay before enabling overlay comparison results."
+    "Acquire and review B. V. Raman, Muhurtha (Electional Astrology): preferably the 2026 MLBD paperback, ISBN 9789359662923, or the page-remapped 1993 UBSPD edition, ISBN 9788185674681, before enabling overlay comparison results."
   ],
   "public_release_blockers": [
     "specialist_review: external rule-pack review is missing",
     "cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
-    "modern_overlay: the named modern source has not been lawfully supplied and reviewed"
+    "modern_overlay: B. V. Raman, Muhurtha (Electional Astrology), ISBN 9789359662923 (preferred) or 9788185674681 (accepted alternate), has not been lawfully supplied and reviewed"
   ]
 }

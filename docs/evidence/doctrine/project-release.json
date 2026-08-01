@@ -53,7 +53,7 @@
     {
       "domain": "muhurta",
       "release_id": "expanded_muhurta_v1",
-      "evidence_sha256": "0531e09a55075e0566bdc792fb931dca2dd170a856846324a1fdedafaa8f83f9",
+      "evidence_sha256": "9f46f03b3132f994969e5033960ec4bcc0c319fd3995cdeb1b1f9b2d9e78d8b2",
       "admission_state": "private_experimental",
       "available": true,
       "gate_statuses": {
@@ -71,7 +71,7 @@
       "blockers": [
         "specialist_review: external rule-pack review is missing",
         "cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
-        "modern_overlay: the named modern source has not been lawfully supplied and reviewed"
+        "modern_overlay: B. V. Raman, Muhurtha (Electional Astrology), ISBN 9789359662923 (preferred) or 9788185674681 (accepted alternate), has not been lawfully supplied and reviewed"
       ]
     }
   ],
@@ -97,7 +97,7 @@
     "full_python_suite": {
       "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine $CODEX_PYTHON -m pytest -q",
       "status": "passed",
-      "passed": 912,
+      "passed": 914,
       "failed": 0,
       "skipped": 2
     },
@@ -120,6 +120,12 @@
       "status": "passed",
       "passed": 2,
       "failed": 0
+    },
+    "muhurta_modern_overlay_acquisition_suite": {
+      "command": ".venv/bin/pytest -q tests/doctrine/test_muhurta_modern_overlay_acquisition_20260801.py",
+      "status": "passed",
+      "passed": 2,
+      "failed": 0
     }
   },
   "private_source_scan": {
@@ -137,7 +143,7 @@
     "prashna: compiled_profile: no production source-admitted Prashna profile exists",
     "muhurta: specialist_review: external rule-pack review is missing",
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
-    "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
+    "muhurta: modern_overlay: B. V. Raman, Muhurtha (Electional Astrology), ISBN 9789359662923 (preferred) or 9788185674681 (accepted alternate), has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "2de946ecb6442de1dcf496b7ea8cd52880705308b14192b5c17bbce6e9d27a0a"
+  "audit_sha256": "038c01ccefe400ab0f49a6f300cb896b40406d37b6e5be2680afec545f2cbd99"
 }

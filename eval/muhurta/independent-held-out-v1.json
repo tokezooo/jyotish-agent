@@ -6,7 +6,7 @@
   "public_safe": true,
   "source_admission_mode": "synthetic_inputs_against_admitted_private_baseline",
   "corpus_manifest_sha256": "e6643be2f730e67b2cd6b80f64cfe46894240bb112a0ff26cae22a0c390c2e07",
-  "compiled_profile_sha256": "4552d6fa9c5c9b99849927586731dccb71bbd88695149d899f07ffef008c78d2",
+  "compiled_profile_sha256": "ecba14ace48d508b0a4789262cc67a4078c72bdd244e6d0a629499b67b7e8f81",
   "cases": [
     {
       "id": "mh_route_focused_en",
