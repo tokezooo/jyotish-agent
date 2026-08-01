@@ -60,6 +60,26 @@
       "scan_quality": "fair",
       "ocr_required": true,
       "ocr_status": "required"
+    },
+    {
+      "source_id": "bv_raman_muhurtha_1969",
+      "title": "Muhurtha or Electional Astrology",
+      "author_or_commentator": "B. V. Raman",
+      "translator_editor": null,
+      "edition": "Fourth edition, Raman Publications, 1969; Internet Archive scan",
+      "publisher": "Raman Publications, Bangalore",
+      "year": 1969,
+      "isbn": null,
+      "languages": ["en"],
+      "domain": "muhurta",
+      "school_role": "overlay",
+      "license_class": "copyrighted_local",
+      "local_file": "muhurta/bv-raman-muhurtha-electional-astrology-1969.pdf",
+      "sha256": "dc8eeb02038a89d3b1b6167aed2640ccb0e535b7374892cce51988b192a3e5c4",
+      "page_offset": -4,
+      "scan_quality": "fair",
+      "ocr_required": true,
+      "ocr_status": "completed"
     }
   ]
 }

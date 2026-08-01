@@ -8,7 +8,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from jyotish_agent.api import app
-from jyotish_agent.doctrine.muhurta_pack import MuhurtaReleaseAudit
+from jyotish_agent.doctrine.muhurta_pack import (
+    MuhurtaReleaseAudit,
+    load_muhurta_release_audit,
+)
 from jyotish_agent.doctrine.muhurta_release import _base_request, execute_muhurta_full
 from jyotish_agent.mcp_facade import JyotishMcpFacade
 from jyotish_agent.mcp_models import MuhurtaFullMcpInput
@@ -171,6 +174,33 @@ def test_private_release_fails_closed_when_source_bytes_do_not_verify(
     assert result.profile == "focused_work"
     assert result.report is None
     assert result.error_code == "SOURCE_BYTES_UNVERIFIED"
+
+
+def test_optional_overlay_bytes_are_not_required_by_classical_runtime(
+    monkeypatch,
+) -> None:
+    from types import SimpleNamespace
+
+    from jyotish_agent.doctrine import muhurta_pack
+
+    verified_ids: set[str] = set()
+
+    def verify(manifest, root):
+        del root
+        verified_ids.update(source.source_id for source in manifest.sources)
+        return SimpleNamespace(ok=True)
+
+    monkeypatch.setattr(
+        muhurta_pack.SourceVerifier,
+        "verify",
+        staticmethod(verify),
+    )
+
+    audit = load_muhurta_release_audit()
+
+    assert audit.available is True
+    assert verified_ids == {"kalaprakasika_1982"}
+    assert "bv_raman_muhurtha_1969" not in verified_ids
 
 
 def test_high_stakes_activity_remains_blocked_before_engine_execution(tmp_path) -> None:

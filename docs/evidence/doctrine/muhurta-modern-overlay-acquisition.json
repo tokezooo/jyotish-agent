@@ -2,8 +2,23 @@
   "schema_version": "1.0",
   "audit_id": "muhurta_modern_overlay_acquisition_v1",
   "reviewed_at": "2026-08-01",
-  "review_scope": "Project-local source index and Telegram download filename inventory plus publisher and library catalog verification; no unlicensed download.",
-  "local_overlay_match_count": 0,
+  "review_scope": "Project-local source identity and byte verification for a private copyrighted overlay; no doctrine admission, source-text tracking, or claim of independently verified licensing.",
+  "local_overlay_match_count": 1,
+  "acquired_edition": {
+    "source_id": "bv_raman_muhurtha_1969",
+    "title": "Muhurtha or Electional Astrology",
+    "author": "B. V. Raman",
+    "publisher": "Raman Publications, Bangalore",
+    "year": 1969,
+    "edition": "Fourth edition",
+    "pages": 208,
+    "language": "en",
+    "scan_provenance_url": "https://archive.org/details/bwb_P9-EAH-659",
+    "sha256": "dc8eeb02038a89d3b1b6167aed2640ccb0e535b7374892cce51988b192a3e5c4",
+    "page_offset": -4,
+    "license_class": "copyrighted_local",
+    "rights_status": "not_independently_verified"
+  },
   "preferred_target_edition": {
     "title": "Muhurtha (Electional Astrology)",
     "author": "B. V. Raman",
@@ -40,14 +55,14 @@
       "finding": "The catalog identifies the 1993 English UBSPD edition as 181 pages with ISBN 9788185674681 and OCLC 314072888."
     }
   ],
-  "acquisition_state": "missing_licensed_bytes",
+  "acquisition_state": "private_bytes_present_identity_verified",
   "acceptable_next_evidence": [
-    "A lawfully supplied scan or PDF of either named edition.",
-    "A SHA-256 identity record and edition-specific page manifest.",
     "Page-mapped extraction and comparison against the immutable classical baseline.",
-    "Human specialist review before optional overlay admission."
+    "Human specialist review before optional overlay admission.",
+    "Independent rights confirmation before any redistribution or non-private use."
   ],
-  "unlicensed_download_attempted": false,
+  "private_bytes_verified": true,
+  "redistribution_allowed": false,
   "source_admitted": false,
   "overlay_enabled": false,
   "baseline_release_affected": false,

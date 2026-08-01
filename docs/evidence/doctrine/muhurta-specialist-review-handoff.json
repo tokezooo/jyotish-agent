@@ -3,8 +3,8 @@
   "handoff_id": "muhurta_classical_baseline_specialist_v1",
   "release_id": "expanded_muhurta_v1",
   "scope": "classical_baseline_v1_private_experimental",
-  "source_manifest_sha256": "e6643be2f730e67b2cd6b80f64cfe46894240bb112a0ff26cae22a0c390c2e07",
-  "compiled_profile_sha256": "ecba14ace48d508b0a4789262cc67a4078c72bdd244e6d0a629499b67b7e8f81",
+  "source_manifest_sha256": "991dc4050a79aa7691d9f356e60e87cdcbe1ac3f66029af4b0babdb2fec89116",
+  "compiled_profile_sha256": "d15fe736bb32c5da1cfbcc0adfec24b8d0405c5b4fc78cd19916c1495cc5438e",
   "profile_catalog_sha256": "f8a3613ab04a0dd3056fe26777e56670e40e4c20f5853c4892a6c266b648784b",
   "admitted_rule_pack_sha256": "0bce81b3d699d0e3151c74c0c513aeb6c2f73bd2a81087ffbd7ca1b73a9484f4",
   "response_schema_ref": "docs/evidence/doctrine/muhurta-specialist-review-response.schema.json",
@@ -249,5 +249,5 @@
   "external_review_status": "missing",
   "ready_for_external_review": true,
   "privacy_projection": "metadata_hashes_and_locators_only",
-  "handoff_sha256": "6637a9e42579a0de4eee9d34ac144c1875d7c85ea2bb32841ac88053b61c0d52"
+  "handoff_sha256": "9055a034166424e15bdb4f4564708c29826143e80b26519541097c125f2dbfda"
 }
