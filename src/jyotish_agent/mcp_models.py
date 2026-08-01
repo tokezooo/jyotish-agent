@@ -108,6 +108,9 @@ class JaiminiMcpInput(ProfileSelection):
 
 class JaiminiFullMcpInput(ProfileSelection):
     question: str = Field(min_length=1, max_length=2_000)
+    birth: JaiminiBirthSelection = Field(
+        default_factory=lambda: ExactJaiminiBirthSelection(confidence="exact")
+    )
     mode: Literal["quick", "full", "deep", "inspection"] = "full"
     locale: Literal["ru", "en"] = "ru"
     topics: list[Literal["self", "career", "relationships", "timing"]] = Field(
@@ -129,25 +132,35 @@ class JaiminiFullMcpInput(ProfileSelection):
 class JaiminiFullReleaseResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
     surface: Literal["experimental_full"] = "experimental_full"
-    status: Literal["unavailable", "needs_input"]
+    status: Literal["completed", "unavailable", "needs_input", "incomplete"]
     request_mode: Literal["quick", "full", "deep", "inspection"] | None = None
     locale: Literal["ru", "en"] | None = None
     topics: list[Literal["self", "career", "relationships", "timing"]] = Field(
         default_factory=list
     )
-    admission_state: Literal["blocked_sources"] | None = None
+    profile: Literal["full_jaimini_private_baseline_v1"] | None = None
+    admission_state: Literal["blocked_sources", "experimental_full"] | None = None
     blockers: list[str] = Field(default_factory=list)
+    public_release_blockers: list[str] = Field(default_factory=list)
     external_review_missing: bool
-    report: str | None = None
-    error_code: Literal["INPUT_INVALID"] | None = None
+    report: dict[str, Any] | None = None
+    error_code: str | None = None
 
     @model_validator(mode="after")
     def _status_contract(self) -> "JaiminiFullReleaseResult":
-        if self.status == "unavailable":
-            if self.admission_state != "blocked_sources" or self.error_code is not None:
-                raise ValueError("unavailable release requires a blocked source audit")
-        elif self.error_code != "INPUT_INVALID" or self.admission_state is not None:
-            raise ValueError("needs_input release requires a sanitized input error")
+        if self.status == "completed":
+            if (
+                self.admission_state != "experimental_full"
+                or self.profile is None
+                or self.report is None
+                or self.error_code is not None
+            ):
+                raise ValueError("completed release requires a private profile and report")
+        elif self.report is not None or self.error_code is None:
+            raise ValueError("non-success release requires a sanitized error")
+        if self.status == "needs_input" and self.error_code == "INPUT_INVALID":
+            if self.admission_state is not None or self.profile is not None:
+                raise ValueError("malformed input cannot claim an admitted profile")
         return self
 
 

@@ -566,7 +566,9 @@ def test_privacy_safe_audit_is_bound_to_ledger_and_preserves_release_blockers() 
         ]
         + [
             f"blocker:{blocker.split(':', 1)[0]}"
-            for blocker in release["blockers"]
+            for blocker in (
+                release["blockers"] + release.get("public_release_blockers", [])
+            )
         ]
     )
     assert audit["preserved_release_blockers"] == expected_release_blockers

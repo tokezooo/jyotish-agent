@@ -82,16 +82,15 @@
   "admitted_binding_count": 0,
   "unresolved_sources": [],
   "release_id": "full_jaimini_v1",
-  "release_evidence_sha256": "63030be4af249f218f087ba518070f8f35234fca322e26e135fd018f0bcd16ad",
-  "release_admission_state": "blocked_sources",
+  "release_evidence_sha256": "a646140ca71fdb3497780b1b9092711a30e61236f8a94a407ac947f454309289",
+  "release_admission_state": "experimental_full",
   "preserved_release_blockers": [
-    "blocker:compiled_profile",
-    "blocker:source_review",
     "blocker:specialist_review",
-    "gate:deep_conversational_e2e"
+    "blocker:timing",
+    "gate:specialist_review"
   ],
   "doctrine_admitted": false,
   "product_rule_use_allowed": false,
   "overlay_activated": false,
-  "release_promoted": false
+  "release_promoted": true
 }

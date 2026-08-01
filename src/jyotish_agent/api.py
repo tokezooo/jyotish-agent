@@ -10,12 +10,12 @@ computed placements are never logged (privacy), and never echoed into error bodi
 
 from __future__ import annotations
 
+import asyncio
 import datetime as _dt
 import logging
 import threading
 import time
 from contextvars import ContextVar
-from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -551,27 +551,12 @@ async def compute(req: ChartComputeRequest) -> ChartComputeResponse:
 async def jaimini_full_release(
     req: JaiminiFullMcpInput,
 ) -> JaiminiFullReleaseResult:
-    """Fail closed until the packaged source/admission audit allows Full Jaimini."""
+    """Run the same source-verified private baseline exposed through MCP."""
 
-    from .doctrine.jaimini_pack import JaiminiReleaseAudit
+    from .mcp_facade import facade_from_environment
 
-    audit = JaiminiReleaseAudit.model_validate_json(
-        (Path(__file__).parent / "data/doctrine/jaimini-release.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    if audit.available:  # pragma: no cover - future admitted production release
-        raise RuntimeError("Full Jaimini runtime is not configured")
-    return JaiminiFullReleaseResult(
-        status="unavailable",
-        request_mode=req.mode,
-        locale=req.locale,
-        topics=req.topics,
-        admission_state="blocked_sources",
-        blockers=list(audit.blockers),
-        external_review_missing=audit.external_review_missing,
-        report=None,
-    )
+    facade = facade_from_environment()
+    return await asyncio.to_thread(facade.jaimini_full, req)
 
 
 @app.post(
