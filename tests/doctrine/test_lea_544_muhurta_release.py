@@ -110,6 +110,19 @@ def test_audit_promotes_private_release_after_real_held_out_evaluation() -> None
     assert held_out.evidence is not None
     assert "independent-held-out-v1.json" in held_out.evidence
     assert "19/19" in held_out.evidence
+    collection_contract = next(
+        gate for gate in audit.gates if gate.gate_id == "concierge_collection_contract"
+    )
+    assert collection_contract.status == "passed"
+    assert collection_contract.evidence is not None
+    assert "concierge-readiness.json" in collection_contract.evidence
+    concierge_gate = next(
+        gate for gate in audit.gates if gate.gate_id == "cross_domain_concierge_sessions"
+    )
+    assert concierge_gate.status == "missing"
+    assert concierge_gate.evidence is None
+    assert all(metric.concierge_session_count == 0 for metric in audit.domain_metrics)
+    assert all(metric.value_score is None for metric in audit.domain_metrics)
     assert all(
         "independent_held_out_evaluation" not in blocker
         for blocker in audit.public_release_blockers

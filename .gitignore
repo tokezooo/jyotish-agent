@@ -21,3 +21,6 @@ tests/fixtures/golden_chennai_1990_swiss_modules.json
 # Copyrighted/licensed doctrine sources are local-only. Git stores manifests,
 # hashes, permitted excerpts, normalized rules, and fixtures — never the books.
 private_sources/
+# Opt-in user/reviewer session records remain local. Only reviewed aggregate
+# metrics may be copied into tracked doctrine evidence.
+private_evidence/
