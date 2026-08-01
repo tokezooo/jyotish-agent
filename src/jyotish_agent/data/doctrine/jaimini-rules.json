@@ -112,10 +112,15 @@
       "school": "nilakantha_baseline",
       "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
       "fact_families": ["jaimini.svamsa.sign"],
-      "anchor": null,
-      "status": "quarantined_missing_anchor",
+      "anchor": {
+        "pdf_page": 56,
+        "printed_page": 39,
+        "sutra": "1.2.1",
+        "fragment_sha256": "ab89ee8c0303f41e4e4f387978b5de2f9c1b0b8b9b1ab0233bc2b3f995a7d8b3"
+      },
+      "status": "quarantined_conflict",
       "ambiguity": "Svamsa terminology is not interchangeable with karakamsa.",
-      "discrepancy": "Exact sutra and reviewed fragment have not been located."
+      "discrepancy": "The baseline uses swamsa for the Atmakaraka's Navamsa; the current engine's independent D9-lagna fact is a distinct calculation not supported by this passage."
     },
     {
       "rule_id": "karakamsa.d9_atmakaraka",
@@ -167,10 +172,15 @@
       "school": "nilakantha_baseline",
       "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
       "fact_families": ["jaimini.chara_dasha.*.sign"],
-      "anchor": null,
-      "status": "quarantined_missing_anchor",
+      "anchor": {
+        "pdf_page": 45,
+        "printed_page": 28,
+        "sutra": "1.1.25-1.1.27.notes.progression",
+        "fragment_sha256": "5e55ff495651987c42cce1df0efc35e3e791e0b71f14b21255d81a7ec79f972d"
+      },
+      "status": "quarantined_conflict",
       "ambiguity": "Progression direction has material commentary variants.",
-      "discrepancy": "Exact sutra and reviewed fragment have not been located."
+      "discrepancy": "The baseline sets odd/even counting with explicit sign exceptions; the current engine's generic odd-forward/even-reverse sequence does not encode every exception."
     },
     {
       "rule_id": "chara_dasha.duration",
@@ -207,20 +217,30 @@
       "school": "nilakantha_baseline",
       "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
       "fact_families": ["jaimini.chara_dasha.*"],
-      "anchor": null,
-      "status": "quarantined_missing_anchor",
+      "anchor": {
+        "pdf_page": 45,
+        "printed_page": 28,
+        "sutra": "1.1.25-1.1.27.notes.progression",
+        "fragment_sha256": "5e55ff495651987c42cce1df0efc35e3e791e0b71f14b21255d81a7ec79f972d"
+      },
+      "status": "quarantined_conflict",
       "ambiguity": "The current binary input branch is not yet source-admitted and must not be interpreted doctrinally.",
-      "discrepancy": "No reviewed anchor establishes the current input semantics."
+      "discrepancy": "The anchored passage makes progression depend on sign parity and sign exceptions; it does not establish the current male/female seed branch."
     },
     {
       "rule_id": "time.boundaries",
       "school": "nilakantha_baseline",
       "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
       "fact_families": ["jaimini.chara_dasha.*.start", "jaimini.chara_dasha.*.end"],
-      "anchor": null,
-      "status": "quarantined_missing_anchor",
+      "anchor": {
+        "pdf_page": 46,
+        "printed_page": 29,
+        "sutra": "1.1.28",
+        "fragment_sha256": "3d4be573d066537762b3522e7ac0cab42ca6e0ca2e41b04cb24f71dbc4a002d9"
+      },
+      "status": "quarantined_conflict",
       "ambiguity": "Year length, rounding, and half-open intervals are engineering conventions.",
-      "discrepancy": "No doctrine source should be claimed for the engineering time convention."
+      "discrepancy": "The source determines integer Rasi Dasa years from the sign-to-lord count; it does not establish the engine's day conversion, rounding, or half-open interval convention."
     }
   ]
 }

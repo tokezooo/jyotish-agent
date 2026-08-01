@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from jyotish_agent.doctrine.jaimini_pack import (
     JaiminiRuleInventory,
     JaiminiRuleStatus,
@@ -76,6 +78,8 @@ def test_existing_nilakantha_mediated_volume_anchors_bounded_rule_families() -> 
         "arudha.exception",
         "chara_dasha.antardasha",
         "chara_dasha.duration",
+        "chara_dasha.gender_semantics",
+        "chara_dasha.progression",
         "co_lords.resolution",
         "karakamsa.d9_atmakaraka",
         "karakas.rahu_reversal",
@@ -83,15 +87,21 @@ def test_existing_nilakantha_mediated_volume_anchors_bounded_rule_families() -> 
         "karakas.tie_policy",
         "rasi_drishti.modal_sign_aspects",
         "special_lagnas.selected_rates",
+        "svamsa.d9_lagna",
+        "time.boundaries",
     }
     assert {
         rule_id
         for rule_id, candidate in anchored.items()
         if candidate.status == JaiminiRuleStatus.QUARANTINED_CONFLICT
     } == {
+        "chara_dasha.gender_semantics",
+        "chara_dasha.progression",
         "co_lords.resolution",
         "karakas.tie_policy",
         "special_lagnas.selected_rates",
+        "svamsa.d9_lagna",
+        "time.boundaries",
     }
     assert all(
         candidate.source_id == "jaimini_sutras_b_suryanarain_rao_1949"
@@ -99,14 +109,15 @@ def test_existing_nilakantha_mediated_volume_anchors_bounded_rule_families() -> 
     )
 
 
-def test_unanchored_candidates_are_quarantined_with_explicit_discrepancies() -> None:
+def test_every_candidate_is_anchored_and_conflicts_are_explicit() -> None:
     inventory = _inventory()
     unanchored = [item for item in inventory.candidates if item.anchor is None]
 
-    assert unanchored
+    assert unanchored == []
+    assert all(item.anchor is not None for item in inventory.candidates)
     assert all(
-        item.status == JaiminiRuleStatus.QUARANTINED_MISSING_ANCHOR and item.discrepancy
-        for item in unanchored
+        item.status != JaiminiRuleStatus.QUARANTINED_MISSING_ANCHOR
+        for item in inventory.candidates
     )
     discrepancy_audit = json.loads(DISCREPANCIES_PATH.read_text(encoding="utf-8"))
     assert discrepancy_audit["inventory_sha256"] == inventory.inventory_sha256
@@ -116,12 +127,23 @@ def test_unanchored_candidates_are_quarantined_with_explicit_discrepancies() -> 
         for item in inventory.candidates
         if item.status == JaiminiRuleStatus.QUARANTINED_CONFLICT
     ]
-    assert discrepancy_audit["quarantined_rule_count"] == len(unanchored) + len(
-        conflicts
-    )
+    assert discrepancy_audit["anchored_rule_count"] == len(inventory.candidates)
+    assert discrepancy_audit["unanchored_rule_count"] == 0
+    assert discrepancy_audit["quarantined_rule_count"] == len(conflicts)
     assert {item["rule_id"] for item in discrepancy_audit["discrepancies"]} == {
-        item.rule_id for item in unanchored
-    } | {item.rule_id for item in conflicts}
+        item.rule_id for item in conflicts
+    }
+    assert all(item["visual_reviewed"] for item in discrepancy_audit["manual_spot_checks"])
+
+
+def test_baseline_inventory_rejects_a_candidate_without_an_anchor() -> None:
+    payload = _inventory().model_dump(mode="json")
+    payload["candidates"][0]["anchor"] = None
+    payload["candidates"][0]["status"] = "quarantined_missing_anchor"
+    payload["candidates"][0]["discrepancy"] = "Anchor intentionally removed."
+
+    with pytest.raises(ValueError, match="require exact source anchors"):
+        JaiminiRuleInventory.model_validate(payload)
 
 
 def test_inventory_identity_is_deterministic_and_order_independent() -> None:

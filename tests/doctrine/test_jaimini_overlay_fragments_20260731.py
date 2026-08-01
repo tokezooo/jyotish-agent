@@ -356,7 +356,7 @@ def test_reviewed_kn_rao_source_is_absent_from_unresolved_queues() -> None:
 
 def test_baseline_reassessment_updates_inventory_without_mutating_frozen_core() -> None:
     assert hashlib.sha256(INVENTORY_PATH.read_bytes()).hexdigest() == (
-        "911b6ad2fa403572e3b0a1d8313c37c5e0b052055354d589b4e4fa08fa52a6aa"
+        "1fd9002c03f2938f10ba4e737452a6dc445a811a206cd052a01bc0e7d4a4e715"
     )
     assert hashlib.sha256(CORE_PATH.read_bytes()).hexdigest() == (
         "8a97c43e8438351ae73a59fed731cf5e48ef3c25c347ddf3570dea5818696b58"

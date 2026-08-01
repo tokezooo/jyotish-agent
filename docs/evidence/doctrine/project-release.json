@@ -5,7 +5,7 @@
     {
       "domain": "jaimini",
       "release_id": "full_jaimini_v1",
-      "evidence_sha256": "d35e26c8b0710c0f65239d9f4b82ef754c85d0f5fe567f415159a93730834c4a",
+      "evidence_sha256": "63030be4af249f218f087ba518070f8f35234fca322e26e135fd018f0bcd16ad",
       "admission_state": "blocked_sources",
       "available": false,
       "gate_statuses": {
@@ -22,7 +22,7 @@
       },
       "blockers": [
         "compiled_profile: no source-admitted production profile exists",
-        "source_review: twelve Nilakantha-mediated baseline fragments plus bounded Sanjay Rath, Narayana, and K. N. Rao overlay fragments are hash-bound but quarantined and uncompiled; four core candidates remain unanchored",
+        "source_review: all sixteen baseline candidates are hash-bound to thirteen Nilakantha-mediated fragments, but seven conflicts remain quarantined and no baseline or overlay rule has specialist admission",
         "specialist_review: no production rule/profile review"
       ]
     },
@@ -96,9 +96,15 @@
     "full_python_suite": {
       "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine $CODEX_PYTHON -m pytest -q",
       "status": "passed",
-      "passed": 918,
+      "passed": 920,
       "failed": 0,
       "skipped": 2
+    },
+    "jaimini_inventory_completion_suite": {
+      "command": "uv run pytest -q tests/doctrine/test_lea_524_jaimini_inventory.py tests/doctrine/test_jaimini_baseline_reassessment_20260801.py tests/doctrine/test_jaimini_overlay_fragments_20260731.py tests/doctrine/test_lea_530_jaimini_release.py tests/doctrine/test_project_release_audit.py",
+      "status": "passed",
+      "passed": 45,
+      "failed": 0
     },
     "ruff": {
       "command": "UV_CACHE_DIR=/tmp/jyotish-uv-cache /tmp/jyotish-uv/uvx --from ruff==0.12.7 ruff check src tests",
@@ -135,7 +141,7 @@
   "public_release_ready": false,
   "blockers": [
     "jaimini: compiled_profile: no source-admitted production profile exists",
-    "jaimini: source_review: twelve Nilakantha-mediated baseline fragments plus bounded Sanjay Rath, Narayana, and K. N. Rao overlay fragments are hash-bound but quarantined and uncompiled; four core candidates remain unanchored",
+    "jaimini: source_review: all sixteen baseline candidates are hash-bound to thirteen Nilakantha-mediated fragments, but seven conflicts remain quarantined and no baseline or overlay rule has specialist admission",
     "jaimini: specialist_review: no production rule/profile review",
     "prashna: tajika_source_admission: D. P. Saxena's 2001 Tajik Nilkanthi (LCCN 2001361798; OCLC 48507695) is the exact translation target, but licensed bytes are missing; bounded OCR candidates on PDF pages 45-47 remain quarantined and transcription, translation and specialist review are incomplete",
     "prashna: compiled_profile: no production source-admitted Prashna profile exists",
@@ -143,5 +149,5 @@
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: B. V. Raman, Muhurtha (Electional Astrology), ISBN 9789359662923 (preferred) or 9788185674681 (accepted alternate), has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "2e737610ebdcdf89c798894b16597e0377436cfc11be5c38feba9dea00785327"
+  "audit_sha256": "ef4058b6c2460ec844942b77a567372a445cb617f22581e25a52f26c3f3af6db"
 }

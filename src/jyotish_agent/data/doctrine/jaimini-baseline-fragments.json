@@ -4,7 +4,7 @@
   "school": "nilakantha_baseline",
   "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
   "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
-  "baseline_inventory_sha256": "a7e0a1fe04766f0f15b36ab6f2fd711decdc799d3b3b972aabb75b3c1f38bb0c",
+  "baseline_inventory_sha256": "887dfa20f2b6c2d99a191dbbfc05f7e0c84633c976983e499fcb8c9fcb6e5a5a",
   "doctrine_admitted": false,
   "product_rule_use_allowed": false,
   "fragments": [
@@ -251,6 +251,28 @@
       "admission_status": "quarantined"
     },
     {
+      "fragment_id": "frag_57e5edfff2cacf6ba9099354",
+      "revision": 1,
+      "revision_sha256": "ece9729a93f6fadfd2d701f784739f478b73424632276916f18533f3c7aaaf26",
+      "draft_sha256": "c791d9f574226b50e9be109a3b0bedc0098fe8f3970bf1c5c788612c9dc69124",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
+      "source_file_sha256": "06953f710d7a52e548fd7b7badeeef0c163debd02b8b08178c3833905aaa76ce",
+      "page_number": 45,
+      "printed_page": 28,
+      "anchor_kind": "sutra",
+      "anchor_label": "1.1.25-1.1.27.notes.progression",
+      "language": "en",
+      "content_role": "commentary",
+      "school": "nilakantha_baseline",
+      "scope": "chara_dasha.progression",
+      "full_text_sha256": "5e55ff495651987c42cce1df0efc35e3e791e0b71f14b21255d81a7ec79f972d",
+      "normalized_content_sha256": "5e55ff495651987c42cce1df0efc35e3e791e0b71f14b21255d81a7ec79f972d",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    },
+    {
       "fragment_id": "frag_03fb804b8121a4f3f9e50f75",
       "revision": 1,
       "revision_sha256": "f21b490ee32c11b0355de83be427a5a4d6ae56a90954cbd75c6dae28824ce1b3",
@@ -281,11 +303,15 @@
     {"binding_id": "bind_4f52b06e92522b12054db600", "fragment": {"fragment_id": "frag_1e7ea7fdc152e5a7d96bff4a", "revision": 1, "revision_sha256": "024b9c2ccdf67cd262ed0c4e2102f4574978cf9cbfe2cadd20815134d1ca275d"}, "rule_id": "karakas.tie_policy", "status": "quarantined_conflict"},
     {"binding_id": "bind_a58d66345c89e2b7fa9ff127", "fragment": {"fragment_id": "frag_d4f1deb7facc376c3738bdd7", "revision": 1, "revision_sha256": "133dc66eb6437ba10de4f0a73fa088e0325f258b2bea52a4942c6c9df504e119"}, "rule_id": "karakas.rahu_reversal", "status": "anchored_unreviewed"},
     {"binding_id": "bind_3e58501eb7a3cb6bee4ef6f5", "fragment": {"fragment_id": "frag_8db4a9093f8940450a53e8fc", "revision": 1, "revision_sha256": "d29104551fbf62c9f66ee89fed9ebff7928d3d879c93b85a763d1ad231d32a32"}, "rule_id": "arudha.exception", "status": "anchored_unreviewed"},
+    {"binding_id": "bind_7fb61eed884d725c50c214c6", "fragment": {"fragment_id": "frag_7374f945c1d8dbba2b04d5ee", "revision": 1, "revision_sha256": "73a565d06e77107018caf6eb0c12fba3fd7202b16e252b1a6ca56cdd5497315f"}, "rule_id": "svamsa.d9_lagna", "status": "quarantined_conflict"},
     {"binding_id": "bind_11b4345f9469f95d3965d416", "fragment": {"fragment_id": "frag_7374f945c1d8dbba2b04d5ee", "revision": 1, "revision_sha256": "73a565d06e77107018caf6eb0c12fba3fd7202b16e252b1a6ca56cdd5497315f"}, "rule_id": "karakamsa.d9_atmakaraka", "status": "anchored_unreviewed"},
     {"binding_id": "bind_b4da953e86ddd14ea7a9485d", "fragment": {"fragment_id": "frag_290f77194b31fac7e934bf64", "revision": 1, "revision_sha256": "28898e5c12bf6dd0e65b116a471537567fd46914aa0f94fcaab71b126cb0232b"}, "rule_id": "special_lagnas.selected_rates", "status": "quarantined_conflict"},
     {"binding_id": "bind_c1e6162650ba4202ea4b039e", "fragment": {"fragment_id": "frag_c50ab8dcb08287ce6a2ec56d", "revision": 1, "revision_sha256": "273f60ab46909fdc1ed5bedcb04ec4acd6e6d8634657c54530b0a9354e0ceae7"}, "rule_id": "co_lords.resolution", "status": "quarantined_conflict"},
+    {"binding_id": "bind_4ff934b4df826c7b16706545", "fragment": {"fragment_id": "frag_57e5edfff2cacf6ba9099354", "revision": 1, "revision_sha256": "ece9729a93f6fadfd2d701f784739f478b73424632276916f18533f3c7aaaf26"}, "rule_id": "chara_dasha.progression", "status": "quarantined_conflict"},
     {"binding_id": "bind_109b8a8ad62d9b95c4f01087", "fragment": {"fragment_id": "frag_bfa1ed3918f23bbbfae4cfe7", "revision": 1, "revision_sha256": "15a76ac1beae437ed397b7da3ae096c125b7600f29b159bea8b0d949944c7c4f"}, "rule_id": "chara_dasha.duration", "status": "anchored_unreviewed"},
-    {"binding_id": "bind_b037f4df74fe19b01d56d55d", "fragment": {"fragment_id": "frag_03fb804b8121a4f3f9e50f75", "revision": 1, "revision_sha256": "f21b490ee32c11b0355de83be427a5a4d6ae56a90954cbd75c6dae28824ce1b3"}, "rule_id": "chara_dasha.antardasha", "status": "anchored_unreviewed"}
+    {"binding_id": "bind_b037f4df74fe19b01d56d55d", "fragment": {"fragment_id": "frag_03fb804b8121a4f3f9e50f75", "revision": 1, "revision_sha256": "f21b490ee32c11b0355de83be427a5a4d6ae56a90954cbd75c6dae28824ce1b3"}, "rule_id": "chara_dasha.antardasha", "status": "anchored_unreviewed"},
+    {"binding_id": "bind_9fb00a96466b28f97c491239", "fragment": {"fragment_id": "frag_57e5edfff2cacf6ba9099354", "revision": 1, "revision_sha256": "ece9729a93f6fadfd2d701f784739f478b73424632276916f18533f3c7aaaf26"}, "rule_id": "chara_dasha.gender_semantics", "status": "quarantined_conflict"},
+    {"binding_id": "bind_1e4674fc95086846ac240f53", "fragment": {"fragment_id": "frag_bfa1ed3918f23bbbfae4cfe7", "revision": 1, "revision_sha256": "15a76ac1beae437ed397b7da3ae096c125b7600f29b159bea8b0d949944c7c4f"}, "rule_id": "time.boundaries", "status": "quarantined_conflict"}
   ],
   "source_limitations": [
     "The English volume is a mediated translation and digest, not a standalone diplomatic edition of the full Subodhini commentary.",

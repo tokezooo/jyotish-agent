@@ -235,6 +235,8 @@ class JaiminiRuleInventory(FrozenModel):
             raise ValueError("duplicate Jaimini rule candidate")
         if any(candidate.school != self.school for candidate in self.candidates):
             raise ValueError("baseline inventory cannot blend schools")
+        if any(candidate.anchor is None for candidate in self.candidates):
+            raise ValueError("baseline inventory candidates require exact source anchors")
         return self
 
     @property
@@ -382,6 +384,9 @@ class JaiminiBaselineFragmentLedger(FrozenModel):
         candidates = {
             candidate.rule_id: candidate for candidate in baseline_inventory.candidates
         }
+        bound_rule_ids = {binding.rule_id for binding in self.bindings}
+        if bound_rule_ids != set(candidates):
+            raise ValueError("baseline ledger must bind every inventory candidate")
 
         for fragment in self.fragments:
             if fragment.source_file_sha256 != source.sha256:
