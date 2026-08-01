@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from pathlib import Path
+
+import pytest
+from pydantic import ValidationError
 
 from jyotish_agent.doctrine.prashna_pack import (
     PrashnaRadicalityInput,
@@ -19,6 +23,7 @@ from jyotish_agent.doctrine.sources import load_source_manifest
 ROOT = Path(__file__).parents[2]
 RULES = ROOT / "src/jyotish_agent/data/doctrine/prashna-rules.json"
 MANIFEST = ROOT / "src/jyotish_agent/data/doctrine/prashna-sources.json"
+AUDIT = ROOT / "docs/evidence/doctrine/prashna-radicality-fragment-review.json"
 
 
 def _profile() -> PrashnaRadicalityProfile:
@@ -54,6 +59,12 @@ def test_every_criterion_has_an_exact_source_page_hash_and_baseline_identity() -
         assert criterion.pdf_page >= 1
         assert criterion.printed_page >= 1
         assert len(criterion.page_sha256) == 64
+        assert 0 <= criterion.fragment_start_offset < criterion.fragment_end_offset
+        assert len(criterion.fragment_text_sha256) == 64
+        assert criterion.fragment_word_count >= 1
+        assert criterion.fragment_normalization == "whitespace_collapse_v1"
+        assert criterion.admission_status == "private_experimental"
+        assert criterion.specialist_review_status == "missing"
 
 
 def test_exact_page_hashes_replay_against_private_sources_when_available() -> None:
@@ -79,6 +90,46 @@ def test_exact_page_hashes_replay_against_private_sources_when_available() -> No
             page.page_number: page for page in artifacts[criterion.source_id].pages
         }
         assert pages[criterion.pdf_page].normalized_sha256 == criterion.page_sha256
+        page_text = pages[criterion.pdf_page].text
+        fragment = " ".join(
+            page_text[
+                criterion.fragment_start_offset : criterion.fragment_end_offset
+            ].split()
+        )
+        assert hashlib.sha256(fragment.encode("utf-8")).hexdigest() == (
+            criterion.fragment_text_sha256
+        )
+        assert len(fragment.split()) == criterion.fragment_word_count
+
+
+def test_fragment_review_audit_matches_profile_without_tracking_source_text() -> None:
+    profile = _profile()
+    manifest = load_source_manifest(MANIFEST)
+    audit = json.loads(AUDIT.read_text(encoding="utf-8"))
+
+    assert audit["source_manifest_sha256"] == manifest.manifest_sha256
+    assert audit["profile_sha256"] == hashlib.sha256(RULES.read_bytes()).hexdigest()
+    assert audit["criterion_ids"] == sorted(
+        criterion.criterion_id for criterion in profile.criteria
+    )
+    assert audit["tracked_source_text"] is False
+    assert audit["admission_state"] == "private_experimental"
+    assert audit["product_rule_use_allowed"] == "safe_low_risk_only"
+    assert audit["external_specialist_review_missing"] is True
+
+
+def test_radicality_profile_rejects_non_admitted_or_unbounded_fragments() -> None:
+    payload = json.loads(RULES.read_text(encoding="utf-8"))
+    payload["criteria"][0]["admission_status"] = "quarantined"
+    with pytest.raises(ValidationError, match="admission_status"):
+        PrashnaRadicalityProfile.model_validate(payload)
+
+    payload = json.loads(RULES.read_text(encoding="utf-8"))
+    payload["criteria"][0]["fragment_end_offset"] = payload["criteria"][0][
+        "fragment_start_offset"
+    ]
+    with pytest.raises(ValidationError, match="fragment offsets"):
+        PrashnaRadicalityProfile.model_validate(payload)
 
 
 def test_readable_bounded_clarification_preserves_sealed_anchor() -> None:
@@ -90,6 +141,7 @@ def test_readable_bounded_clarification_preserves_sealed_anchor() -> None:
     assert result.anchor_action == "reuse_sealed_anchor"
     assert result.confidence_ceiling == 0.65
     assert result.source_refs
+    assert all(":fragment:sha256:" in ref for ref in result.source_refs)
 
 
 def test_repeated_question_is_conflicting_and_cannot_produce_outcome() -> None:

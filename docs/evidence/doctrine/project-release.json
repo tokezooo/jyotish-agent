@@ -30,7 +30,7 @@
     {
       "domain": "prashna",
       "release_id": "full_prashna_v1",
-      "evidence_sha256": "09451acf2f5b7d88483c80df6c96c1b67d195f541cb0e64f9a8efee193385317",
+      "evidence_sha256": "935d76e62de3240385a03d3eeff7a9a4c2fe29ed1776dc73f2f0963c1ab051db",
       "admission_state": "blocked_sources",
       "available": false,
       "gate_statuses": {
@@ -88,10 +88,16 @@
       "passed": 16,
       "failed": 0
     },
+    "radicality_fragment_suite": {
+      "command": ".venv/bin/pytest -q tests/doctrine/test_lea_532_prashna_radicality.py tests/doctrine/test_lea_531_prashna_sources.py tests/doctrine/test_lea_537_prashna_release.py tests/doctrine/test_prashna_held_out_20260801.py",
+      "status": "passed",
+      "passed": 27,
+      "failed": 0
+    },
     "full_python_suite": {
       "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine $CODEX_PYTHON -m pytest -q",
       "status": "passed",
-      "passed": 908,
+      "passed": 910,
       "failed": 0,
       "skipped": 2
     },
@@ -127,5 +133,5 @@
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "a358ae8693c7e8699b5693382b9a87bf1c109ffd68d071f2651dbe2d9434bdb3"
+  "audit_sha256": "3eb9982f00983063480c943a8b839aa395731a10e738e017e4d6734764963193"
 }

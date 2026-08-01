@@ -238,6 +238,19 @@ class PrashnaRadicalityCriterion(FrozenModel):
     printed_page: int = Field(ge=1)
     page_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     source_locator: str = Field(min_length=1)
+    fragment_start_offset: int = Field(ge=0)
+    fragment_end_offset: int = Field(ge=1)
+    fragment_text_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    fragment_word_count: int = Field(ge=1)
+    fragment_normalization: Literal["whitespace_collapse_v1"]
+    admission_status: Literal["private_experimental"]
+    specialist_review_status: Literal["missing"]
+
+    @model_validator(mode="after")
+    def _bounded_fragment(self) -> "PrashnaRadicalityCriterion":
+        if self.fragment_end_offset <= self.fragment_start_offset:
+            raise ValueError("fragment offsets must describe a non-empty range")
+        return self
 
 
 class PrashnaRadicalityProfile(FrozenModel):
@@ -309,7 +322,8 @@ def evaluate_prashna_radicality(
     """Evaluate the source-bound gate before any significator or outcome logic."""
 
     source_refs = tuple(
-        f"{item.source_id}:pdf:{item.pdf_page}:sha256:{item.page_sha256}"
+        f"{item.source_id}:pdf:{item.pdf_page}:sha256:{item.page_sha256}:"
+        f"fragment:sha256:{item.fragment_text_sha256}"
         for item in sorted(
             profile.criteria, key=lambda criterion: criterion.criterion_id
         )
