@@ -2,8 +2,8 @@
   "schema_version": "1.0",
   "release_id": "full_jaimini_v1",
   "corpus_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
-  "rule_inventory_sha256": "887dfa20f2b6c2d99a191dbbfc05f7e0c84633c976983e499fcb8c9fcb6e5a5a",
-  "compiled_profile_sha256": "0ba9c452ec2794aa5a32382482673cef764c5dec18ea1b45965b6dd9cd0bc50c",
+  "rule_inventory_sha256": "2f0eeb254bce32a40a84d85ef3a4acd138b26ca124eb6d2bc70640db20e22cbd",
+  "compiled_profile_sha256": "eba75cfad22a6e93aeaa8e24c13055a99b85492108b8f5c6825348a617199d80",
   "admission_state": "experimental_full",
   "gates": [
     {
@@ -19,7 +19,7 @@
     {
       "gate_id": "school_conflict_cases",
       "status": "passed",
-      "evidence": "Seven material rule conflicts remain explicitly quarantined; the Sanjay Rath source is independent context and never an activated overlay."
+      "evidence": "Eleven material rule conflicts remain explicitly quarantined; the Sanjay Rath source is independent context and never an activated overlay."
     },
     {
       "gate_id": "metamorphic_tests",

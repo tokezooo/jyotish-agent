@@ -311,11 +311,15 @@ class SpecialLagnaRates(_FrozenStrictModel):
 
 
 class SpecialLagnaRules(_FrozenStrictModel):
+    variant: Literal["regular_non_savayava"]
     included: tuple[
         Literal["bhava_lagna"], Literal["hora_lagna"], Literal["ghati_lagna"]
     ]
-    anchor: Literal["sun_longitude_at_sunrise"]
-    elapsed: Literal["minutes_since_sunrise"]
+    anchor: Literal["latest_sunrise_at_or_before_birth"]
+    adjacent_civil_dates: Literal["birth_date_then_previous_date"]
+    sun_epoch: Literal["sun_longitude_at_anchor_instant"]
+    sunrise_definition: Literal["swiss_apparent_upper_limb_with_refraction"]
+    elapsed: Literal["aware_utc_minutes_between_anchor_and_birth"]
     rates_minutes_per_sign: SpecialLagnaRates
     wrap: Literal["modulo_360"]
 

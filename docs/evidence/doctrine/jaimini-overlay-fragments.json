@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0",
   "audit_id": "jaimini_overlay_fragments_2026_08_01",
-  "ledger_sha256": "a28865f9a75a6a93f7b7a0f69d283adf04baa6db64e3a3a1e188086a40efac83",
+  "ledger_sha256": "aff9c9a0be2a1c388889117c8034c4ccbcc433bbb90282d69405efdf6d581a53",
   "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
-  "baseline_inventory_sha256": "887dfa20f2b6c2d99a191dbbfc05f7e0c84633c976983e499fcb8c9fcb6e5a5a",
+  "baseline_inventory_sha256": "2f0eeb254bce32a40a84d85ef3a4acd138b26ca124eb6d2bc70640db20e22cbd",
   "fragment_source_ids": [
     "jaimini_sanjay_rath_narayana_dasa_2004",
     "jaimini_sanjay_rath_upadesa_sutras_1997"
@@ -107,7 +107,7 @@
   "admitted_binding_count": 0,
   "unresolved_sources": [],
   "release_id": "full_jaimini_v1",
-  "release_evidence_sha256": "a646140ca71fdb3497780b1b9092711a30e61236f8a94a407ac947f454309289",
+  "release_evidence_sha256": "e9595dae6f4e5807fe73eb0acd6edddbad0a55d475468e7fac0bbc45a4baf678",
   "release_admission_state": "experimental_full",
   "preserved_release_blockers": [
     "blocker:specialist_review",

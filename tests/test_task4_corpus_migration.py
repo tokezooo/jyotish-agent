@@ -134,13 +134,13 @@ def test_v5_builtin_upgrade_backfills_replay_and_review_history(tmp_path: Path, 
             "SELECT COUNT(*) FROM corpus_operations"
         ).fetchone()[0]
     assert fragment_revisions == {2}
-    assert operation_count == 41
+    assert operation_count == 52
     before_history = store.list_corpus_review_history()
-    assert len(before_history) == 34
+    assert len(before_history) == 41
     assert {row["from_status"] for row in before_history} == {"pending"}
 
     # Current deterministic seed IDs must exact-replay the migrated v5 actions.
-    assert store.seed_builtin_corpus() == 30
+    assert store.seed_builtin_corpus() == 35
     assert store.list_corpus_review_history() == before_history
     with sqlite3.connect(store.database_path) as connection:
         assert connection.execute(
@@ -223,10 +223,10 @@ def test_v5_builtin_source_pending_upgrade_can_finish_seed_idempotently(
 
     store.initialize()
     assert store.get_source_version(source["source_version_id"])["approval_status"] == "pending"
-    assert store.seed_builtin_corpus() == 30
+    assert store.seed_builtin_corpus() == 35
     history = store.list_corpus_review_history()
-    assert len(history) == 34
-    assert store.seed_builtin_corpus() == 30
+    assert len(history) == 41
+    assert store.seed_builtin_corpus() == 35
     assert store.list_corpus_review_history() == history
 
 
@@ -257,10 +257,10 @@ def test_v5_builtin_fragments_pending_upgrade_can_finish_seed_idempotently(
             )
         }
     assert fragment_statuses == {"pending"}
-    assert store.seed_builtin_corpus() == 30
+    assert store.seed_builtin_corpus() == 35
     history = store.list_corpus_review_history()
-    assert len(history) == 34
-    assert store.seed_builtin_corpus() == 30
+    assert len(history) == 41
+    assert store.seed_builtin_corpus() == 35
     assert store.list_corpus_review_history() == history
 
 

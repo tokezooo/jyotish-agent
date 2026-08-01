@@ -185,7 +185,13 @@ def test_builtin_manifest_has_reviewable_approved_fragments_and_quarantines_bphs
     approved_works = {
         row["work_id"] for row in sources if row["approval_status"] == "approved"
     }
-    assert approved_works == {"brhat-jataka", "phaladipika", "saravali"}
+    assert approved_works == {
+        "brhat-jataka",
+        "course-jaimini-upadesa-sutra-volume-1",
+        "phaladipika",
+        "saravali",
+        "vedic-astrology-integrated-approach",
+    }
     assert all(row["rights_note"] and row["manifest_checksum"] for row in sources)
     assert not any(row["work_id"] == "bphs" and row["approval_status"] == "approved" for row in sources)
 

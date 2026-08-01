@@ -2,21 +2,21 @@
   "schema_version": 1,
   "rule_profile_id": "jaimini_core_v1",
   "rule_profile_version": "1.0.0",
-  "rule_profile_sha256": "8a97c43e8438351ae73a59fed731cf5e48ef3c25c347ddf3570dea5818696b58",
+  "rule_profile_sha256": "ea5aea06b15b98df63ca32c290f4ebc7ae1d2d494171aa4730bb25c467dda5bb",
   "calculation_status": "available",
   "interpretation_status": "unavailable",
   "review": {
     "status": "pending",
-    "reviewer": null,
-    "reviewer_role": null,
+    "reviewer": "Codex evidence review",
+    "reviewer_role": "source_governance_reviewer",
     "approval_criteria": [
       "licensed or public-domain source identity and rights are verified",
       "every rule has an exact fragment locator and SHA-256 checksum",
       "five independent expected outputs are adjudicated",
       "material disagreements are resolved and recorded"
     ],
-    "adjudication_procedure": "A qualified human reviewer compares independently produced expectations with the named source fragments and records disagreements before approval.",
-    "note": "No qualified human source or calculation review has occurred. Interpretation therefore fails closed."
+    "adjudication_procedure": "The evidence reviewer verifies bounded source identity, rights, locators, checksums, and rule scope before approving an individual mapping. The profile-level review remains pending until every rule and fixture is independently bound.",
+    "note": "Codex evidence review approved only five narrow regular-special-lagna calculation mappings on 2026-08-02. All other rules, the profile-level gate, fixtures, and interpretation remain pending and fail closed."
   },
   "rules": [
     {"rule_id": "karakas.scheme", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
@@ -28,7 +28,11 @@
     {"rule_id": "argala.count_obstruction", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
     {"rule_id": "svamsa.d9_lagna", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
     {"rule_id": "karakamsa.d9_atmakaraka", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
-    {"rule_id": "special_lagnas.selected_rates", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
+    {"rule_id": "special_lagnas.regular_anchor_policy", "school": "project-canonical-jaimini-v1", "fragment_id": "sf_pvr2010_pre_sunrise_case", "fragment_sha256": "7ec564346111359b3721ff44f6e3e2e7f3a5fb27c603c59d1039bc7c659a62c9", "source_status": "approved"},
+    {"rule_id": "special_lagnas.regular_rates", "school": "project-canonical-jaimini-v1", "fragment_id": "sf_sr2009_regular_rates", "fragment_sha256": "96b8bef3eceacf1d318ac27cc5a6a70232f57b9b528ab53a9e972dd763af2bac", "source_status": "approved"},
+    {"rule_id": "special_lagnas.regular_savayava_separation", "school": "project-canonical-jaimini-v1", "fragment_id": "sf_sr2009_regular_savayava_split", "fragment_sha256": "bee77c4a32874b81052fad8067e723c9828861ad4107424fe79a740f8da29158", "source_status": "approved"},
+    {"rule_id": "special_lagnas.sun_epoch", "school": "project-canonical-jaimini-v1", "fragment_id": "sf_pvr2010_special_lagna_anchor", "fragment_sha256": "fc5edbf017a9a03d16d228af07afa2746e60449fda6177a45de7045519b240ad", "source_status": "approved"},
+    {"rule_id": "special_lagnas.sunrise_definition", "school": "project-canonical-jaimini-v1", "fragment_id": "sf_pvr2010_upper_limb", "fragment_sha256": "db737dbf6372ead9bfb55095b477a08f75746d0a4b60b00f4e4af8b32df3f46d", "source_status": "approved"},
     {"rule_id": "co_lords.resolution", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
     {"rule_id": "chara_dasha.progression", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},
     {"rule_id": "chara_dasha.duration", "school": "project-canonical-jaimini-v1", "fragment_id": null, "fragment_sha256": null, "source_status": "pending"},

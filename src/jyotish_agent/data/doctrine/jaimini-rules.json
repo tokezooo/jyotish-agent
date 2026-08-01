@@ -138,10 +138,10 @@
       "discrepancy": null
     },
     {
-      "rule_id": "special_lagnas.selected_rates",
+      "rule_id": "special_lagnas.regular_anchor_policy",
       "school": "nilakantha_baseline",
       "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
-      "fact_families": ["jaimini.special_lagnas.*", "jaimini.trace.special_lagnas.*"],
+      "fact_families": ["jaimini.trace.special_lagnas.anchor_policy", "jaimini.trace.special_lagnas.minutes_since_sunrise"],
       "anchor": {
         "pdf_page": 52,
         "printed_page": 35,
@@ -149,8 +149,68 @@
         "fragment_sha256": "aaa44d94b73d433915ebd4dfb05d134ed6a331600a7c313f55231a4cd60408ea"
       },
       "status": "quarantined_conflict",
-      "ambiguity": "The selected bhava, hora, and ghati rates need separate source confirmation.",
-      "discrepancy": "The bounded commentary fragment defines selected special lagnas but does not establish every rate used by the current engine."
+      "ambiguity": "The bounded baseline describes time after sunrise but does not state a pre-dawn civil-date rule.",
+      "discrepancy": "It does not establish selection of the latest sunrise at or before birth, including use of the preceding civil date before local sunrise."
+    },
+    {
+      "rule_id": "special_lagnas.regular_rates",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.special_lagnas.*"],
+      "anchor": {
+        "pdf_page": 52,
+        "printed_page": 35,
+        "sutra": "1.1.32.notes.special_lagnas",
+        "fragment_sha256": "aaa44d94b73d433915ebd4dfb05d134ed6a331600a7c313f55231a4cd60408ea"
+      },
+      "status": "quarantined_conflict",
+      "ambiguity": "The bounded baseline gives sign-count treatments for Hora and Ghatika but does not establish the selected continuous BL/HL/GL rate set.",
+      "discrepancy": "It does not establish all three project rates of 15, 30, and 75 degrees per hour, especially the Bhava rate."
+    },
+    {
+      "rule_id": "special_lagnas.regular_savayava_separation",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.trace.special_lagnas.variant"],
+      "anchor": {
+        "pdf_page": 52,
+        "printed_page": 35,
+        "sutra": "1.1.32.notes.special_lagnas",
+        "fragment_sha256": "aaa44d94b73d433915ebd4dfb05d134ed6a331600a7c313f55231a4cd60408ea"
+      },
+      "status": "quarantined_conflict",
+      "ambiguity": "The bounded baseline does not identify a Savayava variant boundary.",
+      "discrepancy": "It cannot establish that regular sunrise-based HL/GL and sunrise-or-sunset Savayava HL/GL are separate algorithms."
+    },
+    {
+      "rule_id": "special_lagnas.sun_epoch",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.trace.special_lagnas.sun_longitude_at_sunrise"],
+      "anchor": {
+        "pdf_page": 52,
+        "printed_page": 35,
+        "sutra": "1.1.32.notes.special_lagnas",
+        "fragment_sha256": "aaa44d94b73d433915ebd4dfb05d134ed6a331600a7c313f55231a4cd60408ea"
+      },
+      "status": "quarantined_conflict",
+      "ambiguity": "The bounded baseline counts from the solar-month sign rather than specifying an exact solar longitude epoch.",
+      "discrepancy": "It does not establish use of the Sun's exact longitude at the selected sunrise instant."
+    },
+    {
+      "rule_id": "special_lagnas.sunrise_definition",
+      "school": "nilakantha_baseline",
+      "source_id": "jaimini_sutras_b_suryanarain_rao_1949",
+      "fact_families": ["jaimini.trace.special_lagnas.sunrise_definition"],
+      "anchor": {
+        "pdf_page": 52,
+        "printed_page": 35,
+        "sutra": "1.1.32.notes.special_lagnas",
+        "fragment_sha256": "aaa44d94b73d433915ebd4dfb05d134ed6a331600a7c313f55231a4cd60408ea"
+      },
+      "status": "quarantined_conflict",
+      "ambiguity": "The bounded baseline uses sunrise without defining its observable event geometry.",
+      "discrepancy": "It does not choose first visible upper limb with refraction over solar-disc-center sunrise."
     },
     {
       "rule_id": "co_lords.resolution",

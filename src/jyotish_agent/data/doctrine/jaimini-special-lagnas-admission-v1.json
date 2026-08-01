@@ -1,0 +1,123 @@
+{
+  "schema_version": "1.0",
+  "ledger_id": "jaimini_regular_special_lagnas_source_admission_v1",
+  "school": "project-canonical-jaimini-v1",
+  "scope": "calculation_only",
+  "review": {
+    "status": "approved",
+    "reviewer": "Codex evidence review",
+    "reviewer_role": "source_governance_reviewer",
+    "reviewed_at": "2026-08-02",
+    "note": "Approval is limited to five regular BL/HL/GL calculation rules. It does not approve interpretation, other Jaimini rules, or a full renderer."
+  },
+  "approved_rule_ids": [
+    "special_lagnas.regular_anchor_policy",
+    "special_lagnas.regular_rates",
+    "special_lagnas.regular_savayava_separation",
+    "special_lagnas.sun_epoch",
+    "special_lagnas.sunrise_definition"
+  ],
+  "interpretation_admitted": false,
+  "renderer_admitted": false,
+  "sources": [
+    {
+      "source_version_id": "sv_pvr_vedic_astrology_integrated_2010",
+      "source_file_sha256": "1cafa828f34764ed5e85816882df2e8f0bc014c5c57ccdb27169416e117fd4db",
+      "provenance_url": "https://vedicastrologer.org/articles/vedic_astro_textbook.pdf",
+      "rights_boundary": "Copyright retained by the author; author-hosted availability does not imply redistribution rights. Only non-verbatim governed abstracts and text-free page commitments are tracked."
+    },
+    {
+      "source_version_id": "sv_sanjay_rath_course_jaimini_2009",
+      "source_file_sha256": "f05759d39fa8b19200a51544130fcc1a1f51ffee321e7c8b255fb97b14f4487d",
+      "provenance_url": "https://archive.org/details/courseonjaiminim0001rath",
+      "rights_boundary": "Copyrighted local research copy; no source prose or page image is tracked. Approval covers only bounded calculation claims and locators."
+    }
+  ],
+  "fragments": [
+    {
+      "fragment_id": "sf_pvr2010_special_lagna_anchor",
+      "source_version_id": "sv_pvr_vedic_astrology_integrated_2010",
+      "pdf_page": 57,
+      "printed_page": 45,
+      "locator": "section 5.2 Bhaava Lagna; corroborated by sections 5.3-5.4",
+      "page_text_sha256": "46e0ca586c0c8f4974137c01d57ebc12b791b63b839bc806754cf09357156911",
+      "claim_scope": ["special_lagnas.sun_epoch"],
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "admitted"
+    },
+    {
+      "fragment_id": "sf_pvr2010_pre_sunrise_case",
+      "source_version_id": "sv_pvr_vedic_astrology_integrated_2010",
+      "pdf_page": 59,
+      "printed_page": 47,
+      "locator": "Exercise 8; expected outputs at PDF p.62, printed p.50",
+      "page_text_sha256": "5daaf95836c983cafc7dd0d0eb1c3186c6bc529c1ed439094a1cf977056ee21c",
+      "claim_scope": ["special_lagnas.regular_anchor_policy"],
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "admitted"
+    },
+    {
+      "fragment_id": "sf_pvr2010_upper_limb",
+      "source_version_id": "sv_pvr_vedic_astrology_integrated_2010",
+      "pdf_page": 60,
+      "printed_page": 48,
+      "locator": "section 5.5, comment 3",
+      "page_text_sha256": "4050c636e04d7fd849e930293cf9a1022c52c75f4afd651a0760e7744081f762",
+      "claim_scope": ["special_lagnas.sunrise_definition"],
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "admitted"
+    },
+    {
+      "fragment_id": "sf_sr2009_regular_rates",
+      "source_version_id": "sv_sanjay_rath_course_jaimini_2009",
+      "pdf_page": 452,
+      "printed_page": 452,
+      "locator": "Calculation of Pranapada, Various formulae; detailed derivations at pp.416-417",
+      "page_text_sha256": "3254523748b57687e7a383cb0e31dcfaaec2e12246280e86dbbe10cc2fa6dc27",
+      "claim_scope": ["special_lagnas.regular_rates"],
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "admitted"
+    },
+    {
+      "fragment_id": "sf_sr2009_regular_savayava_split",
+      "source_version_id": "sv_sanjay_rath_course_jaimini_2009",
+      "pdf_page": 422,
+      "printed_page": 422,
+      "locator": "Use of Savayava Hora and Ghatika Lagna",
+      "page_text_sha256": "05a6f2c747a2027e7ccbd056651fdbf3c9db319c74e532e60d93c7c6e4879e17",
+      "claim_scope": ["special_lagnas.regular_savayava_separation"],
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "admitted"
+    }
+  ],
+  "calculation_policies": [
+    {
+      "policy_id": "special_lagnas.elapsed_utc_instants",
+      "classification": "engineering_inference",
+      "status": "documented_not_doctrine",
+      "note": "Elapsed duration is measured between aware UTC instants to avoid civil-clock and DST ambiguity."
+    },
+    {
+      "policy_id": "special_lagnas.exact_sunrise_boundary",
+      "classification": "engineering_inference",
+      "status": "documented_not_doctrine",
+      "note": "A birth exactly at the selected sunrise uses that event with zero elapsed duration."
+    },
+    {
+      "policy_id": "special_lagnas.polar_no_adjacent_sunrise",
+      "classification": "engineering_inference",
+      "status": "documented_not_doctrine",
+      "note": "If neither current nor previous civil date yields a qualifying sunrise, only special-lagna facts fail closed."
+    }
+  ],
+  "limitations": [
+    "The sources are modern calculation commentaries and do not establish a universal cross-school canon.",
+    "Mapping first visible upper limb to a specific Swiss Ephemeris flag set is an engineering implementation decision, not admitted doctrine.",
+    "Other Jaimini source mappings, adjudication fixtures, interpretation, and release gates remain pending."
+  ]
+}

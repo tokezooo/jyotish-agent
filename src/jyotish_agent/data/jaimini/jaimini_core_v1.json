@@ -37,9 +37,13 @@
     "karakamsa": "d9_atmakaraka_sign"
   },
   "special_lagnas": {
+    "variant": "regular_non_savayava",
     "included": ["bhava_lagna", "hora_lagna", "ghati_lagna"],
-    "anchor": "sun_longitude_at_sunrise",
-    "elapsed": "minutes_since_sunrise",
+    "anchor": "latest_sunrise_at_or_before_birth",
+    "adjacent_civil_dates": "birth_date_then_previous_date",
+    "sun_epoch": "sun_longitude_at_anchor_instant",
+    "sunrise_definition": "swiss_apparent_upper_limb_with_refraction",
+    "elapsed": "aware_utc_minutes_between_anchor_and_birth",
     "rates_minutes_per_sign": {
       "bhava_lagna": 120,
       "hora_lagna": 60,

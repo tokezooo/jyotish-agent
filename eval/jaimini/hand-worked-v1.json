@@ -6,8 +6,8 @@
   "public_safe": true,
   "school": "project-canonical-jaimini-v1",
   "rule_profile_id": "jaimini_core_v1",
-  "rule_profile_sha256": "8a97c43e8438351ae73a59fed731cf5e48ef3c25c347ddf3570dea5818696b58",
-  "source_map_sha256": "5e494796568722aff34fdc6a9fc43634809928d5afb6c1771574119c04ea3095",
+  "rule_profile_sha256": "ea5aea06b15b98df63ca32c290f4ebc7ae1d2d494171aa4730bb25c467dda5bb",
+  "source_map_sha256": "8186c2c05ec3671420ed9393073f15a06eb915ab2dfd8cc398b2b576f1bf02b1",
   "cases": [
     {
       "id": "hw_aries_geometry",

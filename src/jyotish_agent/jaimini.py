@@ -12,7 +12,7 @@ import datetime as dt
 import hashlib
 import json
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_HALF_EVEN
+from decimal import ROUND_HALF_EVEN, Decimal
 from itertools import combinations
 from typing import Callable, Literal, Mapping, Sequence
 from zoneinfo import ZoneInfo
@@ -436,6 +436,8 @@ def capture_birth_snapshots(
             latitude=birth.place.latitude,
             longitude=birth.place.longitude,
             timezone=offset.total_seconds() / 3600,
+            timezone_name=birth.place.timezone,
+            utc_instant=local.astimezone(dt.UTC),
         )
         result = _run_engine_session(
             profile,
@@ -475,6 +477,7 @@ def _facts_for_snapshot(
     request: JaiminiInput,
     *,
     birth_start: dt.datetime,
+    include_special_lagnas: bool,
 ) -> tuple[
     tuple[tuple[str, tuple[JaiminiFact, ...]], ...],
     tuple[JaiminiFact, ...],
@@ -581,36 +584,54 @@ def _facts_for_snapshot(
             ],
         ),
     ]
-    special = special_lagnas(
-        sun_longitude=snapshot.sun_longitude_at_sunrise,  # type: ignore[union-attr]
-        minutes_since_sunrise=snapshot.minutes_since_sunrise,  # type: ignore[union-attr]
-        profile=profile,
-    )
-    for key, longitude in special.items():
-        geometry.extend(
+    if include_special_lagnas:
+        special = special_lagnas(
+            sun_longitude=snapshot.sun_longitude_at_sunrise,  # type: ignore[union-attr]
+            minutes_since_sunrise=snapshot.minutes_since_sunrise,  # type: ignore[union-attr]
+            profile=profile,
+        )
+        for key, longitude in special.items():
+            geometry.extend(
+                (
+                    JaiminiFact(
+                        fact_id=f"jaimini.special_lagnas.{key}.degrees",
+                        value=round(longitude, 6),
+                    ),
+                    JaiminiFact(
+                        fact_id=f"jaimini.special_lagnas.{key}.sign",
+                        value=names.SIGNS[int(longitude // 30)],
+                    ),
+                )
+            )
+        rules = profile.special_lagnas
+        trace.extend(
             (
                 JaiminiFact(
-                    fact_id=f"jaimini.special_lagnas.{key}.degrees",
-                    value=round(longitude, 6),
+                    fact_id="jaimini.trace.special_lagnas.variant",
+                    value=rules.variant,
                 ),
                 JaiminiFact(
-                    fact_id=f"jaimini.special_lagnas.{key}.sign",
-                    value=names.SIGNS[int(longitude // 30)],
+                    fact_id="jaimini.trace.special_lagnas.anchor_policy",
+                    value=rules.anchor,
+                ),
+                JaiminiFact(
+                    fact_id="jaimini.trace.special_lagnas.sunrise_definition",
+                    value=rules.sunrise_definition,
+                ),
+                JaiminiFact(
+                    fact_id="jaimini.trace.special_lagnas.elapsed_basis",
+                    value=rules.elapsed,
+                ),
+                JaiminiFact(
+                    fact_id="jaimini.trace.special_lagnas.sun_longitude_at_sunrise",
+                    value=snapshot.sun_longitude_at_sunrise,  # type: ignore[union-attr]
+                ),
+                JaiminiFact(
+                    fact_id="jaimini.trace.special_lagnas.minutes_since_sunrise",
+                    value=snapshot.minutes_since_sunrise,  # type: ignore[union-attr]
                 ),
             )
         )
-    trace.extend(
-        (
-            JaiminiFact(
-                fact_id="jaimini.trace.special_lagnas.sun_longitude_at_sunrise",
-                value=snapshot.sun_longitude_at_sunrise,  # type: ignore[union-attr]
-            ),
-            JaiminiFact(
-                fact_id="jaimini.trace.special_lagnas.minutes_since_sunrise",
-                value=snapshot.minutes_since_sunrise,  # type: ignore[union-attr]
-            ),
-        )
-    )
     geometry.extend(
         JaiminiFact(fact_id=f"jaimini.arudha.{key}", value=names.SIGNS[value])
         for key, value in sorted(padas.items())
@@ -869,20 +890,18 @@ class JaiminiFacade:
                 next_action=next_action,
             )
 
-        if any(
+        special_lagnas_available = not any(
             snapshot.sun_longitude_at_sunrise is None
             or snapshot.minutes_since_sunrise is None
             for snapshot in snapshots
-        ):
-            return incomplete(
-                "SPECIAL_LAGNA_PRIMITIVE_UNAVAILABLE",
-                "The same-session sunrise primitive is unavailable for this anchor.",
-                "retry_calculation",
-            )
+        )
         try:
             samples = tuple(
                 _facts_for_snapshot(
-                    snapshot, request, birth_start=instant.astimezone(dt.UTC)
+                    snapshot,
+                    request,
+                    birth_start=instant.astimezone(dt.UTC),
+                    include_special_lagnas=special_lagnas_available,
                 )
                 for snapshot, instant in zip(snapshots, local_instants, strict=True)
             )
@@ -946,6 +965,18 @@ class JaiminiFacade:
         )
         unstable_count = sum(value == "unstable" for value in stability.values())
         limitations: list[JaiminiLimitation] = []
+        if not special_lagnas_available:
+            limitations.append(
+                JaiminiLimitation(
+                    code="SPECIAL_LAGNA_PRIMITIVE_UNAVAILABLE",
+                    message=(
+                        "Regular Bhava, Hora, and Ghati Lagna facts were omitted because "
+                        "an adjacent apparent upper-limb sunrise anchor was unavailable "
+                        "for at least one birth-time sample; independent Jaimini facts "
+                        "remain available."
+                    ),
+                )
+            )
         if not admission["verified"]:
             limitations.append(
                 JaiminiLimitation(

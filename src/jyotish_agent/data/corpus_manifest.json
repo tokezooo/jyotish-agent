@@ -71,6 +71,37 @@
       ]
     },
     {
+      "source_version_id": "sv_pvr_vedic_astrology_integrated_2010",
+      "work_id": "vedic-astrology-integrated-approach",
+      "title": "Vedic Astrology: An Integrated Approach",
+      "source_class": "modern_commentary",
+      "language": "en",
+      "edition": "P.V.R. Narasimha Rao; first published 2000; author-hosted PDF with March 18, 2010 update",
+      "provenance_url": "https://vedicastrologer.org/articles/vedic_astro_textbook.pdf",
+      "rights_note": "Copyright remains with P.V.R. Narasimha Rao. The author makes this PDF freely available, but redistribution rights are not inferred. Tracked fragment text is a non-verbatim governed abstract only; no copyrighted page text is reproduced. Approval is limited to the cited calculation claims and locators.",
+      "review": {"status": "approved", "reviewer": "Codex evidence review", "note": "Source identity, author-hosted provenance, PDF and printed page locators, calculation scope, and text-free page commitments were reviewed on 2026-08-02."},
+      "fragments": [
+        {"fragment_id": "sf_pvr2010_special_lagna_anchor", "ordinal": 1, "locator": "PDF p.57, printed p.45, section 5.2 Bhaava Lagna; corroborated by PDF pp.58-59, printed pp.46-47", "text": "Governed abstract: regular special lagnas use the Sun at sunrise and elapsed time from that sunrise.", "transliteration_aliases": ["bhava hora ghati lagna sun longitude sunrise elapsed regular"]},
+        {"fragment_id": "sf_pvr2010_pre_sunrise_case", "ordinal": 2, "locator": "PDF p.59, printed p.47, Exercise 8; expected results at PDF p.62, printed p.50", "text": "Governed abstract: the pre-dawn worked exercise uses the preceding civil date sunrise as its calculation anchor.", "transliteration_aliases": ["pre dawn before sunrise previous civil date last sunrise anchor exercise 8"]},
+        {"fragment_id": "sf_pvr2010_upper_limb", "ordinal": 3, "locator": "PDF p.60, printed p.48, section 5.5 comment 3", "text": "Governed abstract: the recommended sunrise is first visible upper limb rather than the solar-disc center.", "transliteration_aliases": ["sunrise first visibility upper limb first ray disc center"]}
+      ]
+    },
+    {
+      "source_version_id": "sv_sanjay_rath_course_jaimini_2009",
+      "work_id": "course-jaimini-upadesa-sutra-volume-1",
+      "title": "A Course on Jaimini Maharshi's Upadesa Sutra, Volume 1",
+      "source_class": "modern_commentary",
+      "language": "en",
+      "edition": "Sanjay Rath; Sagittarius Publications, 2009; ISBN 9780976517726",
+      "provenance_url": "https://archive.org/details/courseonjaiminim0001rath",
+      "rights_note": "Copyrighted modern commentary. Local research access does not grant redistribution rights. Tracked fragment text is a non-verbatim governed abstract only; no copyrighted page text is reproduced. Approval is limited to the cited regular-special-lagna calculation claims and variant distinction.",
+      "review": {"status": "approved", "reviewer": "Codex evidence review", "note": "Edition identity, PDF and printed page locators, local file checksum, calculation scope, and text-free page commitments were reviewed on 2026-08-02."},
+      "fragments": [
+        {"fragment_id": "sf_sr2009_regular_rates", "ordinal": 1, "locator": "PDF/printed p.452, calculation of Pranapada, Various formulae; detailed derivations at PDF/printed pp.416-417", "text": "Governed abstract: regular Bhava, Hora, and Ghatika lagnas advance at 15, 30, and 75 degrees per hour.", "transliteration_aliases": ["bhava hora ghatika lagna regular rates 15 30 75"]},
+        {"fragment_id": "sf_sr2009_regular_savayava_split", "ordinal": 2, "locator": "PDF/printed p.422, Use of Savayava Hora and Ghatika Lagna", "text": "Governed abstract: regular sunrise-based HL and GL and sunrise-or-sunset Savayava HL and GL are distinct variants.", "transliteration_aliases": ["regular hora ghatika savayava sunrise sunset distinct variants"]}
+      ]
+    },
+    {
       "source_version_id": "sv_bphs_quarantine",
       "work_id": "bphs",
       "title": "Brihat Parashara Hora Shastra - no approved edition",
