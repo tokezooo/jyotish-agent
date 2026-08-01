@@ -30,7 +30,7 @@
     {
       "domain": "prashna",
       "release_id": "full_prashna_v1",
-      "evidence_sha256": "b9b9df9e6461a321c262f532c36fb8ca9e0fc9f86e65bd3de80bd18516ec6db0",
+      "evidence_sha256": "09451acf2f5b7d88483c80df6c96c1b67d195f541cb0e64f9a8efee193385317",
       "admission_state": "blocked_sources",
       "available": false,
       "gate_statuses": {
@@ -46,7 +46,7 @@
         "specialist_review": "missing"
       },
       "blockers": [
-        "tajika_source_admission: OCR, translation, and specialist review are incomplete",
+        "tajika_source_admission: bounded OCR candidates on PDF pages 45-47 remain quarantined; translation and specialist review are incomplete",
         "compiled_profile: no production source-admitted Prashna profile exists"
       ]
     },
@@ -82,10 +82,16 @@
       "passed": 42,
       "failed": 0
     },
+    "tajika_ocr_review_suite": {
+      "command": ".venv/bin/pytest -q tests/doctrine/test_tajika_ocr_review_20260801.py tests/doctrine/test_lea_531_prashna_sources.py tests/doctrine/test_lea_537_prashna_release.py tests/doctrine/test_project_release_audit.py",
+      "status": "passed",
+      "passed": 16,
+      "failed": 0
+    },
     "full_python_suite": {
       "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine $CODEX_PYTHON -m pytest -q",
       "status": "passed",
-      "passed": 905,
+      "passed": 908,
       "failed": 0,
       "skipped": 2
     },
@@ -115,11 +121,11 @@
     "jaimini: nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
     "jaimini: source_review: bounded Sanjay Rath Upadesa, crop-aware Narayana pages 46-48, and K. N. Rao OCR fragments are hash-bound but quarantined and uncompiled; specialist review and overlay rule compilation remain missing",
     "jaimini: specialist_review: no production rule/profile review",
-    "prashna: tajika_source_admission: OCR, translation, and specialist review are incomplete",
+    "prashna: tajika_source_admission: bounded OCR candidates on PDF pages 45-47 remain quarantined; translation and specialist review are incomplete",
     "prashna: compiled_profile: no production source-admitted Prashna profile exists",
     "muhurta: specialist_review: external rule-pack review is missing",
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "61b5c4b4658462a15f14c59b8fabac44c9351fdc2b0d6ab218e50eac5e36a010"
+  "audit_sha256": "a358ae8693c7e8699b5693382b9a87bf1c109ffd68d071f2651dbe2d9434bdb3"
 }
