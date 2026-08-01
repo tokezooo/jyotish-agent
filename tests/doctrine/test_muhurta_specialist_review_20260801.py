@@ -63,14 +63,18 @@ def test_tracked_handoff_is_exact_complete_and_contains_no_private_material() ->
     assert generated == recorded
     assert generated.ready_for_external_review is True
     assert generated.external_review_status == "missing"
-    assert generated.subject_count == 8
+    assert generated.subject_count == 9
     assert sum(item.subject_type == "rule" for item in generated.subjects) == 2
     assert sum(item.subject_type == "profile" for item in generated.subjects) == 6
+    assert (
+        sum(item.subject_type == "overlay_comparison" for item in generated.subjects)
+        == 1
+    )
     rendered = generated.model_dump_json()
     assert "private_sources/" not in rendered
     assert "local_file" not in rendered
     assert ".pdf" not in rendered
-    assert "B. V. Raman modern overlay" in rendered
+    assert "overlay:bv_raman_modern_overlay_v1:rahu_kala" in rendered
     assert generated.response_schema_ref.endswith("response.schema.json")
     assert json.loads(RESPONSE_SCHEMA.read_text()) == (
         muhurta_specialist_review_response_schema()
@@ -85,7 +89,7 @@ def test_complete_approved_review_passes_without_exporting_reviewer_identity() -
 
     assert report.gate_status == "passed"
     assert report.specialist_review_complete is True
-    assert report.reviewed_count == report.approved_count == 8
+    assert report.reviewed_count == report.approved_count == 9
     assert report.amended_count == report.rejected_count == 0
     assert report.blockers == ()
     rendered = report.model_dump_json()
@@ -110,7 +114,7 @@ def test_partial_amended_and_rejected_reviews_remain_fail_closed() -> None:
     )
     partial_report = evaluate_muhurta_specialist_review(handoff, partial)
     assert partial_report.gate_status == "missing"
-    assert partial_report.blockers == ("missing_subject_decisions:7",)
+    assert partial_report.blockers == ("missing_subject_decisions:8",)
 
     amended = _response(
         handoff,
@@ -148,7 +152,7 @@ def test_partial_amended_and_rejected_reviews_remain_fail_closed() -> None:
     rejected_report = evaluate_muhurta_specialist_review(handoff, rejected)
     assert rejected_report.gate_status == "failed"
     assert rejected_report.blockers == (
-        "missing_subject_decisions:7",
+        "missing_subject_decisions:8",
         "rejected_subjects:1",
     )
 

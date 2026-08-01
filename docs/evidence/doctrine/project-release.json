@@ -51,7 +51,7 @@
     {
       "domain": "muhurta",
       "release_id": "expanded_muhurta_v1",
-      "evidence_sha256": "3567149524e901a202a28437681385819b7157203a27930ad39b608d87ff4086",
+      "evidence_sha256": "d6b3fb5ede8157edbf083b8138e1eaa35b5c78deefe30830a64a42aaca10ecfa",
       "admission_state": "private_experimental",
       "available": true,
       "gate_statuses": {
@@ -71,7 +71,7 @@
       "blockers": [
         "specialist_review: external rule-pack review is missing",
         "cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
-        "modern_overlay_review: the acquired B. V. Raman 1969 fourth edition is identity-verified but not page-mapped, independently rights-confirmed, or specialist-reviewed; the overlay remains disabled"
+        "modern_overlay_review: the acquired B. V. Raman 1969 fourth edition is identity-verified and page-mapped for Rahukalam, but Yamagandam coverage, independent rights confirmation, and specialist review remain missing; the overlay remains disabled"
       ]
     }
   ],
@@ -97,7 +97,7 @@
     "full_python_suite": {
       "command": "uv run pytest -q",
       "status": "passed",
-      "passed": 945,
+      "passed": 948,
       "failed": 0,
       "skipped": 2
     },
@@ -145,6 +145,12 @@
       "passed": 2,
       "failed": 0
     },
+    "muhurta_overlay_page_mapping_suite": {
+      "command": "uv run pytest -q tests/doctrine/test_muhurta_modern_overlay_fragments_20260801.py tests/doctrine/test_muhurta_modern_overlay_acquisition_20260801.py tests/doctrine/test_muhurta_specialist_review_20260801.py tests/doctrine/test_muhurta_held_out_20260801.py tests/doctrine/test_lea_543_muhurta_reports.py tests/doctrine/test_lea_544_muhurta_release.py",
+      "status": "passed",
+      "passed": 38,
+      "failed": 0
+    },
     "concierge_collection_contract_suite": {
       "command": "uv run pytest -q tests/doctrine/test_concierge_evaluation_20260801.py tests/doctrine/test_lea_544_muhurta_release.py",
       "status": "passed",
@@ -169,7 +175,7 @@
     "jaimini: timing: Chara Dasha progression, co-lords, gender branching, and period boundaries remain school-conflicted and unavailable",
     "muhurta: specialist_review: external rule-pack review is missing",
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
-    "muhurta: modern_overlay_review: the acquired B. V. Raman 1969 fourth edition is identity-verified but not page-mapped, independently rights-confirmed, or specialist-reviewed; the overlay remains disabled"
+    "muhurta: modern_overlay_review: the acquired B. V. Raman 1969 fourth edition is identity-verified and page-mapped for Rahukalam, but Yamagandam coverage, independent rights confirmation, and specialist review remain missing; the overlay remains disabled"
   ],
-  "audit_sha256": "a963176d2c1b318ad6635c15e5a2019f279ec2eea509c5feafea9a6ab6c1c5ed"
+  "audit_sha256": "8d0b220e835d6b7a907a515b9ba4cff4daccacec3ce8865baeb89df584f62a92"
 }

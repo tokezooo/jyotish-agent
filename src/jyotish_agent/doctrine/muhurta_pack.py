@@ -18,6 +18,7 @@ from typing import Literal
 
 from pydantic import Field, model_validator
 
+from .evidence import EvidenceStore, FragmentDraft, FragmentRef, SourceFragment
 from .evaluation import AdmissionEvaluator
 from .models import FrozenModel
 from .sources import (
@@ -840,7 +841,11 @@ _REPORT_COPY = {
         "tradeoff": "Review components and confidence before choosing.",
         "near_dosa": "A hard doṣa interval excludes this candidate.",
         "near_generic": "A hard eligibility rule excludes this candidate.",
-        "overlay": "The named modern overlay is unavailable pending lawful acquisition and review.",
+        "overlay": (
+            "The acquired named modern overlay has one page-mapped Rahukalam "
+            "agreement; it remains unavailable pending specialist review and "
+            "complete rule coverage."
+        ),
         "limitations": (
             "Astrological ranking is a bounded comparison, not a guarantee.",
             "No calendar event, booking, or external side effect is created.",
@@ -854,7 +859,11 @@ _REPORT_COPY = {
         "tradeoff": "Перед выбором сопоставьте компоненты и уверенность.",
         "near_dosa": "Кандидат исключён жёстким интервалом доши.",
         "near_generic": "Кандидат исключён жёстким правилом допустимости.",
-        "overlay": "Именованный современный overlay недоступен до легального получения и ревью.",
+        "overlay": (
+            "В полученном именованном современном overlay сопоставлено одно "
+            "совпадение Rahukalam; он остаётся недоступным до проверки "
+            "специалистом и полного покрытия правил."
+        ),
         "limitations": (
             "Астрологический рейтинг — ограниченное сравнение, а не гарантия.",
             "Событие в календаре, бронирование и другие внешние действия не создаются.",
@@ -1016,6 +1025,174 @@ def load_muhurta_admitted_rule_pack() -> MuhurtaAdmittedRulePack:
     return MuhurtaAdmittedRulePack.model_validate(json.loads(payload))
 
 
+def _muhurta_hash_payload(payload: object) -> str:
+    canonical = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+    ).encode("utf-8")
+    return hashlib.sha256(canonical).hexdigest()
+
+
+def _reject_private_overlay_text(value: str) -> None:
+    lowered = value.casefold()
+    if any(marker in lowered for marker in ("private_sources", ".pdf", "/users/")):
+        raise ValueError("tracked overlay evidence cannot contain private locators")
+
+
+class MuhurtaOverlayFragmentBinding(FrozenModel):
+    """A text-free overlay comparison that cannot activate a product rule."""
+
+    binding_id: str = Field(pattern=r"^bind_[0-9a-f]{24}$")
+    fragment: FragmentRef
+    baseline_rule_id: str = Field(pattern=r"^muhurta\.[A-Za-z0-9_.-]+$")
+    relation: Literal["agrees_with"]
+    paraphrase: str = Field(min_length=1, max_length=500)
+    review_status: Literal["anchored_unreviewed"]
+
+    @model_validator(mode="after")
+    def _content_addressed_and_quarantined(self) -> "MuhurtaOverlayFragmentBinding":
+        _reject_private_overlay_text(self.paraphrase)
+        payload = self.model_dump(mode="json", exclude={"binding_id"})
+        expected = f"bind_{_muhurta_hash_payload(payload)[:24]}"
+        if self.binding_id != expected:
+            raise ValueError("overlay comparison identity is not content-addressed")
+        return self
+
+
+class MuhurtaOverlayCoverageGap(FrozenModel):
+    baseline_rule_id: str = Field(pattern=r"^muhurta\.[A-Za-z0-9_.-]+$")
+    blocker_code: Literal["overlay_page_not_located"]
+    search_scope: Literal["full_document_ocr_and_index"]
+    blocker: str = Field(min_length=1, max_length=500)
+
+    @model_validator(mode="after")
+    def _privacy_safe(self) -> "MuhurtaOverlayCoverageGap":
+        _reject_private_overlay_text(self.blocker)
+        return self
+
+
+class MuhurtaModernOverlayLedger(FrozenModel):
+    """Hash-bound B. V. Raman evidence kept structurally outside the baseline."""
+
+    schema_version: Literal["1.0"] = "1.0"
+    ledger_id: Literal["muhurta_bv_raman_overlay_fragments_v1"]
+    overlay_profile: Literal["bv_raman_modern_overlay_v1"]
+    source_manifest_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    baseline_rule_pack_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    activation_status: Literal["unavailable"]
+    doctrine_admitted: Literal[False]
+    product_rule_use_allowed: Literal[False]
+    rights_status: Literal["not_independently_verified"]
+    fragments: tuple[SourceFragment, ...] = Field(min_length=1, max_length=1)
+    comparisons: tuple[MuhurtaOverlayFragmentBinding, ...] = Field(
+        min_length=1, max_length=1
+    )
+    coverage_gaps: tuple[MuhurtaOverlayCoverageGap, ...] = Field(
+        min_length=1, max_length=1
+    )
+    specialist_review_status: Literal["missing"]
+
+    @model_validator(mode="after")
+    def _coherent_quarantine(self) -> "MuhurtaModernOverlayLedger":
+        fragment = self.fragments[0]
+        if (
+            fragment.source_id != "bv_raman_muhurtha_1969"
+            or fragment.school != self.overlay_profile
+            or fragment.page_number != 182
+            or fragment.printed_page != 178
+        ):
+            raise ValueError("overlay ledger does not use the reviewed Raman page")
+        if (
+            fragment.admission_status != "quarantined"
+            or fragment.excerpt_permission != "none"
+            or fragment.permitted_excerpt is not None
+        ):
+            raise ValueError("overlay fragments must remain text-free and quarantined")
+        reference = FragmentRef.from_fragment(fragment)
+        comparison = self.comparisons[0]
+        if comparison.fragment != reference:
+            raise ValueError("overlay comparison references a missing fragment")
+        if comparison.baseline_rule_id != "muhurta.interval.rahu_kala":
+            raise ValueError("overlay comparison targets the wrong baseline rule")
+        gap = self.coverage_gaps[0]
+        if gap.baseline_rule_id != "muhurta.interval.yamaganda":
+            raise ValueError("overlay coverage gap targets the wrong baseline rule")
+        return self
+
+    @property
+    def ledger_sha256(self) -> str:
+        return _muhurta_hash_payload(self.model_dump(mode="json"))
+
+    @property
+    def activation_allowed(self) -> bool:
+        return False
+
+    def validate_context(
+        self,
+        *,
+        manifest: SourceManifest,
+        rule_pack: MuhurtaAdmittedRulePack,
+    ) -> None:
+        if manifest.manifest_sha256 != self.source_manifest_sha256:
+            raise ValueError("overlay source manifest identity drifted")
+        expected_rule_pack_sha256 = _muhurta_hash_payload(
+            rule_pack.model_dump(mode="json")
+        )
+        if expected_rule_pack_sha256 != self.baseline_rule_pack_sha256:
+            raise ValueError("overlay baseline rule-pack identity drifted")
+        sources = {source.source_id: source for source in manifest.sources}
+        source = sources.get("bv_raman_muhurtha_1969")
+        if source is None or source.school_role.value != "overlay":
+            raise ValueError("overlay source is absent or misclassified")
+        fragment = self.fragments[0]
+        if fragment.source_file_sha256 != source.sha256:
+            raise ValueError("overlay fragment source bytes drifted")
+        if fragment.printed_page != fragment.page_number + source.page_offset:
+            raise ValueError("overlay fragment page mapping drifted")
+        expected_fragment = EvidenceStore(manifest).append(
+            FragmentDraft(
+                source_id=fragment.source_id,
+                source_manifest_sha256=fragment.source_manifest_sha256,
+                page_number=fragment.page_number,
+                printed_page=fragment.printed_page,
+                anchor_kind=fragment.anchor_kind,
+                anchor_label=fragment.anchor_label,
+                language=fragment.language,
+                content_role=fragment.content_role,
+                school=fragment.school,
+                scope=fragment.scope,
+                full_text_sha256=fragment.full_text_sha256,
+                normalized_content_sha256=fragment.normalized_content_sha256,
+                excerpt_permission=fragment.excerpt_permission,
+                permitted_excerpt=fragment.permitted_excerpt,
+                admission_status=fragment.admission_status,
+            )
+        )
+        if expected_fragment != fragment:
+            raise ValueError("overlay fragment identity drifted")
+        rule_ids = {rule.rule_id for rule in rule_pack.rules}
+        if self.comparisons[0].baseline_rule_id not in rule_ids:
+            raise ValueError("overlay comparison references an unknown baseline rule")
+        if self.coverage_gaps[0].baseline_rule_id not in rule_ids:
+            raise ValueError("overlay coverage gap references an unknown baseline rule")
+
+
+def load_muhurta_modern_overlay_ledger() -> MuhurtaModernOverlayLedger:
+    ledger = MuhurtaModernOverlayLedger.model_validate(
+        _muhurta_resource_json("muhurta-modern-overlay-fragments.json")
+    )
+    manifest = SourceManifest.model_validate(
+        _muhurta_resource_json("muhurta-sources.json")
+    )
+    ledger.validate_context(
+        manifest=manifest,
+        rule_pack=load_muhurta_admitted_rule_pack(),
+    )
+    return ledger
+
+
 def _muhurta_resource_json(name: str) -> object:
     payload = resources.files("jyotish_agent").joinpath(
         f"data/doctrine/{name}"
@@ -1035,6 +1212,7 @@ def muhurta_compiled_profile_sha256() -> str:
             "muhurta-profiles.json",
             "muhurta-admitted-rules-v1.json",
             "muhurta-ranking-v1.json",
+            "muhurta-modern-overlay-fragments.json",
         )
     }
     canonical = json.dumps(
@@ -1133,6 +1311,7 @@ def load_muhurta_release_audit(*, verify_source_bytes: bool = True) -> MuhurtaRe
     audit = MuhurtaReleaseAudit.model_validate(
         _muhurta_resource_json("muhurta-release.json")
     )
+    load_muhurta_modern_overlay_ledger()
     manifest = SourceManifest.model_validate(
         _muhurta_resource_json("muhurta-sources.json")
     )

@@ -124,7 +124,10 @@ def test_audit_promotes_private_release_after_real_held_out_evaluation() -> None
     )
     assert review_handoff.status == "passed"
     assert review_handoff.evidence is not None
-    assert "two admitted rules and six safe activity profiles" in review_handoff.evidence
+    assert (
+        "two admitted rules, six safe activity profiles, and one quarantined"
+        in review_handoff.evidence
+    )
     assert "strict response schema" in review_handoff.evidence
     concierge_gate = next(
         gate for gate in audit.gates if gate.gate_id == "cross_domain_concierge_sessions"

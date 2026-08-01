@@ -2,21 +2,21 @@
   "schema_version": "1.0",
   "release_id": "expanded_muhurta_v1",
   "corpus_manifest_sha256": "991dc4050a79aa7691d9f356e60e87cdcbe1ac3f66029af4b0babdb2fec89116",
-  "compiled_profile_sha256": "d15fe736bb32c5da1cfbcc0adfec24b8d0405c5b4fc78cd19916c1495cc5438e",
+  "compiled_profile_sha256": "9b38b79c47f61cb627fc5269af726701ad050c1ba1a390d009231ada2e83f1e4",
   "admission_state": "private_experimental",
   "available": true,
   "public_release_ready": false,
   "external_review_missing": true,
   "gates": [
     {"gate_id": "source_manifest", "status": "passed", "evidence": "Three public-domain classical files and one private copyrighted modern overlay verify by SHA-256 with explicit PDF-to-print offsets."},
-    {"gate_id": "profile_identity", "status": "passed", "evidence": "The release identity binds the source manifest, corpus, examples, profiles, admitted rules, and ranking catalog."},
+    {"gate_id": "profile_identity", "status": "passed", "evidence": "The release identity binds the source manifest, corpus, examples, profiles, admitted rules, ranking catalog, and quarantined modern-overlay ledger."},
     {"gate_id": "private_baseline_profile", "status": "passed", "evidence": "The immutable private baseline admits only Yamaganda and Rahu-kala intervals anchored to Kalaprakasika PDF page 208 / printed page 176."},
     {"gate_id": "profile_rule_fixture_suite", "status": "passed", "evidence": "RU/EN routing, hard/soft eligibility, DST, personalization, ranking, privacy, and report fixtures pass."},
     {"gate_id": "private_runtime_e2e", "status": "passed", "evidence": "The internal read-only engine returns ranked calendar-ready windows in direct E2E tests; MCP and HTTP remain fail-closed while required release gates are missing."},
-    {"gate_id": "independent_held_out_evaluation", "status": "passed", "evidence": "LEA-544: eval/muhurta/independent-held-out-v1.json (SHA-256 17b9f8c573c360024eb7d616664addadfae23de03e4dcc570dbc2428cb37b151) executed by evaluate_muhurta_held_out_cases(allow_held_out=True): 19/19 passed; material-error rate 0.0; synthetic inputs against the resealed admitted private baseline."},
+    {"gate_id": "independent_held_out_evaluation", "status": "passed", "evidence": "LEA-544: eval/muhurta/independent-held-out-v1.json (SHA-256 e852afe0ac536e66ee45d4ef7c769fb77852ea28c16a82d9d792127178e4b076) executed by evaluate_muhurta_held_out_cases(allow_held_out=True): 19/19 passed; material-error rate 0.0; synthetic inputs against the resealed admitted private baseline."},
     {"gate_id": "concierge_collection_contract", "status": "passed", "evidence": "The privacy-safe concierge evaluator and docs/evidence/doctrine/concierge-readiness.json are content-addressed; the real session count remains zero and the cross-domain evidence gate remains missing."},
-    {"gate_id": "specialist_review_handoff", "status": "passed", "evidence": "The content-addressed Muhurta handoff (SHA-256 9055a034166424e15bdb4f4564708c29826143e80b26519541097c125f2dbfda) and its bound strict response schema identify exactly two admitted rules and six safe activity profiles without source text; the external specialist decision remains missing."},
-    {"gate_id": "modern_overlay", "status": "passed", "evidence": "B. V. Raman's 1969 fourth-edition private PDF verifies as a separately named copyrighted-local overlay; it remains disabled and contributes no product rules pending page comparison and specialist review."},
+    {"gate_id": "specialist_review_handoff", "status": "passed", "evidence": "The content-addressed Muhurta handoff (SHA-256 dd92ae6315c7fdd8a09fc9ffde5d7bc0ba5a79f69177ba38658a2d7cf009498e) and its bound strict response schema identify exactly two admitted rules, six safe activity profiles, and one quarantined Raman-to-Kalaprakasika comparison without source text; the external specialist decision remains missing."},
+    {"gate_id": "modern_overlay", "status": "passed", "evidence": "B. V. Raman's 1969 fourth-edition private PDF verifies as a separately named copyrighted-local overlay. PDF page 182 / printed page 178 independently agrees with the baseline Rahu-kala schedule at Kalaprakasika PDF page 208 / printed page 176; the text-free comparison remains quarantined and the overlay remains disabled pending specialist review."},
     {"gate_id": "specialist_review", "status": "missing", "evidence": null},
     {"gate_id": "cross_domain_concierge_sessions", "status": "missing", "evidence": null},
     {"gate_id": "whole_project_independent_review", "status": "passed", "evidence": "Independent read-only review of origin/main..a07c068 reported zero Critical and zero Important findings and a Ready to merge verdict."}
@@ -32,17 +32,17 @@
     "Independent whole-project code review completed with no Critical or Important findings.",
     "Nineteen independently hand-authored held-out cases cover RU/EN routing, all six safe profiles, DST and skipped-date behavior, constraints, ranking, and natal uncertainty with zero material errors.",
     "A strict opt-in concierge collection and evaluation contract now records privacy-safe cross-domain metrics without exporting session-level content; current real session evidence remains zero.",
-    "A deterministic specialist-review handoff now binds the complete private Muhurta baseline to exact source locators and fail-closed decision semantics without exporting source text or reviewer identity.",
-    "B. V. Raman's 1969 fourth edition is hash-verified as a private named overlay without admitting overlay rules, tracking source text, or changing the classical baseline."
+    "A deterministic specialist-review handoff now binds the complete private Muhurta baseline and one quarantined modern-overlay comparison to exact source locators and fail-closed decision semantics without exporting source text or reviewer identity.",
+    "B. V. Raman's 1969 fourth edition is hash-verified and page-mapped as a private named overlay: Rahukalam agrees with the immutable classical baseline, Yamagandam coverage remains unresolved, and no overlay rule is admitted."
   ],
   "future_follow_up": [
     "Run 10-20 opt-in concierge sessions across Jaimini, Prashna, and Muhurta and record domain value scores.",
-    "Send the prepared eight-subject handoff to a qualified specialist and import an exact complete set of approved decisions.",
-    "Page-map and review the acquired B. V. Raman 1969 fourth edition against the immutable classical baseline before enabling overlay comparison results."
+    "Send the prepared nine-subject handoff to a qualified specialist and import an exact complete set of approved decisions.",
+    "Have a qualified specialist review the page-mapped Raman Rahukalam agreement and unresolved Yamagandam coverage before enabling overlay comparison results."
   ],
   "public_release_blockers": [
     "specialist_review: external rule-pack review is missing",
     "cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
-    "modern_overlay_review: the acquired B. V. Raman 1969 fourth edition is identity-verified but not page-mapped, independently rights-confirmed, or specialist-reviewed; the overlay remains disabled"
+    "modern_overlay_review: the acquired B. V. Raman 1969 fourth edition is identity-verified and page-mapped for Rahukalam, but Yamagandam coverage, independent rights confirmation, and specialist review remain missing; the overlay remains disabled"
   ]
 }

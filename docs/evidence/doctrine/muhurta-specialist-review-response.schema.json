@@ -15,13 +15,14 @@
         "subject_type": {
           "enum": [
             "rule",
-            "profile"
+            "profile",
+            "overlay_comparison"
           ],
           "title": "Subject Type",
           "type": "string"
         },
         "subject_id": {
-          "pattern": "^(?:muhurta\\.[A-Za-z0-9_.-]+|profile:[a-z][a-z0-9_]+)$",
+          "pattern": "^(?:muhurta\\.[A-Za-z0-9_.-]+|profile:[a-z][a-z0-9_]+|overlay:[a-z][a-z0-9_]+:[a-z][a-z0-9_]+)$",
           "title": "Subject Id",
           "type": "string"
         },
@@ -130,7 +131,7 @@
       "items": {
         "$ref": "#/$defs/MuhurtaSpecialistDecision"
       },
-      "maxItems": 8,
+      "maxItems": 9,
       "minItems": 1,
       "title": "Decisions",
       "type": "array"

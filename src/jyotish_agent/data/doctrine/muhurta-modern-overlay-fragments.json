@@ -1,0 +1,58 @@
+{
+  "schema_version": "1.0",
+  "ledger_id": "muhurta_bv_raman_overlay_fragments_v1",
+  "overlay_profile": "bv_raman_modern_overlay_v1",
+  "source_manifest_sha256": "991dc4050a79aa7691d9f356e60e87cdcbe1ac3f66029af4b0babdb2fec89116",
+  "baseline_rule_pack_sha256": "0bce81b3d699d0e3151c74c0c513aeb6c2f73bd2a81087ffbd7ca1b73a9484f4",
+  "activation_status": "unavailable",
+  "doctrine_admitted": false,
+  "product_rule_use_allowed": false,
+  "rights_status": "not_independently_verified",
+  "fragments": [
+    {
+      "fragment_id": "frag_a96e0e807947b2c5cf298b2c",
+      "revision": 1,
+      "revision_sha256": "eb62e24c53c2c1c87834c28d976cbf6eee9977249d73dc5f016a2df124d4f611",
+      "draft_sha256": "f474887f3c75b996e939d54e0ba96ec26380b3f6191f052c0ecdd32855e73fca",
+      "source_id": "bv_raman_muhurtha_1969",
+      "source_manifest_sha256": "991dc4050a79aa7691d9f356e60e87cdcbe1ac3f66029af4b0babdb2fec89116",
+      "source_file_sha256": "dc8eeb02038a89d3b1b6167aed2640ccb0e535b7374892cce51988b192a3e5c4",
+      "page_number": 182,
+      "printed_page": 178,
+      "anchor_kind": "heading",
+      "anchor_label": "Rahukalam",
+      "language": "en",
+      "content_role": "school_interpretation",
+      "school": "bv_raman_modern_overlay_v1",
+      "scope": "weekday_rahu_kala",
+      "full_text_sha256": "2012b2fcd5632317bf27c356607f524e5c85b6cde22d73b2726233a32428a669",
+      "normalized_content_sha256": "89e9faf9153345e771e764dcdabf89d0ad0893892895bf6cf64591c94994ae7f",
+      "excerpt_permission": "none",
+      "permitted_excerpt": null,
+      "admission_status": "quarantined"
+    }
+  ],
+  "comparisons": [
+    {
+      "binding_id": "bind_0e5dd5f97e172e688f526f8f",
+      "fragment": {
+        "fragment_id": "frag_a96e0e807947b2c5cf298b2c",
+        "revision": 1,
+        "revision_sha256": "eb62e24c53c2c1c87834c28d976cbf6eee9977249d73dc5f016a2df124d4f611"
+      },
+      "baseline_rule_id": "muhurta.interval.rahu_kala",
+      "relation": "agrees_with",
+      "paraphrase": "The named overlay independently repeats the seven weekday Rahukalam periods under an explicit 6 a.m. sunrise assumption.",
+      "review_status": "anchored_unreviewed"
+    }
+  ],
+  "coverage_gaps": [
+    {
+      "baseline_rule_id": "muhurta.interval.yamaganda",
+      "blocker_code": "overlay_page_not_located",
+      "search_scope": "full_document_ocr_and_index",
+      "blocker": "No exact Yamagandam weekday-period page was located in the full-document OCR and index review; absence is not treated as a doctrinal disagreement."
+    }
+  ],
+  "specialist_review_status": "missing"
+}
