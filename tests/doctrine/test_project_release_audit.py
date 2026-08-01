@@ -18,7 +18,7 @@ def test_project_release_audit_is_generated_from_current_domain_evidence() -> No
         private_source_scan=recorded["private_source_scan"],
     )
     assert generated == recorded
-    assert not recorded["all_domains_available"]
+    assert recorded["all_domains_available"]
     assert not recorded["public_release_ready"]
     assert {item["domain"] for item in recorded["domains"]} == {
         "jaimini",
@@ -35,3 +35,9 @@ def test_project_release_audit_is_generated_from_current_domain_evidence() -> No
     )
     assert muhurta["available"] is True
     assert muhurta["admission_state"] == "private_experimental"
+    jaimini = next(
+        item for item in recorded["domains"] if item["domain"] == "jaimini"
+    )
+    assert jaimini["available"] is True
+    assert jaimini["admission_state"] == "experimental_full"
+    assert jaimini["gate_statuses"]["specialist_review"] == "missing"

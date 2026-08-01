@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import datetime as dt
 import json
+import os
 import re
 from enum import StrEnum
 from pathlib import Path
@@ -26,6 +27,7 @@ from .sources import (
     Sha256,
     SourceId,
     SourceManifest,
+    SourceVerifier,
     SourceVerificationReport,
     load_source_manifest,
 )
@@ -1399,6 +1401,146 @@ class JaiminiReleaseGate(FrozenModel):
         return self
 
 
+class JaiminiPrivateSourceRef(FrozenModel):
+    source_id: SourceId
+    pdf_page: int = Field(ge=1)
+    printed_page: int = Field(ge=1)
+    anchor: str = Field(min_length=1, max_length=120)
+    school: Literal["nilakantha_baseline", "sanjay_rath"]
+    role: Literal["baseline", "independent_cross_check"]
+
+    @model_validator(mode="after")
+    def _school_matches_role(self) -> "JaiminiPrivateSourceRef":
+        expected = {
+            "baseline": (
+                "nilakantha_baseline",
+                "jaimini_sutras_b_suryanarain_rao_1949",
+            ),
+            "independent_cross_check": (
+                "sanjay_rath",
+                "jaimini_sanjay_rath_upadesa_sutras_1997",
+            ),
+        }
+        if (self.school, self.source_id) != expected[self.role]:
+            raise ValueError("private source role cannot silently blend schools")
+        return self
+
+
+class JaiminiPrivateClaim(FrozenModel):
+    claim_id: str = Field(pattern=r"^[a-z][a-z0-9_]+$")
+    topic: Literal["self", "career", "relationships"]
+    fact_path: str = Field(pattern=r"^jaimini\.[A-Za-z0-9_.]+$")
+    label_ru: str = Field(min_length=1, max_length=120)
+    label_en: str = Field(min_length=1, max_length=120)
+    meaning_ru: str = Field(min_length=1, max_length=300)
+    meaning_en: str = Field(min_length=1, max_length=300)
+    confidence: float = Field(gt=0.0, le=0.65)
+    source_refs: tuple[JaiminiPrivateSourceRef, ...] = Field(min_length=2)
+
+    @model_validator(mode="after")
+    def _requires_baseline_and_cross_check(self) -> "JaiminiPrivateClaim":
+        if {ref.role for ref in self.source_refs} != {
+            "baseline",
+            "independent_cross_check",
+        }:
+            raise ValueError("each private claim needs baseline and independent context")
+        return self
+
+
+class JaiminiUnavailableTopic(FrozenModel):
+    topic: Literal["timing"]
+    reason_code: Literal["CHARA_DASHA_SCHOOL_CONFLICT"]
+    reason_ru: str = Field(min_length=1, max_length=500)
+    reason_en: str = Field(min_length=1, max_length=500)
+
+
+class JaiminiPrivateBaselineProfile(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    profile_id: Literal["full_jaimini_private_baseline_v1"]
+    admission_scope: Literal["private_experimental"]
+    school: Literal["nilakantha_baseline"]
+    karaka_scheme: Literal[7]
+    confidence_ceiling: float = Field(gt=0.0, le=0.65)
+    external_review_missing: Literal[True]
+    required_source_ids: tuple[SourceId, ...]
+    cross_check_policy: Literal[
+        "sanjay_rath_is_independent_context_not_an_activated_overlay"
+    ]
+    claims: tuple[JaiminiPrivateClaim, ...] = Field(min_length=6, max_length=6)
+    unavailable_topics: tuple[JaiminiUnavailableTopic, ...] = Field(
+        min_length=1, max_length=1
+    )
+    quarantined_rule_ids: tuple[str, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _conservative_complete_profile(self) -> "JaiminiPrivateBaselineProfile":
+        expected_paths = {
+            "jaimini.karakas.7.AK",
+            "jaimini.karakamsa.sign",
+            "jaimini.karakas.7.AmK",
+            "jaimini.arudha.AL",
+            "jaimini.karakas.7.DK",
+            "jaimini.arudha.UL",
+        }
+        paths = [claim.fact_path for claim in self.claims]
+        ids = [claim.claim_id for claim in self.claims]
+        if set(paths) != expected_paths or len(paths) != len(set(paths)):
+            raise ValueError("private profile must expose exactly six structural facts")
+        if len(ids) != len(set(ids)):
+            raise ValueError("private claim IDs must be unique")
+        if {claim.topic for claim in self.claims} != {
+            "self",
+            "career",
+            "relationships",
+        }:
+            raise ValueError("private profile must cover all three safe topics")
+        expected_sources = {
+            "jaimini_sutras_b_suryanarain_rao_1949",
+            "jaimini_sanjay_rath_upadesa_sutras_1997",
+        }
+        if set(self.required_source_ids) != expected_sources:
+            raise ValueError("private profile source set is substituted")
+        if len(self.required_source_ids) != len(expected_sources):
+            raise ValueError("private profile source IDs must be unique")
+        if any(claim.confidence > self.confidence_ceiling for claim in self.claims):
+            raise ValueError("claim confidence exceeds the profile ceiling")
+        if set(self.quarantined_rule_ids) != {
+            "karakas.tie_policy",
+            "svamsa.d9_lagna",
+            "special_lagnas.selected_rates",
+            "co_lords.resolution",
+            "chara_dasha.progression",
+            "chara_dasha.gender_semantics",
+            "time.boundaries",
+        }:
+            raise ValueError("private profile must preserve all material quarantines")
+        if len(self.quarantined_rule_ids) != 7:
+            raise ValueError("quarantined rule IDs must be unique")
+        return self
+
+
+_JAIMINI_DOCTRINE_ROOT = Path(__file__).resolve().parents[1] / "data/doctrine"
+_JAIMINI_PRIVATE_PROFILE = (
+    _JAIMINI_DOCTRINE_ROOT / "jaimini-private-baseline-profile.json"
+)
+_JAIMINI_SOURCE_MANIFEST = _JAIMINI_DOCTRINE_ROOT / "jaimini-sources.json"
+_JAIMINI_RULE_INVENTORY = _JAIMINI_DOCTRINE_ROOT / "jaimini-rules.json"
+_JAIMINI_PACKAGED_RELEASE = _JAIMINI_DOCTRINE_ROOT / "jaimini-release.json"
+
+
+def load_jaimini_private_baseline_profile() -> JaiminiPrivateBaselineProfile:
+    return JaiminiPrivateBaselineProfile.model_validate(
+        _load_strict_jaimini_json(_JAIMINI_PRIVATE_PROFILE)
+    )
+
+
+def jaimini_compiled_profile_sha256() -> str:
+    profile = load_jaimini_private_baseline_profile()
+    return hashlib.sha256(
+        canonical_json(profile.model_dump(mode="json")).encode("utf-8")
+    ).hexdigest()
+
+
 class JaiminiReleaseAudit(FrozenModel):
     schema_version: Literal["1.0"] = "1.0"
     release_id: Literal["full_jaimini_v1"]
@@ -1410,8 +1552,11 @@ class JaiminiReleaseAudit(FrozenModel):
     ]
     gates: tuple[JaiminiReleaseGate, ...]
     blockers: tuple[str, ...]
+    public_release_blockers: tuple[str, ...]
     external_review_missing: bool
     available: bool
+    completed_evidence: tuple[str, ...] = Field(min_length=1)
+    future_follow_up: tuple[str, ...] = Field(min_length=1)
 
     @model_validator(mode="after")
     def _honest_release_state(self) -> "JaiminiReleaseAudit":
@@ -1427,7 +1572,10 @@ class JaiminiReleaseAudit(FrozenModel):
             )
         AdmissionEvaluator.assert_required_gates(
             gates=self.gates,
-            required_gate_ids=REQUIRED_AUTOMATED_GATES,
+            required_gate_ids=(
+                *REQUIRED_AUTOMATED_GATES,
+                "source_bound_private_profile",
+            ),
             available=self.available,
         )
         if (
@@ -1435,4 +1583,58 @@ class JaiminiReleaseAudit(FrozenModel):
             and self.admission_state != "blocked_sources"
         ):
             raise ValueError("missing compiled profile is a source-blocked release")
+        if self.external_review_missing and not self.public_release_blockers:
+            raise ValueError("missing external review must remain a public blocker")
+        statuses = {gate.gate_id: gate.status for gate in self.gates}
+        if "specialist_review" not in statuses:
+            raise ValueError("release audit must declare the specialist gate")
+        if self.external_review_missing != (
+            statuses.get("specialist_review") != "passed"
+        ):
+            raise ValueError("external review flag must follow the specialist gate")
+        if not any(
+            blocker.startswith("timing:") for blocker in self.public_release_blockers
+        ):
+            raise ValueError("school-conflicted timing must remain a public blocker")
         return self
+
+
+def load_jaimini_release_audit(
+    *, verify_source_bytes: bool = True
+) -> JaiminiReleaseAudit:
+    """Verify the restricted private profile without activating any overlay."""
+
+    audit = JaiminiReleaseAudit.model_validate(
+        _load_strict_jaimini_json(_JAIMINI_PACKAGED_RELEASE)
+    )
+    manifest = load_source_manifest(_JAIMINI_SOURCE_MANIFEST)
+    inventory = JaiminiRuleInventory.model_validate(
+        _load_strict_jaimini_json(_JAIMINI_RULE_INVENTORY)
+    )
+    if audit.corpus_manifest_sha256 != manifest.manifest_sha256:
+        raise ValueError("JAIMINI_SOURCE_MANIFEST_SUBSTITUTED")
+    if audit.rule_inventory_sha256 != inventory.inventory_sha256:
+        raise ValueError("JAIMINI_RULE_INVENTORY_SUBSTITUTED")
+    if audit.compiled_profile_sha256 != jaimini_compiled_profile_sha256():
+        raise ValueError("JAIMINI_COMPILED_PROFILE_SUBSTITUTED")
+    if audit.available and verify_source_bytes:
+        profile = load_jaimini_private_baseline_profile()
+        required_ids = set(profile.required_source_ids)
+        runtime_sources = tuple(
+            source for source in manifest.sources if source.source_id in required_ids
+        )
+        if {source.source_id for source in runtime_sources} != required_ids:
+            raise ValueError("JAIMINI_PRIVATE_SOURCE_MISSING")
+        runtime_manifest = SourceManifest(
+            schema_version=manifest.schema_version,
+            sources=runtime_sources,
+        )
+        root = Path(
+            os.environ.get(
+                "JYOTISH_PRIVATE_SOURCES_ROOT",
+                str(Path.cwd() / "private_sources"),
+            )
+        )
+        if not SourceVerifier.verify(runtime_manifest, root).ok:
+            raise ValueError("JAIMINI_SOURCE_BYTES_UNVERIFIED")
+    return audit

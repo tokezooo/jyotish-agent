@@ -149,8 +149,9 @@ Routing:
 - calculate and search_sources are stateless and do not create ResearchRuns.
 - jaimini is stateless and returns signed computed facts; do not invent interpretation
   when interpretation_status is unavailable, and never infer an approximate range.
-- jaimini_full is an additive governed interpretation surface. Respect its admission
-  status; when unavailable, report blockers and use jaimini facts without inventing prose.
+- jaimini_full is an additive governed interpretation surface. When completed, use only
+  its returned report and preserve every limitation; never fill the unavailable timing
+  section from legacy facts. When unavailable, report its error/blockers without prose.
 - prashna seals one explicit/captured question moment and supports only bounded work/project
   facts; reuse its opaque anchor token for clarification and never invent doctrine. While
   source review is pending, report literal computed facts/statuses only: do not infer a
@@ -240,8 +241,9 @@ def build_server(facade: JyotishMcpFacade | None = None) -> FastMCP:
         name="jaimini_full",
         description=(
             "Request the governed Full Jaimini experimental surface in quick, full, deep, "
-            "or inspection mode. It fails closed with explicit acquisition/admission "
-            "blockers until the source-bound profile is eligible."
+            "or inspection mode. The private baseline renders six source-bound structural "
+            "factors for self, career, and relationships; school-conflicted timing remains "
+            "explicitly unavailable and external review remains visible."
         ),
         annotations=READ_ONLY,
         structured_output=True,

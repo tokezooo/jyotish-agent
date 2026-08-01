@@ -1,0 +1,118 @@
+{
+  "schema_version": "1.0",
+  "profile_id": "full_jaimini_private_baseline_v1",
+  "admission_scope": "private_experimental",
+  "school": "nilakantha_baseline",
+  "karaka_scheme": 7,
+  "confidence_ceiling": 0.65,
+  "external_review_missing": true,
+  "required_source_ids": [
+    "jaimini_sutras_b_suryanarain_rao_1949",
+    "jaimini_sanjay_rath_upadesa_sutras_1997"
+  ],
+  "cross_check_policy": "sanjay_rath_is_independent_context_not_an_activated_overlay",
+  "claims": [
+    {
+      "claim_id": "self_atmakaraka_role",
+      "topic": "self",
+      "fact_path": "jaimini.karakas.7.AK",
+      "label_ru": "Атмакарака",
+      "label_en": "Atmakaraka",
+      "meaning_ru": "символический показатель самости и внутренней направленности",
+      "meaning_en": "a symbolic indicator of self and inner direction",
+      "confidence": 0.65,
+      "source_refs": [
+        {"source_id": "jaimini_sutras_b_suryanarain_rao_1949", "pdf_page": 29, "printed_page": 12, "anchor": "1.1.11", "school": "nilakantha_baseline", "role": "baseline"},
+        {"source_id": "jaimini_sanjay_rath_upadesa_sutras_1997", "pdf_page": 20, "printed_page": 7, "anchor": "chara-karaka ordering", "school": "sanjay_rath", "role": "independent_cross_check"},
+        {"source_id": "jaimini_sanjay_rath_upadesa_sutras_1997", "pdf_page": 21, "printed_page": 8, "anchor": "atmakaraka role", "school": "sanjay_rath", "role": "independent_cross_check"}
+      ]
+    },
+    {
+      "claim_id": "self_karakamsa_role",
+      "topic": "self",
+      "fact_path": "jaimini.karakamsa.sign",
+      "label_ru": "Каракамша",
+      "label_en": "Karakamsa",
+      "meaning_ru": "знак Атмакараки в D9, используемый здесь только как структурная точка темы самости",
+      "meaning_en": "the Atmakaraka sign in D9, used here only as a structural self-topic point",
+      "confidence": 0.6,
+      "source_refs": [
+        {"source_id": "jaimini_sutras_b_suryanarain_rao_1949", "pdf_page": 56, "printed_page": 39, "anchor": "1.2.1", "school": "nilakantha_baseline", "role": "baseline"},
+        {"source_id": "jaimini_sanjay_rath_upadesa_sutras_1997", "pdf_page": 49, "printed_page": 36, "anchor": "karakamsa definition", "school": "sanjay_rath", "role": "independent_cross_check"}
+      ]
+    },
+    {
+      "claim_id": "career_amatyakaraka_role",
+      "topic": "career",
+      "fact_path": "jaimini.karakas.7.AmK",
+      "label_ru": "Аматьякарака",
+      "label_en": "Amatyakaraka",
+      "meaning_ru": "символический показатель роли министра или советника в последовательности чара-карак, а не вывод о профессии",
+      "meaning_en": "a symbolic minister or adviser role in the chara-karaka sequence, not a career conclusion",
+      "confidence": 0.6,
+      "source_refs": [
+        {"source_id": "jaimini_sutras_b_suryanarain_rao_1949", "pdf_page": 29, "printed_page": 12, "anchor": "1.1.11", "school": "nilakantha_baseline", "role": "baseline"},
+        {"source_id": "jaimini_sanjay_rath_upadesa_sutras_1997", "pdf_page": 22, "printed_page": 9, "anchor": "amatyakaraka definition", "school": "sanjay_rath", "role": "independent_cross_check"}
+      ]
+    },
+    {
+      "claim_id": "career_arudha_lagna_role",
+      "topic": "career",
+      "fact_path": "jaimini.arudha.AL",
+      "label_ru": "Арудха-лагна",
+      "label_en": "Arudha Lagna",
+      "meaning_ru": "структурная точка проявленного образа, без вывода о профессии или статусе",
+      "meaning_en": "a structural point for manifested image, without a profession or status prediction",
+      "confidence": 0.55,
+      "source_refs": [
+        {"source_id": "jaimini_sutras_b_suryanarain_rao_1949", "pdf_page": 50, "printed_page": 33, "anchor": "1.1.30-1.1.31", "school": "nilakantha_baseline", "role": "baseline"},
+        {"source_id": "jaimini_sanjay_rath_upadesa_sutras_1997", "pdf_page": 28, "printed_page": 15, "anchor": "arudha definition and exception", "school": "sanjay_rath", "role": "independent_cross_check"}
+      ]
+    },
+    {
+      "claim_id": "relationships_darakaraka_role",
+      "topic": "relationships",
+      "fact_path": "jaimini.karakas.7.DK",
+      "label_ru": "Даракарака",
+      "label_en": "Darakaraka",
+      "meaning_ru": "символический показатель партнёрской роли, не прогноз конкретного союза",
+      "meaning_en": "a symbolic indicator of the partner role, not a forecast of a specific union",
+      "confidence": 0.6,
+      "source_refs": [
+        {"source_id": "jaimini_sutras_b_suryanarain_rao_1949", "pdf_page": 29, "printed_page": 12, "anchor": "1.1.11", "school": "nilakantha_baseline", "role": "baseline"},
+        {"source_id": "jaimini_sanjay_rath_upadesa_sutras_1997", "pdf_page": 22, "printed_page": 9, "anchor": "darakaraka definition", "school": "sanjay_rath", "role": "independent_cross_check"}
+      ]
+    },
+    {
+      "claim_id": "relationships_upapada_role",
+      "topic": "relationships",
+      "fact_path": "jaimini.arudha.UL",
+      "label_ru": "Упапада",
+      "label_en": "Upapada",
+      "meaning_ru": "арудха двенадцатого дома, используемая здесь как структурная точка союза и его социальной формы",
+      "meaning_en": "the arudha of the twelfth house, used here as a structural point for union and its social form",
+      "confidence": 0.55,
+      "source_refs": [
+        {"source_id": "jaimini_sutras_b_suryanarain_rao_1949", "pdf_page": 122, "printed_page": 105, "anchor": "1.4 upapada definition", "school": "nilakantha_baseline", "role": "baseline"},
+        {"source_id": "jaimini_sanjay_rath_upadesa_sutras_1997", "pdf_page": 129, "printed_page": 116, "anchor": "upapada definition", "school": "sanjay_rath", "role": "independent_cross_check"}
+      ]
+    }
+  ],
+  "unavailable_topics": [
+    {
+      "topic": "timing",
+      "reason_code": "CHARA_DASHA_SCHOOL_CONFLICT",
+      "reason_ru": "Тайминг Chara Dasha не включён: направление, co-lords, гендерная ветка и границы периодов расходятся между школами или с текущим движком.",
+      "reason_en": "Chara Dasha timing is not enabled: progression, co-lords, gender branching, and period boundaries conflict across schools or with the current engine."
+    }
+  ],
+  "quarantined_rule_ids": [
+    "karakas.tie_policy",
+    "svamsa.d9_lagna",
+    "special_lagnas.selected_rates",
+    "co_lords.resolution",
+    "chara_dasha.progression",
+    "chara_dasha.gender_semantics",
+    "time.boundaries"
+  ]
+}

@@ -369,25 +369,99 @@ class JyotishMcpFacade:
         return JaiminiNeedsInputResult(status="needs_input", **fields)
 
     def jaimini_full(self, value: JaiminiFullMcpInput) -> JaiminiFullReleaseResult:
-        """Expose the governed Full Jaimini surface only when its audit permits it."""
+        """Run the source-verified six-factor private Jaimini baseline."""
 
-        from .doctrine.jaimini_pack import JaiminiReleaseAudit
+        from .doctrine.jaimini_pack import load_jaimini_release_audit
+        from .doctrine.jaimini_release import execute_jaimini_full
+        from .interpretations import screen_question
+        from .timezone_resolution import TimezoneResolutionError
 
-        audit_path = Path(__file__).parent / "data/doctrine/jaimini-release.json"
-        audit = JaiminiReleaseAudit.model_validate_json(
-            audit_path.read_text(encoding="utf-8")
+        # Safety routing intentionally precedes source access and chart calculation.
+        if screen_question(value.question) is not None:
+            return JaiminiFullReleaseResult(
+                status="unavailable",
+                request_mode=value.mode,
+                locale=value.locale,
+                topics=value.topics,
+                external_review_missing=True,
+                error_code="HIGH_STAKES_TOPIC",
+            )
+        try:
+            audit = load_jaimini_release_audit(verify_source_bytes=False)
+        except ValueError:
+            return JaiminiFullReleaseResult(
+                status="unavailable",
+                request_mode=value.mode,
+                locale=value.locale,
+                topics=value.topics,
+                external_review_missing=True,
+                error_code="RELEASE_IDENTITY_INVALID",
+            )
+        common = {
+            "request_mode": value.mode,
+            "locale": value.locale,
+            "topics": value.topics,
+            "profile": "full_jaimini_private_baseline_v1",
+            "admission_state": audit.admission_state,
+            "blockers": list(audit.blockers),
+            "public_release_blockers": list(audit.public_release_blockers),
+            "external_review_missing": audit.external_review_missing,
+        }
+        if not audit.available:
+            return JaiminiFullReleaseResult(
+                status="unavailable",
+                **common,
+                error_code="RELEASE_GATES_INCOMPLETE",
+            )
+        try:
+            load_jaimini_release_audit()
+        except ValueError:
+            return JaiminiFullReleaseResult(
+                status="unavailable",
+                **common,
+                error_code="SOURCE_BYTES_UNVERIFIED",
+            )
+        core_request = JaiminiMcpInput(
+            profile=value.profile,
+            inline_profile=value.inline_profile,
+            question=value.question,
+            birth=value.birth,
+            rule_profile="jaimini_core_v1",
+            analysis_scope="core",
+            gender=None,
+            include_trace=False,
         )
-        if audit.available:  # pragma: no cover - requires future admitted source pack
-            raise McpFacadeError("JAIMINI_FULL_RUNTIME_NOT_CONFIGURED")
-        return JaiminiFullReleaseResult(
-            status="unavailable",
-            request_mode=value.mode,
+        try:
+            base = self.jaimini(core_request)
+        except TimezoneResolutionError as exc:
+            return JaiminiFullReleaseResult(
+                status="needs_input",
+                **common,
+                error_code=exc.error_code,
+            )
+        except McpFacadeError as exc:
+            return JaiminiFullReleaseResult(
+                status="needs_input",
+                **common,
+                error_code=str(exc),
+            )
+        execution = execute_jaimini_full(
+            base,
+            audit=audit,
+            topics=tuple(value.topics),
             locale=value.locale,
-            topics=value.topics,
-            admission_state="blocked_sources",
-            blockers=list(audit.blockers),
-            external_review_missing=audit.external_review_missing,
-            report=None,
+            mode=value.mode,
+            include_evidence=value.include_evidence,
+        )
+        return JaiminiFullReleaseResult(
+            status=execution.status,
+            **common,
+            report=(
+                execution.report.model_dump(mode="json", exclude_none=True)
+                if execution.report is not None
+                else None
+            ),
+            error_code=execution.reason_code,
         )
 
     def jaimini_full_payload(

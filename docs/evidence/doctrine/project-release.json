@@ -5,9 +5,9 @@
     {
       "domain": "jaimini",
       "release_id": "full_jaimini_v1",
-      "evidence_sha256": "63030be4af249f218f087ba518070f8f35234fca322e26e135fd018f0bcd16ad",
-      "admission_state": "blocked_sources",
-      "available": false,
+      "evidence_sha256": "a646140ca71fdb3497780b1b9092711a30e61236f8a94a407ac947f454309289",
+      "admission_state": "experimental_full",
+      "available": true,
       "gate_statuses": {
         "rule_fixtures": "passed",
         "hand_worked_cases": "passed",
@@ -18,12 +18,13 @@
         "conversational_e2e_en": "passed",
         "privacy_adversarial": "passed",
         "payload_performance": "passed",
-        "deep_conversational_e2e": "missing"
+        "deep_conversational_e2e": "passed",
+        "source_bound_private_profile": "passed",
+        "specialist_review": "missing"
       },
       "blockers": [
-        "compiled_profile: no source-admitted production profile exists",
-        "source_review: all sixteen baseline candidates are hash-bound to thirteen Nilakantha-mediated fragments, but seven conflicts remain quarantined and no baseline or overlay rule has specialist admission",
-        "specialist_review: no production rule/profile review"
+        "specialist_review: external review of the six-factor private profile is missing",
+        "timing: Chara Dasha progression, co-lords, gender branching, and period boundaries remain school-conflicted and unavailable"
       ]
     },
     {
@@ -96,7 +97,7 @@
     "full_python_suite": {
       "command": "uv run pytest -q",
       "status": "passed",
-      "passed": 939,
+      "passed": 945,
       "failed": 0,
       "skipped": 2
     },
@@ -110,6 +111,12 @@
       "command": "uv run pytest -q tests/doctrine/test_lea_524_jaimini_inventory.py tests/doctrine/test_jaimini_baseline_reassessment_20260801.py tests/doctrine/test_jaimini_overlay_fragments_20260731.py tests/doctrine/test_lea_530_jaimini_release.py tests/doctrine/test_project_release_audit.py",
       "status": "passed",
       "passed": 45,
+      "failed": 0
+    },
+    "jaimini_private_release_suite": {
+      "command": "uv run pytest -q tests/doctrine/test_lea_523_jaimini_sources.py tests/doctrine/test_lea_524_jaimini_inventory.py tests/doctrine/test_lea_525_jaimini_self.py tests/doctrine/test_lea_526_jaimini_career.py tests/doctrine/test_lea_527_jaimini_relationships.py tests/doctrine/test_lea_528_chara_dasha_timing.py tests/doctrine/test_lea_529_jaimini_overlays.py tests/doctrine/test_lea_530_jaimini_release.py tests/doctrine/test_jaimini_baseline_reassessment_20260801.py tests/doctrine/test_jaimini_overlay_fragments_20260731.py tests/doctrine/test_project_release_audit.py",
+      "status": "passed",
+      "passed": 82,
       "failed": 0
     },
     "ruff": {
@@ -155,15 +162,14 @@
     "status": "passed",
     "tracked_private_source_count": 0
   },
-  "all_domains_available": false,
+  "all_domains_available": true,
   "public_release_ready": false,
   "blockers": [
-    "jaimini: compiled_profile: no source-admitted production profile exists",
-    "jaimini: source_review: all sixteen baseline candidates are hash-bound to thirteen Nilakantha-mediated fragments, but seven conflicts remain quarantined and no baseline or overlay rule has specialist admission",
-    "jaimini: specialist_review: no production rule/profile review",
+    "jaimini: specialist_review: external review of the six-factor private profile is missing",
+    "jaimini: timing: Chara Dasha progression, co-lords, gender branching, and period boundaries remain school-conflicted and unavailable",
     "muhurta: specialist_review: external rule-pack review is missing",
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay_review: the acquired B. V. Raman 1969 fourth edition is identity-verified but not page-mapped, independently rights-confirmed, or specialist-reviewed; the overlay remains disabled"
   ],
-  "audit_sha256": "727ce52472677ee42571c3282759f9567ac561e995a3e32b4f4548baaa9f2153"
+  "audit_sha256": "a963176d2c1b318ad6635c15e5a2019f279ec2eea509c5feafea9a6ab6c1c5ed"
 }

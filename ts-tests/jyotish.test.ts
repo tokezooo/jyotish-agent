@@ -146,6 +146,16 @@ describe("JaiminiFullRequestSchema", () => {
   test("accepts bounded modes and reserves evidence for inspection", () => {
     expect(Value.Check(JaiminiFullRequestSchema, request)).toBe(true);
     expect(
+      Value.Check(JaiminiFullRequestSchema, {
+        ...request,
+        birth: {
+          confidence: "approximate",
+          earliest_time: "12:00:00",
+          latest_time: "13:00:00",
+        },
+      }),
+    ).toBe(true);
+    expect(
       Value.Check(JaiminiFullRequestSchema, { ...request, include_evidence: true }),
     ).toBe(false);
     expect(
@@ -157,7 +167,7 @@ describe("JaiminiFullRequestSchema", () => {
     ).toBe(true);
   });
 
-  test("registered tool calls the governed endpoint without rewriting blockers", async () => {
+  test("registered tool preserves a completed governed report", async () => {
     const tools = new Map<string, any>();
     const fakePi = {
       registerTool(tool: any) { tools.set(tool.name, tool); },
@@ -172,14 +182,19 @@ describe("JaiminiFullRequestSchema", () => {
       expect(String(input)).toContain("/v2/doctrine/jaimini/full");
       return new Response(JSON.stringify({
         surface: "experimental_full",
-        status: "unavailable",
-        blockers: ["compiled_profile: missing"],
+        status: "completed",
+        admission_state: "experimental_full",
+        blockers: [],
+        report: {
+          profile_id: "full_jaimini_private_baseline_v1",
+          sections: [{ topic: "timing", status: "unavailable" }],
+        },
       }), { status: 200, headers: { "content-type": "application/json" } });
     }) as any;
     try {
       const result = await tool.execute("tc_full", request, new AbortController().signal);
-      expect(result.content[0].text).toContain("compiled_profile: missing");
-      expect(result.details.status).toBe("unavailable");
+      expect(result.content[0].text).toContain("full_jaimini_private_baseline_v1");
+      expect(result.details.status).toBe("completed");
     } finally {
       globalThis.fetch = originalFetch;
     }

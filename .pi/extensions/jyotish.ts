@@ -93,6 +93,19 @@ const ResearchBirthProfileSchema = Type.Object(
 const JaiminiFullCommon = {
   profile: Type.Optional(StringEnum(["default", "inline"] as const)),
   inline_profile: Type.Optional(ResearchBirthProfileSchema),
+  birth: Type.Optional(
+    Type.Union([
+      Type.Object({ confidence: Type.Literal("exact") }, NO_EXTRA),
+      Type.Object(
+        {
+          confidence: Type.Literal("approximate"),
+          earliest_time: Type.String({ pattern: "^\\d{2}:\\d{2}:\\d{2}$" }),
+          latest_time: Type.String({ pattern: "^\\d{2}:\\d{2}:\\d{2}$" }),
+        },
+        NO_EXTRA,
+      ),
+    ]),
+  ),
   question: Type.String({ minLength: 1, maxLength: 2_000 }),
   locale: StringEnum(["ru", "en"] as const),
   topics: Type.Array(
@@ -1606,10 +1619,12 @@ export default function (pi: ExtensionAPI) {
     name: "jyotish_jaimini_full",
     label: "Full Jaimini (governed)",
     description:
-      "Request the source-bound Full Jaimini experimental surface. The endpoint " +
-      "returns explicit admission blockers and no interpretation until the release audit permits it.",
+      "Request the private source-bound Full Jaimini surface. It returns six bounded " +
+      "structural factors for self, career, and relationships; school-conflicted timing stays unavailable.",
     promptGuidelines: [
       "If status is unavailable, report the blockers and do not invent Jaimini interpretation.",
+      "If status is completed, use only the returned report and preserve its limitations.",
+      "Never fill an unavailable timing section from the legacy Jaimini fact surface.",
       "Use inspection mode only when the user asks for evidence details.",
     ],
     parameters: JaiminiFullRequestSchema,

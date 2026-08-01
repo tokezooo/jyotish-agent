@@ -3,65 +3,86 @@
   "release_id": "full_jaimini_v1",
   "corpus_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
   "rule_inventory_sha256": "887dfa20f2b6c2d99a191dbbfc05f7e0c84633c976983e499fcb8c9fcb6e5a5a",
-  "compiled_profile_sha256": null,
-  "admission_state": "blocked_sources",
+  "compiled_profile_sha256": "0ba9c452ec2794aa5a32382482673cef764c5dec18ea1b45965b6dd9cd0bc50c",
+  "admission_state": "experimental_full",
   "gates": [
     {
       "gate_id": "rule_fixtures",
       "status": "passed",
-      "evidence": "LEA-525 through LEA-529 focused suites: 24 passed"
+      "evidence": "LEA-525 through LEA-529 focused structural suites pass while conflicting rules remain quarantined."
     },
     {
       "gate_id": "hand_worked_cases",
       "status": "passed",
-      "evidence": "LEA-530: eval/jaimini/hand-worked-v1.json (SHA-256 cafa1778659323c261798a3065ddbb8f64947538cc0a5412744b69b672c96a0a) executed by jyotish_agent.jaimini_evaluation.evaluate_hand_worked_cases(allow_hand_worked=True): 11/11 checks across 5 hand-worked cases passed"
+      "evidence": "LEA-530: eval/jaimini/hand-worked-v1.json executed by evaluate_hand_worked_cases(allow_hand_worked=True): 11/11 checks across 5 cases passed."
     },
     {
       "gate_id": "school_conflict_cases",
       "status": "passed",
-      "evidence": "Explicit conflict and hidden-blending tests"
+      "evidence": "Seven material rule conflicts remain explicitly quarantined; the Sanjay Rath source is independent context and never an activated overlay."
     },
     {
       "gate_id": "metamorphic_tests",
       "status": "passed",
-      "evidence": "Fact and graph substitution tests"
+      "evidence": "Signed fact substitution, profile identity, source substitution, and visible report mutation fail closed."
     },
     {
       "gate_id": "held_out_cases",
       "status": "passed",
-      "evidence": "LEA-530: eval/jaimini/geometry-held-out-v1.json (SHA-256 manifest) executed by jyotish_agent.jaimini_evaluation.evaluate_held_out_geometry(allow_held_out=True): 26/26 passed"
+      "evidence": "LEA-530: eval/jaimini/geometry-held-out-v1.json executed by evaluate_held_out_geometry(allow_held_out=True): 26/26 passed."
     },
     {
       "gate_id": "conversational_e2e_ru",
       "status": "passed",
-      "evidence": "Bounded RU projection contract"
+      "evidence": "RU quick/full/deep/inspection private baseline returns computed structural values and visible limitations."
     },
     {
       "gate_id": "conversational_e2e_en",
       "status": "passed",
-      "evidence": "Bounded EN projection contract"
+      "evidence": "EN quick/full/deep/inspection private baseline returns computed structural values and visible limitations."
     },
     {
       "gate_id": "privacy_adversarial",
       "status": "passed",
-      "evidence": "Secret and private-path reflection tests"
+      "evidence": "Malformed inputs, private paths, source text, artifact tokens, and high-stakes questions remain sanitized or unavailable."
     },
     {
       "gate_id": "payload_performance",
       "status": "passed",
-      "evidence": "Bounded deterministic release-gate test"
+      "evidence": "The deterministic structured report is bounded below 16 KB; only two admitted private source files are hash-verified."
     },
     {
       "gate_id": "deep_conversational_e2e",
+      "status": "passed",
+      "evidence": "Deep and inspection E2E bind signed computed facts to the content-addressed six-factor profile and safe page locators."
+    },
+    {
+      "gate_id": "source_bound_private_profile",
+      "status": "passed",
+      "evidence": "The private profile binds six structural factors to B. Suryanarain Rao with Sanjay Rath as an explicitly non-activated independent cross-check."
+    },
+    {
+      "gate_id": "specialist_review",
       "status": "missing",
       "evidence": null
     }
   ],
-  "blockers": [
-    "compiled_profile: no source-admitted production profile exists",
-    "source_review: all sixteen baseline candidates are hash-bound to thirteen Nilakantha-mediated fragments, but seven conflicts remain quarantined and no baseline or overlay rule has specialist admission",
-    "specialist_review: no production rule/profile review"
+  "blockers": [],
+  "public_release_blockers": [
+    "specialist_review: external review of the six-factor private profile is missing",
+    "timing: Chara Dasha progression, co-lords, gender branching, and period boundaries remain school-conflicted and unavailable"
   ],
   "external_review_missing": true,
-  "available": false
+  "available": true,
+  "completed_evidence": [
+    "Six conservative structural factors cover self, career, and relationships in RU and EN from signed computed facts.",
+    "The baseline verifies the exact local bytes of B. Suryanarain Rao 1949 and Sanjay Rath 1997 without tracking either PDF.",
+    "Quick, full, deep, and inspection reports are additive, content-addressed, bounded, and privacy-safe.",
+    "High-stakes questions fail before source access or chart calculation, and timing is explicitly unavailable rather than inferred."
+  ],
+  "future_follow_up": [
+    "Obtain an external specialist decision for every private profile claim.",
+    "Choose and review one Chara Dasha school before compiling timing.",
+    "Collect opt-in concierge value scores without exporting session content."
+  ]
 }
