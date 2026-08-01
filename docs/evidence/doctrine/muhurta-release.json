@@ -15,6 +15,7 @@
     {"gate_id": "private_runtime_e2e", "status": "passed", "evidence": "The internal read-only engine returns ranked calendar-ready windows in direct E2E tests; MCP and HTTP remain fail-closed while required release gates are missing."},
     {"gate_id": "independent_held_out_evaluation", "status": "passed", "evidence": "LEA-544: eval/muhurta/independent-held-out-v1.json (SHA-256 90bb92e7aef06be67ba38d93ffdc5477383aca11547987049bcbe0c9a198b0b1) executed by evaluate_muhurta_held_out_cases(allow_held_out=True): 19/19 passed; material-error rate 0.0; synthetic inputs against the resealed admitted private baseline."},
     {"gate_id": "concierge_collection_contract", "status": "passed", "evidence": "The privacy-safe concierge evaluator and docs/evidence/doctrine/concierge-readiness.json are content-addressed; the real session count remains zero and the cross-domain evidence gate remains missing."},
+    {"gate_id": "specialist_review_handoff", "status": "passed", "evidence": "The content-addressed Muhurta handoff (SHA-256 6637a9e42579a0de4eee9d34ac144c1875d7c85ea2bb32841ac88053b61c0d52) and its bound strict response schema identify exactly two admitted rules and six safe activity profiles without source text; the external specialist decision remains missing."},
     {"gate_id": "modern_overlay", "status": "optional_missing", "evidence": null},
     {"gate_id": "specialist_review", "status": "missing", "evidence": null},
     {"gate_id": "cross_domain_concierge_sessions", "status": "missing", "evidence": null},
@@ -31,11 +32,12 @@
     "Independent whole-project code review completed with no Critical or Important findings.",
     "Nineteen independently hand-authored held-out cases cover RU/EN routing, all six safe profiles, DST and skipped-date behavior, constraints, ranking, and natal uncertainty with zero material errors.",
     "A strict opt-in concierge collection and evaluation contract now records privacy-safe cross-domain metrics without exporting session-level content; current real session evidence remains zero.",
+    "A deterministic specialist-review handoff now binds the complete private Muhurta baseline to exact source locators and fail-closed decision semantics without exporting source text or reviewer identity.",
     "The optional modern overlay acquisition target is catalog-verified to exact B. V. Raman editions without admitting source bytes or changing the classical baseline."
   ],
   "future_follow_up": [
     "Run 10-20 opt-in concierge sessions across Jaimini, Prashna, and Muhurta and record domain value scores.",
-    "Obtain specialist review of the private Muhurta rule pack.",
+    "Send the prepared eight-subject handoff to a qualified specialist and import an exact complete set of approved decisions.",
     "Acquire and review B. V. Raman, Muhurtha (Electional Astrology): preferably the 2026 MLBD paperback, ISBN 9789359662923, or the page-remapped 1993 UBSPD edition, ISBN 9788185674681, before enabling overlay comparison results."
   ],
   "public_release_blockers": [

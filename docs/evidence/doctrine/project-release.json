@@ -52,7 +52,7 @@
     {
       "domain": "muhurta",
       "release_id": "expanded_muhurta_v1",
-      "evidence_sha256": "625706a612f6d1c39127693544a4ea48a96ac5679d75f3a260b002da1279aa87",
+      "evidence_sha256": "041cc3b5dc8664eee5f086a5e10a6224e5990e5bf4bcbc58971c9da54f0490ad",
       "admission_state": "private_experimental",
       "available": true,
       "gate_statuses": {
@@ -63,6 +63,7 @@
         "private_runtime_e2e": "passed",
         "independent_held_out_evaluation": "passed",
         "concierge_collection_contract": "passed",
+        "specialist_review_handoff": "passed",
         "modern_overlay": "optional_missing",
         "specialist_review": "missing",
         "cross_domain_concierge_sessions": "missing",
@@ -97,7 +98,7 @@
     "full_python_suite": {
       "command": "uv run pytest -q",
       "status": "passed",
-      "passed": 926,
+      "passed": 932,
       "failed": 0,
       "skipped": 2
     },
@@ -138,6 +139,12 @@
       "status": "passed",
       "passed": 19,
       "failed": 0
+    },
+    "muhurta_specialist_handoff_suite": {
+      "command": "uv run pytest -q tests/doctrine/test_muhurta_specialist_review_20260801.py tests/doctrine/test_lea_544_muhurta_release.py",
+      "status": "passed",
+      "passed": 19,
+      "failed": 0
     }
   },
   "private_source_scan": {
@@ -156,5 +163,5 @@
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: B. V. Raman, Muhurtha (Electional Astrology), ISBN 9789359662923 (preferred) or 9788185674681 (accepted alternate), has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "365d162778fef3b565e11ba869f7da212d46fe8c501139e4c0aff7c1a750e6df"
+  "audit_sha256": "6b15b59af4e5c0f73fc1a67ab3c342bf3687742eb41a8cbd7d1fc5b99aee4db5"
 }

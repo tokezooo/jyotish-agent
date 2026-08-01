@@ -1,0 +1,253 @@
+{
+  "schema_version": "1.0",
+  "handoff_id": "muhurta_classical_baseline_specialist_v1",
+  "release_id": "expanded_muhurta_v1",
+  "scope": "classical_baseline_v1_private_experimental",
+  "source_manifest_sha256": "e6643be2f730e67b2cd6b80f64cfe46894240bb112a0ff26cae22a0c390c2e07",
+  "compiled_profile_sha256": "ecba14ace48d508b0a4789262cc67a4078c72bdd244e6d0a629499b67b7e8f81",
+  "profile_catalog_sha256": "f8a3613ab04a0dd3056fe26777e56670e40e4c20f5853c4892a6c266b648784b",
+  "admitted_rule_pack_sha256": "0bce81b3d699d0e3151c74c0c513aeb6c2f73bd2a81087ffbd7ca1b73a9484f4",
+  "response_schema_ref": "docs/evidence/doctrine/muhurta-specialist-review-response.schema.json",
+  "response_schema_sha256": "67b1835488c50f52becb4ab1a1ac135c206ba5c490f9ce6bedd9fa1bd7a50b1a",
+  "subject_count": 8,
+  "subjects": [
+    {
+      "subject_type": "rule",
+      "subject_id": "muhurta.interval.rahu_kala",
+      "current_status": "private_experimental",
+      "rule_ids": [
+        "muhurta.interval.rahu_kala"
+      ],
+      "source_ids": [
+        "kalaprakasika_1982"
+      ],
+      "source_locators": [
+        "kalaprakasika_1982:pdf:208:printed:176"
+      ],
+      "evidence_refs": [
+        "src/jyotish_agent/data/doctrine/muhurta-admitted-rules-v1.json#/rules/1"
+      ],
+      "review_questions": [
+        "source_alignment",
+        "rule_semantics",
+        "exceptions_and_scope",
+        "safety_boundary"
+      ],
+      "artifact_sha256": "6fd1cbc1ce6c3c1a20efaf165ff2aebeabc81056e5a62e5c8c2b3378c3d1f912",
+      "subject_sha256": "6194e2d8796fb209899cb5e3231d1780216839408f3eb4462c81d022628260c3"
+    },
+    {
+      "subject_type": "rule",
+      "subject_id": "muhurta.interval.yamaganda",
+      "current_status": "private_experimental",
+      "rule_ids": [
+        "muhurta.interval.yamaganda"
+      ],
+      "source_ids": [
+        "kalaprakasika_1982"
+      ],
+      "source_locators": [
+        "kalaprakasika_1982:pdf:208:printed:176"
+      ],
+      "evidence_refs": [
+        "src/jyotish_agent/data/doctrine/muhurta-admitted-rules-v1.json#/rules/0"
+      ],
+      "review_questions": [
+        "source_alignment",
+        "rule_semantics",
+        "exceptions_and_scope",
+        "safety_boundary"
+      ],
+      "artifact_sha256": "d03b67f90a5c85a05599784b5c388a38a27d2d632ad6dab5ea693433cf9512f0",
+      "subject_sha256": "3c9ddf8268f322506aaf55faa520cead45e4a2d8bad808aae129468e55288f36"
+    },
+    {
+      "subject_type": "profile",
+      "subject_id": "profile:creative_production",
+      "current_status": "available",
+      "rule_ids": [
+        "muhurta.interval.rahu_kala",
+        "muhurta.interval.yamaganda"
+      ],
+      "source_ids": [
+        "kalaprakasika_1982"
+      ],
+      "source_locators": [
+        "kalaprakasika_1982:pdf:208:printed:176"
+      ],
+      "evidence_refs": [
+        "src/jyotish_agent/data/doctrine/muhurta-profiles.json#/profiles/2",
+        "src/jyotish_agent/data/doctrine/muhurta-admitted-rules-v1.json#/rules/1",
+        "src/jyotish_agent/data/doctrine/muhurta-admitted-rules-v1.json#/rules/0"
+      ],
+      "review_questions": [
+        "profile_applicability",
+        "rule_completeness",
+        "exceptions_and_scope",
+        "safety_boundary"
+      ],
+      "artifact_sha256": "e35d11b10e34a89b0b69cef5999d43c5c7963458a0452a690c9b317fa7043a7d",
+      "subject_sha256": "c0395f8fd49e749a097db94f715650ee20223e3c8c78794cb7e32b18126254bb"
+    },
+    {
+      "subject_type": "profile",
+      "subject_id": "profile:focused_work",
+      "current_status": "available",
+      "rule_ids": [
+        "muhurta.interval.rahu_kala",
+        "muhurta.interval.yamaganda"
+      ],
+      "source_ids": [
+        "kalaprakasika_1982"
+      ],
+      "source_locators": [
+        "kalaprakasika_1982:pdf:208:printed:176"
+      ],
+      "evidence_refs": [
+        "src/jyotish_agent/data/doctrine/muhurta-profiles.json#/profiles/0",
+        "src/jyotish_agent/data/doctrine/muhurta-admitted-rules-v1.json#/rules/1",
+        "src/jyotish_agent/data/doctrine/muhurta-admitted-rules-v1.json#/rules/0"
+      ],
+      "review_questions": [
+        "profile_applicability",
+        "rule_completeness",
+        "exceptions_and_scope",
+        "safety_boundary"
+      ],
+      "artifact_sha256": "6fb2caff3555c1dae43461587b28c5b429e934d8b1241a2c6b818d4ab4afd7fc",
+      "subject_sha256": "cda64c51bdcc26ef7456f80c70ae7672fcb3fafe1f97befcec41ec2ff19a7c77"
+    },
+    {
+      "subject_type": "profile",
+      "subject_id": "profile:general_private_task",
+      "current_status": "available",
+      "rule_ids": [
+        "muhurta.interval.rahu_kala",
+        "muhurta.interval.yamaganda"
+      ],
+      "source_ids": [
+        "kalaprakasika_1982"
+      ],
+      "source_locators": [
+        "kalaprakasika_1982:pdf:208:printed:176"
+      ],
+      "evidence_refs": [
+        "src/jyotish_agent/data/doctrine/muhurta-profiles.json#/profiles/5",
+        "src/jyotish_agent/data/doctrine/muhurta-admitted-rules-v1.json#/rules/1",
+        "src/jyotish_agent/data/doctrine/muhurta-admitted-rules-v1.json#/rules/0"
+      ],
+      "review_questions": [
+        "profile_applicability",
+        "rule_completeness",
+        "exceptions_and_scope",
+        "safety_boundary"
+      ],
+      "artifact_sha256": "6c896e332aa142d7bea3cd1d1bed1ed3f8a58ee3e2bcbcecc00a15c8d4f4ea1f",
+      "subject_sha256": "670976387ac7f58207525c9a6a97c372950b422d761a741a9706789bb828767b"
+    },
+    {
+      "subject_type": "profile",
+      "subject_id": "profile:low_risk_travel_planning",
+      "current_status": "available",
+      "rule_ids": [
+        "muhurta.interval.rahu_kala",
+        "muhurta.interval.yamaganda"
+      ],
+      "source_ids": [
+        "kalaprakasika_1982"
+      ],
+      "source_locators": [
+        "kalaprakasika_1982:pdf:208:printed:176"
+      ],
+      "evidence_refs": [
+        "src/jyotish_agent/data/doctrine/muhurta-profiles.json#/profiles/4",
+        "src/jyotish_agent/data/doctrine/muhurta-admitted-rules-v1.json#/rules/1",
+        "src/jyotish_agent/data/doctrine/muhurta-admitted-rules-v1.json#/rules/0"
+      ],
+      "review_questions": [
+        "profile_applicability",
+        "rule_completeness",
+        "exceptions_and_scope",
+        "safety_boundary"
+      ],
+      "artifact_sha256": "3c41ec732080f58fcff847c6e91fe7f5b477109230beeb79a6a240c631bb9805",
+      "subject_sha256": "eb0e8defa72e4a14120bf3401a3e62bc0b756425dc25191fe54ce5d8c9f0a0f0"
+    },
+    {
+      "subject_type": "profile",
+      "subject_id": "profile:product_launch_communication",
+      "current_status": "available",
+      "rule_ids": [
+        "muhurta.interval.rahu_kala",
+        "muhurta.interval.yamaganda"
+      ],
+      "source_ids": [
+        "kalaprakasika_1982"
+      ],
+      "source_locators": [
+        "kalaprakasika_1982:pdf:208:printed:176"
+      ],
+      "evidence_refs": [
+        "src/jyotish_agent/data/doctrine/muhurta-profiles.json#/profiles/3",
+        "src/jyotish_agent/data/doctrine/muhurta-admitted-rules-v1.json#/rules/1",
+        "src/jyotish_agent/data/doctrine/muhurta-admitted-rules-v1.json#/rules/0"
+      ],
+      "review_questions": [
+        "profile_applicability",
+        "rule_completeness",
+        "exceptions_and_scope",
+        "safety_boundary"
+      ],
+      "artifact_sha256": "dabd4453440c9e40c65fbcb9020e0f93de109bc305cf15bcce14c95d36cbc1a1",
+      "subject_sha256": "d7fdccbcb313b4198a4cc7cc4176ecfae59677a4cbbc29417c28cdb33810f23b"
+    },
+    {
+      "subject_type": "profile",
+      "subject_id": "profile:study_learning",
+      "current_status": "available",
+      "rule_ids": [
+        "muhurta.interval.rahu_kala",
+        "muhurta.interval.yamaganda"
+      ],
+      "source_ids": [
+        "kalaprakasika_1982"
+      ],
+      "source_locators": [
+        "kalaprakasika_1982:pdf:208:printed:176"
+      ],
+      "evidence_refs": [
+        "src/jyotish_agent/data/doctrine/muhurta-profiles.json#/profiles/1",
+        "src/jyotish_agent/data/doctrine/muhurta-admitted-rules-v1.json#/rules/1",
+        "src/jyotish_agent/data/doctrine/muhurta-admitted-rules-v1.json#/rules/0"
+      ],
+      "review_questions": [
+        "profile_applicability",
+        "rule_completeness",
+        "exceptions_and_scope",
+        "safety_boundary"
+      ],
+      "artifact_sha256": "e75753c5b3f726edd2d540afd2f2b233c93df72de6bb40aaa71a041e7d895dc8",
+      "subject_sha256": "390ee9287a656a2ed09a0cf1387fd9fc5118c63de28a4da05282c6b4c5991710"
+    }
+  ],
+  "decision_options": [
+    "approved",
+    "amended",
+    "rejected"
+  ],
+  "review_requirements": [
+    "Review each exact local source page named by the subject locators.",
+    "Judge source alignment, rule semantics, exceptions, applicability, and safety.",
+    "Record one decision for every subject and identify the qualified reviewer.",
+    "Treat amended subjects as pending implementation and re-review, not approval."
+  ],
+  "excluded_scope": [
+    "B. V. Raman modern overlay until exact licensed source bytes are supplied.",
+    "High-stakes medical, longevity, legal, and financial activities.",
+    "Copyrighted source text and local private-source paths."
+  ],
+  "external_review_status": "missing",
+  "ready_for_external_review": true,
+  "privacy_projection": "metadata_hashes_and_locators_only",
+  "handoff_sha256": "6637a9e42579a0de4eee9d34ac144c1875d7c85ea2bb32841ac88053b61c0d52"
+}
