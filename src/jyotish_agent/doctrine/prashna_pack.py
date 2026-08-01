@@ -11,6 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import json
+import os
 import re
 import unicodedata
 from enum import StrEnum
@@ -24,6 +25,7 @@ from ..prashna_models import (
     PrashnaAspectDoctrineProfile,
     PrashnaAspectGeometryInput,
     PrashnaAspectGeometryResult,
+    PrashnaFact,
 )
 from ..research_store import canonical_json
 from .evaluation import AdmissionEvaluator
@@ -32,6 +34,7 @@ from .sources import (
     SourceId,
     SourceManifest,
     SourceVerificationReport,
+    SourceVerifier,
     load_source_manifest,
 )
 
@@ -462,7 +465,7 @@ _QUESTION_BINDINGS = {
         secondary_houses=(1, 6, 11),
         significators=("lagna_lord", "primary_house_lord", "moon"),
         source_refs=(
-            "daivajna_vallabha_2003_scan:pdf:4:sha256:"
+            "daivajna_vallabha_2003_scan:pdf:3:sha256:"
             "e881c291388fd5e02f8717c5902380ef8ad2b68985572caa6eeaa4eba4d41759",
         ),
     ),
@@ -472,7 +475,7 @@ _QUESTION_BINDINGS = {
         secondary_houses=(3, 11),
         significators=("lagna_lord", "primary_house_lord", "moon"),
         source_refs=(
-            "daivajna_vallabha_2003_scan:pdf:3:sha256:"
+            "daivajna_vallabha_2003_scan:pdf:2:sha256:"
             "52855cdb9c26b1cb15c795f471a9c12d33bbe5b1d6071a2a42b3f8e8b0e9c894",
         ),
     ),
@@ -482,9 +485,9 @@ _QUESTION_BINDINGS = {
         secondary_houses=(2, 4, 7, 11),
         significators=("lagna_lord", "primary_house_lord", "moon"),
         source_refs=(
-            "daivajna_vallabha_2003_scan:pdf:14:sha256:"
+            "daivajna_vallabha_2003_scan:pdf:13:sha256:"
             "08a051f2c5bda4e0583fd7311690a1faaf64237d4b1cddfb90b8953cb42fbe05",
-            "daivajna_vallabha_2003_scan:pdf:15:sha256:"
+            "daivajna_vallabha_2003_scan:pdf:14:sha256:"
             "1891ca12a62377cb054a077f2b52a1a1ab0b1a3aaef07933e80a390c2eda2551",
         ),
     ),
@@ -494,7 +497,7 @@ _QUESTION_BINDINGS = {
         secondary_houses=(4, 7, 10, 11),
         significators=("lagna_lord", "primary_house_lord", "moon"),
         source_refs=(
-            "daivajna_vallabha_2003_scan:pdf:4:sha256:"
+            "daivajna_vallabha_2003_scan:pdf:3:sha256:"
             "e881c291388fd5e02f8717c5902380ef8ad2b68985572caa6eeaa4eba4d41759",
         ),
     ),
@@ -601,16 +604,18 @@ def classify_prashna_question(question: str) -> PrashnaQuestionRoute:
     explicitly_low_risk = _has_marker(
         normalized, ("low risk", "безрисков", "низкорисков")
     )
-    if explicitly_low_risk:
+    specific_text = (
+        normalized.replace("work out", "") if explicitly_low_risk else normalized
+    )
+    for profile, markers in (
+        (PrashnaQuestionProfile.WORK_PROJECT_STATUS, _WORK_MARKERS),
+        (PrashnaQuestionProfile.COMMUNICATION_CONTACT, _CONTACT_MARKERS),
+        (PrashnaQuestionProfile.LOST_OBJECT, _LOST_MARKERS),
+    ):
+        if _has_marker(specific_text, markers):
+            detected.append(profile)
+    if not detected and explicitly_low_risk:
         detected.append(PrashnaQuestionProfile.GENERAL_LOW_RISK_OUTCOME)
-    else:
-        for profile, markers in (
-            (PrashnaQuestionProfile.WORK_PROJECT_STATUS, _WORK_MARKERS),
-            (PrashnaQuestionProfile.COMMUNICATION_CONTACT, _CONTACT_MARKERS),
-            (PrashnaQuestionProfile.LOST_OBJECT, _LOST_MARKERS),
-        ):
-            if _has_marker(normalized, markers):
-                detected.append(profile)
     if len(detected) > 1:
         return PrashnaQuestionRoute(
             status="composite", guidance_code="ASK_ONE_MATERIAL_QUESTION"
@@ -636,8 +641,9 @@ def classify_prashna_question(question: str) -> PrashnaQuestionRoute:
         "prashna.lagna.sign",
         "prashna.moon.sign",
         "prashna.topic.primary_house",
-        "prashna.planetary.longitudes",
-        *(f"prashna.house.{house}.lord" for house in houses),
+        "prashna.topic.primary_lord",
+        "prashna.topic.primary_lord_house",
+        *(f"prashna.bhava.{house}.lord" for house in houses),
     }
     return PrashnaQuestionRoute(
         status="supported",
@@ -702,6 +708,182 @@ def prashna_aspect_profile(
     )
 
 
+class PrashnaBaselineRule(FrozenModel):
+    rule_id: Literal[
+        "primary_house_lord_connection",
+        "relative_benefic_support",
+        "relative_malefic_obstacle",
+    ]
+    kind: Literal["geometry", "assistance", "obstacle"]
+    confidence: float = Field(gt=0.0, le=0.65)
+    source_ref: str = Field(
+        pattern=(
+            r"^[a-z][a-z0-9_]+:pdf:[1-9][0-9]*:sha256:[0-9a-f]{64}$"
+        )
+    )
+
+
+class PrashnaBaselineRulePack(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    profile_id: Literal["full_prashna_private_baseline_v1"]
+    school: Literal["prasna_marga_baseline"]
+    confidence_ceiling: float = Field(gt=0.0, le=0.65)
+    benefic_planets: tuple[Literal["Jupiter", "Venus"], ...]
+    malefic_planets: tuple[Literal["Mars", "Saturn"], ...]
+    rules: tuple[PrashnaBaselineRule, ...] = Field(min_length=3)
+
+    @model_validator(mode="after")
+    def _complete_conservative_pack(self) -> "PrashnaBaselineRulePack":
+        expected = {
+            "primary_house_lord_connection": "geometry",
+            "relative_benefic_support": "assistance",
+            "relative_malefic_obstacle": "obstacle",
+        }
+        actual = {rule.rule_id: rule.kind for rule in self.rules}
+        if actual != expected or len(self.rules) != len(expected):
+            raise ValueError("Prashna baseline rule pack is incomplete or blended")
+        if set(self.benefic_planets) & set(self.malefic_planets):
+            raise ValueError("benefic and malefic classifications must be disjoint")
+        return self
+
+    def rule(self, rule_id: str) -> PrashnaBaselineRule:
+        return next(rule for rule in self.rules if rule.rule_id == rule_id)
+
+
+_PRASHNA_BASELINE_PROFILE = (
+    Path(__file__).resolve().parents[1]
+    / "data/doctrine/prashna-baseline-profile.json"
+)
+
+
+def load_prashna_baseline_rule_pack() -> PrashnaBaselineRulePack:
+    return PrashnaBaselineRulePack.model_validate_json(
+        _PRASHNA_BASELINE_PROFILE.read_text(encoding="utf-8")
+    )
+
+
+def prashna_compiled_profile_sha256() -> str:
+    pack = load_prashna_baseline_rule_pack()
+    return hashlib.sha256(
+        canonical_json(pack.model_dump(mode="json")).encode("utf-8")
+    ).hexdigest()
+
+
+class PrashnaBaselineGeometryResult(FrozenModel):
+    schema_version: Literal["1.0"] = "1.0"
+    profile_id: Literal["full_prashna_private_baseline_v1"]
+    school: Literal["prasna_marga_baseline"]
+    state: Literal["connected", "unconnected", "unavailable"]
+    primary_house: int = Field(ge=1, le=12)
+    primary_lord: str | None
+    connection: Literal["associated", "aspected", "none", "unavailable"]
+    reason_code: str | None
+    source_refs: tuple[str, ...]
+    fact_refs: tuple[str, ...]
+    geometry_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def _coherent_geometry(self) -> "PrashnaBaselineGeometryResult":
+        if self.state == "unavailable":
+            if self.connection != "unavailable" or self.reason_code is None:
+                raise ValueError("unavailable baseline geometry requires a reason")
+        elif self.reason_code is not None or self.connection == "unavailable":
+            raise ValueError("available baseline geometry cannot carry an error")
+        if (self.state == "connected") != (
+            self.connection in {"associated", "aspected"}
+        ):
+            raise ValueError("baseline connection and state disagree")
+        return self
+
+
+def _baseline_geometry(
+    payload: dict[str, object],
+) -> PrashnaBaselineGeometryResult:
+    draft = PrashnaBaselineGeometryResult(**payload, geometry_sha256="0" * 64)
+    encoded = canonical_json(
+        draft.model_dump(mode="json", exclude={"geometry_sha256"})
+    )
+    return draft.model_copy(
+        update={"geometry_sha256": hashlib.sha256(encoded.encode()).hexdigest()}
+    )
+
+
+def _prashna_fact_map(facts: tuple[PrashnaFact, ...]) -> dict[str, object]:
+    return {fact.fact_id: fact.value for fact in facts}
+
+
+def evaluate_prashna_baseline_geometry(
+    facts: tuple[PrashnaFact, ...],
+    route: PrashnaQuestionRoute,
+    pack: PrashnaBaselineRulePack | None = None,
+) -> PrashnaBaselineGeometryResult:
+    """Evaluate the admitted Daivajna house-lord connection without Tajika."""
+
+    pack = pack or load_prashna_baseline_rule_pack()
+    source_ref = pack.rule("primary_house_lord_connection").source_ref
+    primary_house = route.primary_house or 1
+    values = _prashna_fact_map(facts)
+    lord_path = "prashna.topic.primary_lord"
+    lord_house_path = "prashna.topic.primary_lord_house"
+    primary_lord = values.get(lord_path)
+    primary_lord_house = values.get(lord_house_path)
+    if not isinstance(primary_lord, str) or not isinstance(primary_lord_house, int):
+        return _baseline_geometry(
+            {
+                "schema_version": "1.0",
+                "profile_id": pack.profile_id,
+                "school": pack.school,
+                "state": "unavailable",
+                "primary_house": primary_house,
+                "primary_lord": primary_lord if isinstance(primary_lord, str) else None,
+                "connection": "unavailable",
+                "reason_code": "PRIMARY_LORD_FACTS_MISSING",
+                "source_refs": (source_ref,),
+                "fact_refs": (),
+            }
+        )
+    aspect_path = f"prashna.graha_drishti.{primary_lord}.houses"
+    aspect_value = values.get(aspect_path)
+    if not isinstance(aspect_value, str):
+        return _baseline_geometry(
+            {
+                "schema_version": "1.0",
+                "profile_id": pack.profile_id,
+                "school": pack.school,
+                "state": "unavailable",
+                "primary_house": primary_house,
+                "primary_lord": primary_lord,
+                "connection": "unavailable",
+                "reason_code": "PRIMARY_LORD_ASPECT_FACT_MISSING",
+                "source_refs": (source_ref,),
+                "fact_refs": (lord_path, lord_house_path),
+            }
+        )
+    aspected_houses = {
+        int(value) for value in aspect_value.split(",") if value.isdigit()
+    }
+    if primary_lord_house == primary_house:
+        connection = "associated"
+    elif primary_house in aspected_houses:
+        connection = "aspected"
+    else:
+        connection = "none"
+    return _baseline_geometry(
+        {
+            "schema_version": "1.0",
+            "profile_id": pack.profile_id,
+            "school": pack.school,
+            "state": "connected" if connection != "none" else "unconnected",
+            "primary_house": primary_house,
+            "primary_lord": primary_lord,
+            "connection": connection,
+            "reason_code": None,
+            "source_refs": (source_ref,),
+            "fact_refs": (aspect_path, lord_path, lord_house_path),
+        }
+    )
+
+
 class PrashnaTestimony(FrozenModel):
     testimony_id: str = Field(pattern=r"^[a-z][a-z0-9_]{1,63}$")
     polarity: Literal["assistance", "obstacle"]
@@ -716,6 +898,72 @@ class PrashnaTestimony(FrozenModel):
         if len(set(self.source_refs)) != len(self.source_refs):
             raise ValueError("testimony source references must be unique")
         return self
+
+
+def build_prashna_baseline_testimonies(
+    facts: tuple[PrashnaFact, ...],
+    route: PrashnaQuestionRoute,
+    geometry: PrashnaBaselineGeometryResult,
+    pack: PrashnaBaselineRulePack | None = None,
+) -> tuple[PrashnaTestimony, ...]:
+    """Build only conservative testimonies declared by the private baseline pack."""
+
+    if route.status != "supported" or route.primary_house is None:
+        return ()
+    pack = pack or load_prashna_baseline_rule_pack()
+    values = _prashna_fact_map(facts)
+    testimonies: list[PrashnaTestimony] = []
+    if geometry.state == "connected":
+        rule = pack.rule("primary_house_lord_connection")
+        testimonies.append(
+            PrashnaTestimony(
+                testimony_id=rule.rule_id,
+                polarity="assistance",
+                confidence=rule.confidence,
+                fact_refs=geometry.fact_refs,
+                source_refs=(rule.source_ref,),
+            )
+        )
+
+    supporting_paths: list[str] = []
+    obstacle_paths: list[str] = []
+    favorable_relative_houses = {2, 4, 7, 10, 12}
+    for planet in (*pack.benefic_planets, *pack.malefic_planets):
+        path = f"prashna.planets.{planet}.house"
+        house = values.get(path)
+        if not isinstance(house, int):
+            continue
+        relative_house = ((house - route.primary_house) % 12) + 1
+        if relative_house not in favorable_relative_houses:
+            continue
+        if planet in pack.benefic_planets:
+            supporting_paths.append(path)
+        else:
+            obstacle_paths.append(path)
+
+    if supporting_paths:
+        rule = pack.rule("relative_benefic_support")
+        testimonies.append(
+            PrashnaTestimony(
+                testimony_id=rule.rule_id,
+                polarity="assistance",
+                confidence=rule.confidence,
+                fact_refs=tuple(sorted(supporting_paths)),
+                source_refs=(rule.source_ref,),
+            )
+        )
+    if obstacle_paths:
+        rule = pack.rule("relative_malefic_obstacle")
+        testimonies.append(
+            PrashnaTestimony(
+                testimony_id=rule.rule_id,
+                polarity="obstacle",
+                confidence=rule.confidence,
+                fact_refs=tuple(sorted(obstacle_paths)),
+                source_refs=(rule.source_ref,),
+            )
+        )
+    return tuple(sorted(testimonies, key=lambda item: item.testimony_id))
 
 
 class PrashnaTimingSupport(FrozenModel):
@@ -804,7 +1052,7 @@ def _blocked_prashna_outcome(
 def evaluate_prashna_outcome(
     radicality: PrashnaRadicalityResult,
     route: PrashnaQuestionRoute,
-    geometry: PrashnaAspectGeometryResult,
+    geometry: PrashnaAspectGeometryResult | PrashnaBaselineGeometryResult,
     *,
     testimonies: tuple[PrashnaTestimony, ...],
     available_fact_paths: tuple[str, ...],
@@ -840,7 +1088,12 @@ def evaluate_prashna_outcome(
             reason_code="REQUIRED_FACTS_MISSING",
             source_refs=tuple(sorted(set(radicality.source_refs + route.source_refs))),
         )
-    if geometry.state not in {"applying", "exact", "separating"}:
+    geometry_available = (
+        geometry.state in {"connected", "unconnected"}
+        if isinstance(geometry, PrashnaBaselineGeometryResult)
+        else geometry.state in {"applying", "exact", "separating"}
+    )
+    if not geometry_available:
         return _blocked_prashna_outcome(
             profile=route.profile,
             school=school,
@@ -884,8 +1137,12 @@ def evaluate_prashna_outcome(
 
     assistance = [item for item in ordered_testimonies if item.polarity == "assistance"]
     obstacles = [item for item in ordered_testimonies if item.polarity == "obstacle"]
+    if isinstance(geometry, PrashnaBaselineGeometryResult):
+        geometry_score = 0.2 if geometry.state == "connected" else 0.0
+    else:
+        geometry_score = 0.2 if geometry.state in {"applying", "exact"} else -0.2
     score = (
-        (0.2 if geometry.state in {"applying", "exact"} else -0.2)
+        geometry_score
         + sum(item.confidence for item in assistance)
         - sum(item.confidence for item in obstacles)
     )
@@ -905,7 +1162,11 @@ def evaluate_prashna_outcome(
     )
     confidence = round(min(0.65, 0.35 + min(abs(score), 0.3)), 6)
     timing_window = None
-    if timing_support is not None and geometry.state in {"applying", "exact"}:
+    if (
+        timing_support is not None
+        and not isinstance(geometry, PrashnaBaselineGeometryResult)
+        and geometry.state in {"applying", "exact"}
+    ):
         common_refs.update(timing_support.source_refs)
         timing_window = PrashnaTimingWindow(
             minimum=timing_support.minimum,
@@ -1225,7 +1486,7 @@ class PrashnaReleaseAudit(FrozenModel):
                 "taxonomy_ru_en",
                 "geometry_property_suite",
                 "outcome_graph_and_privacy",
-                "tajika_source_admission",
+                "baseline_geometry_admission",
                 "published_outcome_cases",
                 "held_out_questions",
             ),
@@ -1260,7 +1521,52 @@ _PRASHNA_RADICALITY_PROFILE = (
 _PRASHNA_SOURCE_MANIFEST = (
     _PRASHNA_ROOT / "src/jyotish_agent/data/doctrine/prashna-sources.json"
 )
+_PRASHNA_PACKAGED_RELEASE = (
+    _PRASHNA_ROOT / "src/jyotish_agent/data/doctrine/prashna-release.json"
+)
 _PRASHNA_HELD_OUT_ID = re.compile(r"^[a-z][a-z0-9_]{2,80}$")
+
+
+def load_prashna_release_audit(
+    *, verify_source_bytes: bool = True
+) -> PrashnaReleaseAudit:
+    """Load the private release and verify only its admitted baseline bytes."""
+
+    audit = PrashnaReleaseAudit.model_validate_json(
+        _PRASHNA_PACKAGED_RELEASE.read_text(encoding="utf-8")
+    )
+    manifest = load_source_manifest(_PRASHNA_SOURCE_MANIFEST)
+    if audit.corpus_manifest_sha256 != manifest.manifest_sha256:
+        raise ValueError("PRASHNA_SOURCE_MANIFEST_SUBSTITUTED")
+    if audit.compiled_profile_sha256 != prashna_compiled_profile_sha256():
+        raise ValueError("PRASHNA_COMPILED_PROFILE_SUBSTITUTED")
+    if audit.available and verify_source_bytes:
+        radicality = PrashnaRadicalityProfile.model_validate_json(
+            _PRASHNA_RADICALITY_PROFILE.read_text(encoding="utf-8")
+        )
+        required_ids = {item.source_id for item in radicality.criteria}
+        required_ids.update(
+            rule.source_ref.split(":", 1)[0]
+            for rule in load_prashna_baseline_rule_pack().rules
+        )
+        runtime_sources = tuple(
+            source for source in manifest.sources if source.source_id in required_ids
+        )
+        if {source.source_id for source in runtime_sources} != required_ids:
+            raise ValueError("PRASHNA_ADMITTED_SOURCE_MISSING")
+        runtime_manifest = SourceManifest(
+            schema_version=manifest.schema_version,
+            sources=runtime_sources,
+        )
+        root = Path(
+            os.environ.get(
+                "JYOTISH_PRIVATE_SOURCES_ROOT",
+                str(Path.cwd() / "private_sources"),
+            )
+        )
+        if not SourceVerifier.verify(runtime_manifest, root).ok:
+            raise ValueError("PRASHNA_SOURCE_BYTES_UNVERIFIED")
+    return audit
 
 
 def _held_out_json(path: Path, label: str) -> dict[str, object]:

@@ -415,25 +415,84 @@ class JyotishMcpFacade:
         return PrashnaFacade(clock=self.clock).calculate(value)
 
     def prashna_full(self, value: PrashnaFullMcpInput) -> PrashnaFullReleaseResult:
-        """Expose Full Prashna only when the packaged release audit permits it."""
+        """Run the source-verified private baseline without the Tajika overlay."""
 
-        from .doctrine.prashna_pack import PrashnaReleaseAudit
-
-        audit = PrashnaReleaseAudit.model_validate_json(
-            (Path(__file__).parent / "data/doctrine/prashna-release.json").read_text(
-                encoding="utf-8"
-            )
+        from .doctrine.prashna_pack import (
+            classify_prashna_question,
+            load_prashna_release_audit,
         )
-        if audit.available:  # pragma: no cover - future admitted production release
-            raise McpFacadeError("PRASHNA_FULL_RUNTIME_NOT_CONFIGURED")
+        from .doctrine.prashna_release import execute_prashna_full
+
+        try:
+            audit = load_prashna_release_audit(verify_source_bytes=False)
+        except ValueError:
+            return PrashnaFullReleaseResult(
+                status="unavailable",
+                request_mode=value.mode,
+                locale=value.locale,
+                admission_state="blocked_sources",
+                external_review_missing=True,
+                error_code="RELEASE_IDENTITY_INVALID",
+            )
+
+        route = classify_prashna_question(value.question)
+        if route.status == "high_stakes":
+            return PrashnaFullReleaseResult(
+                status="unavailable",
+                request_mode=value.mode,
+                locale=value.locale,
+                admission_state=audit.admission_state,
+                blockers=list(audit.blockers),
+                external_review_missing=audit.external_review_missing,
+                error_code="HIGH_STAKES_TOPIC",
+            )
+        if route.status == "supported":
+            if not audit.available:
+                return PrashnaFullReleaseResult(
+                    status="unavailable",
+                    request_mode=value.mode,
+                    locale=value.locale,
+                    profile=route.profile,
+                    admission_state=audit.admission_state,
+                    blockers=list(audit.blockers),
+                    external_review_missing=audit.external_review_missing,
+                    error_code="RELEASE_GATES_INCOMPLETE",
+                )
+            try:
+                load_prashna_release_audit()
+            except ValueError:
+                return PrashnaFullReleaseResult(
+                    status="unavailable",
+                    request_mode=value.mode,
+                    locale=value.locale,
+                    profile=route.profile,
+                    admission_state=audit.admission_state,
+                    blockers=list(audit.blockers),
+                    external_review_missing=audit.external_review_missing,
+                    error_code="SOURCE_BYTES_UNVERIFIED",
+                )
+
+        execution = execute_prashna_full(
+            value,
+            locale=value.locale,
+            mode=value.mode,
+            include_evidence=value.include_evidence,
+            clock=self.clock,
+        )
         return PrashnaFullReleaseResult(
-            status="unavailable",
+            status=execution.status,
             request_mode=value.mode,
             locale=value.locale,
-            admission_state="blocked_sources",
+            profile=execution.profile,
+            admission_state=audit.admission_state,
             blockers=list(audit.blockers),
             external_review_missing=audit.external_review_missing,
-            report=None,
+            report=(
+                execution.report.model_dump(mode="json")
+                if execution.report is not None
+                else None
+            ),
+            error_code=execution.reason_code,
         )
 
     def prashna_full_payload(

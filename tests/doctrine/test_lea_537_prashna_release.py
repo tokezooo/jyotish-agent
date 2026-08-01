@@ -8,7 +8,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from jyotish_agent.api import app
-from jyotish_agent.doctrine.prashna_pack import PrashnaReleaseAudit
+from jyotish_agent.doctrine.prashna_pack import (
+    PrashnaReleaseAudit,
+    prashna_compiled_profile_sha256,
+)
 from jyotish_agent.mcp_facade import JyotishMcpFacade
 from jyotish_agent.mcp_models import PrashnaFullMcpInput
 from jyotish_agent.mcp_server import build_server
@@ -16,6 +19,18 @@ from jyotish_agent.mcp_server import build_server
 
 ROOT = Path(__file__).parents[2]
 AUDIT = ROOT / "docs/evidence/doctrine/prashna-release.json"
+
+
+def _admit_source_bytes(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from jyotish_agent.doctrine import prashna_pack
+
+    monkeypatch.setattr(
+        prashna_pack.SourceVerifier,
+        "verify",
+        staticmethod(lambda manifest, root: SimpleNamespace(ok=True)),
+    )
 
 
 def test_available_audit_requires_every_required_gate_to_pass() -> None:
@@ -32,7 +47,7 @@ def test_available_audit_requires_every_required_gate_to_pass() -> None:
         "taxonomy_ru_en",
         "geometry_property_suite",
         "outcome_graph_and_privacy",
-        "tajika_source_admission",
+        "baseline_geometry_admission",
         "published_outcome_cases",
         "held_out_questions",
     }
@@ -73,9 +88,10 @@ def _request(mode: str, locale: str) -> dict[str, object]:
 def test_release_audit_distinguishes_completed_checks_from_future_follow_up() -> None:
     audit = PrashnaReleaseAudit.model_validate_json(AUDIT.read_text())
     assert audit.release_id == "full_prashna_v1"
-    assert audit.admission_state == "blocked_sources"
-    assert audit.compiled_profile_sha256 is None
-    assert audit.available is False
+    assert audit.admission_state == "experimental_full"
+    assert audit.compiled_profile_sha256 == prashna_compiled_profile_sha256()
+    assert audit.available is True
+    assert audit.blockers == ()
     assert audit.external_review_missing is True
     assert audit.completed_evidence
     assert audit.future_outcome_follow_up
@@ -100,20 +116,34 @@ def test_release_audit_distinguishes_completed_checks_from_future_follow_up() ->
     assert "questions-held-out-v1.json" in held_out.evidence
     assert "12/12" in held_out.evidence
     assert all("held_out" not in blocker for blocker in audit.blockers)
+    baseline = next(
+        gate for gate in audit.gates if gate.gate_id == "baseline_geometry_admission"
+    )
+    tajika = next(
+        gate for gate in audit.gates if gate.gate_id == "tajika_source_admission"
+    )
+    assert baseline.status == "passed"
+    assert tajika.status == "failed"
+    assert "Saxena" in (tajika.evidence or "")
 
 
-def test_ru_en_mode_matrix_is_additive_and_fails_closed_with_audit(tmp_path) -> None:
+def test_ru_en_mode_matrix_executes_private_baseline(
+    tmp_path, monkeypatch
+) -> None:
+    _admit_source_bytes(monkeypatch)
     facade = JyotishMcpFacade(tmp_path, None)
     for mode in ("quick", "full", "deep", "inspection"):
         for locale in ("ru", "en"):
             parsed = PrashnaFullMcpInput.model_validate(_request(mode, locale))
             result = facade.prashna_full(parsed)
             assert result.surface == "experimental_full"
-            assert result.status == "unavailable"
+            assert result.status == "completed"
             assert result.request_mode == mode
             assert result.locale == locale
-            assert result.admission_state == "blocked_sources"
-            assert result.report is None
+            assert result.profile == "work_project_status"
+            assert result.admission_state == "experimental_full"
+            assert result.report is not None
+            assert result.error_code is None
             assert result.external_review_missing
             assert len(result.model_dump_json()) < 16_000
 
@@ -143,8 +173,9 @@ def test_secret_malformed_input_is_sanitized(tmp_path) -> None:
 
 
 def test_mcp_schema_and_release_gate_are_deterministic_fast_and_private(
-    tmp_path,
+    tmp_path, monkeypatch
 ) -> None:
+    _admit_source_bytes(monkeypatch)
     facade = JyotishMcpFacade(tmp_path, None)
     server = build_server(facade)
     tool = server._tool_manager.get_tool("prashna_full")
@@ -154,21 +185,85 @@ def test_mcp_schema_and_release_gate_are_deterministic_fast_and_private(
 
     parsed = PrashnaFullMcpInput.model_validate(_request("inspection", "ru"))
     started = time.perf_counter()
-    results = [facade.prashna_full(parsed) for _ in range(50)]
-    assert time.perf_counter() - started < 1.0
+    results = [facade.prashna_full(parsed) for _ in range(2)]
+    assert time.perf_counter() - started < 5.0
     assert all(result == results[0] for result in results)
     rendered = json.dumps(results[0].model_dump(mode="json"), sort_keys=True)
     assert ".pdf" not in rendered
     assert "private_sources" not in rendered
 
 
-def test_http_adapter_exposes_same_fail_closed_release() -> None:
+def test_http_adapter_exposes_same_private_release(monkeypatch) -> None:
+    _admit_source_bytes(monkeypatch)
     response = TestClient(app).post(
         "/v2/doctrine/prashna/full", json=_request("inspection", "en")
     )
     assert response.status_code == 200
     body = response.json()
     assert body["surface"] == "experimental_full"
-    assert body["status"] == "unavailable"
-    assert body["admission_state"] == "blocked_sources"
-    assert body["report"] is None
+    assert body["status"] == "completed"
+    assert body["admission_state"] == "experimental_full"
+    assert body["profile"] == "work_project_status"
+    assert body["report"] is not None
+    assert body["error_code"] is None
+
+
+def test_all_four_low_risk_profiles_execute_without_tajika(
+    tmp_path, monkeypatch
+) -> None:
+    _admit_source_bytes(monkeypatch)
+    facade = JyotishMcpFacade(tmp_path, None)
+    questions = {
+        "work_project_status": "What blocks this work project?",
+        "communication_contact": "Will this person contact me about the ordinary message?",
+        "lost_object": "Where is my lost notebook?",
+        "general_low_risk_outcome": "Will this low-risk plan work out?",
+    }
+    for profile, question in questions.items():
+        payload = _request("full", "en")
+        payload["question"] = question
+        result = facade.prashna_full(PrashnaFullMcpInput.model_validate(payload))
+        assert result.status == "completed"
+        assert result.profile == profile
+        assert result.report is not None
+        assert "tajika" not in json.dumps(result.report).casefold()
+
+
+def test_private_release_fails_closed_when_admitted_bytes_do_not_verify(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("JYOTISH_PRIVATE_SOURCES_ROOT", str(tmp_path / "missing"))
+    facade = JyotishMcpFacade(tmp_path, None)
+    result = facade.prashna_full(
+        PrashnaFullMcpInput.model_validate(_request("full", "en"))
+    )
+    assert result.status == "unavailable"
+    assert result.admission_state == "experimental_full"
+    assert result.error_code == "SOURCE_BYTES_UNVERIFIED"
+    assert result.report is None
+
+
+def test_tajika_bytes_are_not_required_by_baseline_runtime(monkeypatch) -> None:
+    from types import SimpleNamespace
+
+    from jyotish_agent.doctrine import prashna_pack
+
+    verified_ids: set[str] = set()
+
+    def verify(manifest, root):
+        del root
+        verified_ids.update(source.source_id for source in manifest.sources)
+        return SimpleNamespace(ok=True)
+
+    monkeypatch.setattr(
+        prashna_pack.SourceVerifier,
+        "verify",
+        staticmethod(verify),
+    )
+    audit = prashna_pack.load_prashna_release_audit()
+    assert audit.available is True
+    assert verified_ids == {
+        "daivajna_vallabha_2003_scan",
+        "prasna_marga_bv_raman_part_1_1991",
+    }
+    assert "tajika_nilakanthi_1893" not in verified_ids

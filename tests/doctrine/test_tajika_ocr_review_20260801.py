@@ -107,9 +107,10 @@ def test_prashna_release_names_bounded_tajika_progress_without_passing_gate() ->
     assert gate["status"] == "failed"
     assert "PDF pages 45-47" in gate["evidence"]
     assert "quarantined" in gate["evidence"]
-    assert any(
-        "translation and specialist review" in blocker
-        for blocker in release["blockers"]
-        if blocker.startswith("tajika_source_admission:")
-    )
-    assert release["available"] is False
+    assert release["available"] is True
+    assert release["admission_state"] == "experimental_full"
+    assert next(
+        item
+        for item in release["gates"]
+        if item["gate_id"] == "baseline_geometry_admission"
+    )["status"] == "passed"

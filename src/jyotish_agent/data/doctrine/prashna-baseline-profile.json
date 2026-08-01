@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "profile_id": "full_prashna_private_baseline_v1",
+  "school": "prasna_marga_baseline",
+  "confidence_ceiling": 0.65,
+  "benefic_planets": ["Jupiter", "Venus"],
+  "malefic_planets": ["Mars", "Saturn"],
+  "rules": [
+    {
+      "rule_id": "primary_house_lord_connection",
+      "kind": "geometry",
+      "confidence": 0.45,
+      "source_ref": "daivajna_vallabha_2003_scan:pdf:2:sha256:52855cdb9c26b1cb15c795f471a9c12d33bbe5b1d6071a2a42b3f8e8b0e9c894"
+    },
+    {
+      "rule_id": "relative_benefic_support",
+      "kind": "assistance",
+      "confidence": 0.35,
+      "source_ref": "daivajna_vallabha_2003_scan:pdf:2:sha256:52855cdb9c26b1cb15c795f471a9c12d33bbe5b1d6071a2a42b3f8e8b0e9c894"
+    },
+    {
+      "rule_id": "relative_malefic_obstacle",
+      "kind": "obstacle",
+      "confidence": 0.35,
+      "source_ref": "daivajna_vallabha_2003_scan:pdf:2:sha256:52855cdb9c26b1cb15c795f471a9c12d33bbe5b1d6071a2a42b3f8e8b0e9c894"
+    }
+  ]
+}
