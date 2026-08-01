@@ -33,7 +33,7 @@
     {
       "gate_id": "tajika_source_admission",
       "status": "failed",
-      "evidence": "A bounded OCR review hash-binds candidate passages on PDF pages 45-47; they remain quarantined pending transcription, translation, and specialist review."
+      "evidence": "A bounded OCR review hash-binds quarantined candidate passages on PDF pages 45-47. The exact translation target is D. P. Saxena, Tajik Nilkanthi, 1st edition (Ranjan Publications, 2001; LCCN 2001361798; OCLC 48507695), but licensed bytes are not local; transcription, translation, and specialist review remain incomplete."
     },
     {
       "gate_id": "published_outcome_cases",
@@ -65,7 +65,7 @@
   "completed_evidence": [
     "Automated source identity, anchor, taxonomy, geometry, graph, renderer, and privacy suites are implemented.",
     "Four Prasna Marga baseline radicality criteria are admitted for safe low-risk private experimentation with exact text offsets and fragment hashes; external specialist review remains missing.",
-    "Bounded Tajika candidate passages on PDF pages 45-47 are image-hash-bound and visually localized without admitting source text or product rules.",
+    "Bounded Tajika candidate passages on PDF pages 45-47 are image-hash-bound and visually localized without admitting source text or product rules; the exact D. P. Saxena translation acquisition target is catalog-verified.",
     "Two published known-outcome cases are page-anchored and reproduced offline: one safe work-status case is admitted and one relationship case remains excluded from product use.",
     "Twelve independently authored RU/EN held-out questions pass deterministic route and synthetic gated-outcome scoring without claiming source admission."
   ],
@@ -73,7 +73,7 @@
     "Follow eventual outcomes from opt-in concierge sessions where feasible."
   ],
   "blockers": [
-    "tajika_source_admission: bounded OCR candidates on PDF pages 45-47 remain quarantined; translation and specialist review are incomplete",
+    "tajika_source_admission: D. P. Saxena's 2001 Tajik Nilkanthi (LCCN 2001361798; OCLC 48507695) is the exact translation target, but licensed bytes are missing; bounded OCR candidates on PDF pages 45-47 remain quarantined and transcription, translation and specialist review are incomplete",
     "compiled_profile: no production source-admitted Prashna profile exists"
   ],
   "external_review_missing": true,

@@ -30,7 +30,7 @@
     {
       "domain": "prashna",
       "release_id": "full_prashna_v1",
-      "evidence_sha256": "935d76e62de3240385a03d3eeff7a9a4c2fe29ed1776dc73f2f0963c1ab051db",
+      "evidence_sha256": "ca3fdd6b747360cf40b999bc031de9249fccc8a02ea3acd33f775664226ab9b3",
       "admission_state": "blocked_sources",
       "available": false,
       "gate_statuses": {
@@ -46,7 +46,7 @@
         "specialist_review": "missing"
       },
       "blockers": [
-        "tajika_source_admission: bounded OCR candidates on PDF pages 45-47 remain quarantined; translation and specialist review are incomplete",
+        "tajika_source_admission: D. P. Saxena's 2001 Tajik Nilkanthi (LCCN 2001361798; OCLC 48507695) is the exact translation target, but licensed bytes are missing; bounded OCR candidates on PDF pages 45-47 remain quarantined and transcription, translation and specialist review are incomplete",
         "compiled_profile: no production source-admitted Prashna profile exists"
       ]
     },
@@ -97,7 +97,7 @@
     "full_python_suite": {
       "command": "PATH=/tmp/jyotish-uv:$PATH PYTHONPATH=.venv/lib/python3.12/site-packages:src:tests/doctrine $CODEX_PYTHON -m pytest -q",
       "status": "passed",
-      "passed": 910,
+      "passed": 912,
       "failed": 0,
       "skipped": 2
     },
@@ -114,6 +114,12 @@
       "status": "passed",
       "passed": 58,
       "failed": 0
+    },
+    "tajika_translation_acquisition_suite": {
+      "command": ".venv/bin/pytest -q tests/doctrine/test_tajika_translation_acquisition_20260801.py",
+      "status": "passed",
+      "passed": 2,
+      "failed": 0
     }
   },
   "private_source_scan": {
@@ -127,11 +133,11 @@
     "jaimini: nilakantha_subodhini_translation: supplied similarly named file is the existing Vimala commentary; licensed English translation bytes remain missing",
     "jaimini: source_review: bounded Sanjay Rath Upadesa, crop-aware Narayana pages 46-48, and K. N. Rao OCR fragments are hash-bound but quarantined and uncompiled; specialist review and overlay rule compilation remain missing",
     "jaimini: specialist_review: no production rule/profile review",
-    "prashna: tajika_source_admission: bounded OCR candidates on PDF pages 45-47 remain quarantined; translation and specialist review are incomplete",
+    "prashna: tajika_source_admission: D. P. Saxena's 2001 Tajik Nilkanthi (LCCN 2001361798; OCLC 48507695) is the exact translation target, but licensed bytes are missing; bounded OCR candidates on PDF pages 45-47 remain quarantined and transcription, translation and specialist review are incomplete",
     "prashna: compiled_profile: no production source-admitted Prashna profile exists",
     "muhurta: specialist_review: external rule-pack review is missing",
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay: the named modern source has not been lawfully supplied and reviewed"
   ],
-  "audit_sha256": "3eb9982f00983063480c943a8b839aa395731a10e738e017e4d6734764963193"
+  "audit_sha256": "2de946ecb6442de1dcf496b7ea8cd52880705308b14192b5c17bbce6e9d27a0a"
 }

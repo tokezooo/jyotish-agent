@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "audit_id": "prashna_tajika_translation_acquisition_v1",
+  "reviewed_at": "2026-08-01",
+  "review_scope": "Local private source index and Telegram download filename inventory plus public library catalog verification; no unlicensed download.",
+  "existing_sanskrit_source_id": "tajika_nilakanthi_1893",
+  "existing_sanskrit_source_sha256": "faeb2c49a41f8f4638e14645554515eb820e5ddfcfc08ab583ce8d2171941502",
+  "local_translation_match_count": 0,
+  "target_edition": {
+    "title": "Tajik Nilkanthi = Tajika Nilakanthi",
+    "author": "Nilakantha",
+    "translator_commentator": "D. P. Saxena",
+    "publisher": "Ranjan Publications",
+    "publication_place": "New Delhi",
+    "year": 2001,
+    "edition": "1st edition",
+    "pages": 334,
+    "languages": ["en", "sa"],
+    "lccn": "2001361798",
+    "oclc": "48507695",
+    "open_library_id": "OL4006298M"
+  },
+  "catalog_evidence": [
+    {
+      "catalog": "Open Library",
+      "url": "https://openlibrary.org/books/OL4006298M/Tajik_Nilkanthi",
+      "finding": "Bibliographic record verified; no licensed digital text was identified."
+    },
+    {
+      "catalog": "New York Public Library",
+      "url": "https://www.nypl.org/research/research-catalog/bib/b15611987",
+      "finding": "The English and Sanskrit edition is catalogued as an offsite physical book."
+    }
+  ],
+  "acquisition_state": "missing_licensed_bytes",
+  "acceptable_next_evidence": [
+    "A lawfully supplied scan or PDF of the target edition.",
+    "A SHA-256 identity record and page manifest for the supplied edition.",
+    "Page-mapped transcription and translation review for the bounded candidate passages.",
+    "Human specialist review before doctrine admission or product-rule use."
+  ],
+  "unlicensed_download_attempted": false,
+  "source_admitted": false,
+  "product_rule_use_allowed": false
+}
