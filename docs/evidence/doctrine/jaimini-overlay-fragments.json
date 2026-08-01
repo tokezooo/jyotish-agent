@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "audit_id": "jaimini_overlay_fragments_2026_08_01",
-  "ledger_sha256": "7d7e79cd3ba2ea246a1113419d7293856f55cc9cd22d8642bf681841e65870d3",
+  "ledger_sha256": "a28865f9a75a6a93f7b7a0f69d283adf04baa6db64e3a3a1e188086a40efac83",
   "source_manifest_sha256": "8acec9d797d3ebcabc8be1862840e98d256c93fda395de5a222cbf0f3f95bb41",
   "baseline_inventory_sha256": "887dfa20f2b6c2d99a191dbbfc05f7e0c84633c976983e499fcb8c9fcb6e5a5a",
   "fragment_source_ids": [
@@ -23,6 +23,31 @@
       "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
       "page_number": 48,
       "printed_page": 48
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "page_number": 49,
+      "printed_page": 49
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "page_number": 50,
+      "printed_page": 50
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "page_number": 51,
+      "printed_page": 51
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "page_number": 52,
+      "printed_page": 52
+    },
+    {
+      "source_id": "jaimini_sanjay_rath_narayana_dasa_2004",
+      "page_number": 53,
+      "printed_page": 53
     },
     {
       "source_id": "jaimini_sanjay_rath_upadesa_sutras_1997",
@@ -75,10 +100,10 @@
       "printed_page": 36
     }
   ],
-  "fragment_count": 13,
-  "binding_count": 15,
+  "fragment_count": 18,
+  "binding_count": 21,
   "anchored_unreviewed_binding_count": 9,
-  "conflict_binding_count": 6,
+  "conflict_binding_count": 12,
   "admitted_binding_count": 0,
   "unresolved_sources": [],
   "release_id": "full_jaimini_v1",

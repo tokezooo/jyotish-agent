@@ -418,8 +418,8 @@ def test_private_narayana_pages_replay_crop_aware_commitments_without_duplicates
         key=lambda fragment: fragment.page_number,
     )
 
-    assert [fragment.page_number for fragment in fragments] == [46, 47, 48]
-    assert [fragment.printed_page for fragment in fragments] == [46, 47, 48]
+    assert [fragment.page_number for fragment in fragments] == list(range(46, 54))
+    assert [fragment.printed_page for fragment in fragments] == list(range(46, 54))
     bounded_hashes: list[str] = []
     for fragment in fragments:
         text = _normalize_text(bounded[fragment.page_number - 1].text)
@@ -441,7 +441,7 @@ def test_private_narayana_pages_replay_crop_aware_commitments_without_duplicates
             fragment.normalized_content_sha256
         )
 
-    assert len(set(bounded_hashes)) == 3
+    assert len(set(bounded_hashes)) == 8
     assert _normalize_text(default[45].text) != _normalize_text(bounded[45].text)
     assert _normalize_text(default[46].text) != _normalize_text(bounded[46].text)
     assert _normalize_text(default[46].text) == _normalize_text(default[47].text)
