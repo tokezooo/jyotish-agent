@@ -1,0 +1,85 @@
+{
+  "schema_version": "1.0",
+  "audit_id": "prashna_tajika_ocr_review_v1",
+  "source_id": "tajika_nilakanthi_1893",
+  "source_file_sha256": "faeb2c49a41f8f4638e14645554515eb820e5ddfcfc08ab583ce8d2171941502",
+  "source_manifest_sha256": "7f320ba34fadc878ee028826a04d4b0b17b980614e4be212a262fdd552e5378b",
+  "review_scope": "Bounded candidate-page localization and technical OCR only; no translation, doctrine admission, or product activation.",
+  "candidate_search": {
+    "pdf_page_range": [7, 211],
+    "renderer": "pdftoppm",
+    "renderer_version": "26.04.0",
+    "dpi": 120,
+    "ocr_name": "tesseract",
+    "ocr_version": "5.5.2",
+    "languages": ["san", "hin"],
+    "psm": 6,
+    "search_output_persisted": false
+  },
+  "ocr": {
+    "extractor": "pypdf raw /DCTDecode image stream",
+    "name": "tesseract",
+    "version": "5.5.2",
+    "languages": ["san", "hin"],
+    "psm": 6
+  },
+  "foliation_note": "The scan splits each printed page into upper and lower image regions. Printed page numbers were visually checked on the upper region and paired with the adjacent lower region; the manifest page_offset was not used for this mapping.",
+  "candidate_pages": [
+    {
+      "pdf_page": 45,
+      "printed_page": 19,
+      "page_region": "lower",
+      "topic": "itthasala_definition_and_application_state",
+      "source_page_image_sha256": "ca74ad86d1bd37fe9f10d23c7d95d7c1f07cc689fe2b3f0d111d3a91f787ad90",
+      "source_page_image_dimensions": [3688, 1342],
+      "ocr_text_sha256": "ce21ab1efad0f2e80314ac14cacbe1b7a129ec8d0a81fb57686ee5678c77eb3e",
+      "ocr_word_count": 145,
+      "mean_word_confidence": 0.568056,
+      "visual_anchor_terms": ["itthasala", "muthashila"],
+      "agent_visual_localization_review": "passed",
+      "transcription_review": "pending_specialist",
+      "disposition": "quarantined_translation_review"
+    },
+    {
+      "pdf_page": 46,
+      "printed_page": 20,
+      "page_region": "upper",
+      "topic": "itthasala_temporal_interpretation",
+      "source_page_image_sha256": "c3c1ef1ef1ce59b01fd8cc05984f9509da9ffef6ee2f37ab7d2e10ad34687261",
+      "source_page_image_dimensions": [3688, 1418],
+      "ocr_text_sha256": "a0881257eedc515a9135ca6c6a4487530f0cf101e63fb90c0d911137a83d7f13",
+      "ocr_word_count": 137,
+      "mean_word_confidence": 0.59618,
+      "visual_anchor_terms": ["past", "current", "future"],
+      "agent_visual_localization_review": "passed",
+      "transcription_review": "pending_specialist",
+      "disposition": "quarantined_translation_review"
+    },
+    {
+      "pdf_page": 47,
+      "printed_page": 20,
+      "page_region": "lower",
+      "topic": "isarapha_separation_definition",
+      "source_page_image_sha256": "7ef8002184595546e516ca44478085e4bf15a09365601484c0bb5b474ad64a4f",
+      "source_page_image_dimensions": [3688, 1342],
+      "ocr_text_sha256": "7bfbd7e22f3437ed21d88f271096f66ff02a464f147401d2207cbd5c3534bba7",
+      "ocr_word_count": 153,
+      "mean_word_confidence": 0.550827,
+      "visual_anchor_terms": ["isarapha", "musaripha", "separation"],
+      "agent_visual_localization_review": "passed",
+      "transcription_review": "pending_specialist",
+      "disposition": "quarantined_translation_review"
+    }
+  ],
+  "source_ocr_status_after_review": "required",
+  "doctrine_admitted": false,
+  "product_rule_use_allowed": false,
+  "tracked_source_text": false,
+  "translation_review_missing": true,
+  "specialist_review_missing": true,
+  "review_blockers": [
+    "The bounded machine OCR has low mean word confidence and is not a reviewed Sanskrit transcription.",
+    "No reviewed translation or doctrine-level adjudication is available.",
+    "The remaining scan has not completed page-by-page OCR review."
+  ]
+}
