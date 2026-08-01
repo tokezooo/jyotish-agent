@@ -62,4 +62,10 @@ def test_existing_sanskrit_scan_is_not_mislabeled_as_the_missing_translation() -
     assert gate["status"] == "failed"
     assert "D. P. Saxena" in gate["evidence"]
     assert "LCCN 2001361798" in gate["evidence"]
-    assert release["available"] is False
+    assert release["available"] is True
+    assert release["admission_state"] == "experimental_full"
+    assert next(
+        item
+        for item in release["gates"]
+        if item["gate_id"] == "baseline_geometry_admission"
+    )["status"] == "passed"

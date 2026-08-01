@@ -2,14 +2,15 @@
   "schema_version": "1.0",
   "release_id": "full_prashna_v1",
   "corpus_manifest_sha256": "7f320ba34fadc878ee028826a04d4b0b17b980614e4be212a262fdd552e5378b",
-  "compiled_profile_sha256": null,
-  "admission_state": "blocked_sources",
+  "compiled_profile_sha256": "0aac4fe74b9a529ce5f7a51db1ea3d24efa2f8a7dd9b2131e61c1c13eb138039",
+  "admission_state": "experimental_full",
   "gates": [
     {"gate_id": "source_manifest", "status": "passed", "evidence": "Six declared local sources verify by SHA-256."},
     {"gate_id": "radicality_and_anchor_suite", "status": "passed", "evidence": "Four private-experimental baseline criteria have exact page and fragment hashes; readable, conflicting, unavailable, retry, and clarification gates pass."},
     {"gate_id": "taxonomy_ru_en", "status": "passed", "evidence": "Four safe profiles and adversarial ambiguity cases pass in RU and EN."},
     {"gate_id": "geometry_property_suite", "status": "passed", "evidence": "Hand checks, wrap, retrograde, station, boundary, replay, and substitution pass."},
     {"gate_id": "outcome_graph_and_privacy", "status": "passed", "evidence": "Three mandatory gates, conflicts, no-answer, renderer identity, and secret-input cases pass."},
+    {"gate_id": "baseline_geometry_admission", "status": "passed", "evidence": "The private baseline uses only the exact Daivajna Vallabha PDF page 2 house-lord and relative benefic/malefic geometry rules; the compiled rule pack is SHA-256 addressed and never selects Tajika."},
     {"gate_id": "tajika_source_admission", "status": "failed", "evidence": "A bounded OCR review hash-binds quarantined candidate passages on PDF pages 45-47. The exact translation target is D. P. Saxena, Tajik Nilkanthi, 1st edition (Ranjan Publications, 2001; LCCN 2001361798; OCLC 48507695), but licensed bytes are not local; transcription, translation, and specialist review remain incomplete."},
     {"gate_id": "published_outcome_cases", "status": "passed", "evidence": "2/2 published cases have exact question time/place, page-paired judgment and timing, and traceable observed outcomes; the safe teaching case is admitted and the marriage case remains excluded."},
     {"gate_id": "held_out_questions", "status": "passed", "evidence": "LEA-537: eval/prashna/questions-held-out-v1.json (SHA-256 ea337e395aadd08f7e7498293e3e3e388c79aa33ca130250aa333ee29a744303) executed by evaluate_prashna_held_out_questions(allow_held_out=True): 12/12 passed; material-error rate 0.0; safe-supported no-answer rate 0.125; source mode synthetic_test_fixture_only"},
@@ -25,17 +26,16 @@
   "completed_evidence": [
     "Automated source identity, anchor, taxonomy, geometry, graph, renderer, and privacy suites are implemented.",
     "Four Prasna Marga baseline radicality criteria are admitted for safe low-risk private experimentation with exact text offsets and fragment hashes; external specialist review remains missing.",
+    "The source-bound Daivajna Vallabha baseline compiles three conservative geometry and testimony rules and executes all four low-risk RU/EN profiles without selecting the Tajika overlay.",
     "Bounded Tajika candidate passages on PDF pages 45-47 are image-hash-bound and visually localized without admitting source text or product rules; the exact D. P. Saxena translation acquisition target is catalog-verified.",
     "Two published known-outcome cases are page-anchored and reproduced offline: one safe work-status case is admitted and one relationship case remains excluded from product use.",
     "Twelve independently authored RU/EN held-out questions pass deterministic route and synthetic gated-outcome scoring without claiming source admission."
   ],
   "future_outcome_follow_up": [
-    "Follow eventual outcomes from opt-in concierge sessions where feasible."
+    "Follow eventual outcomes from opt-in concierge sessions where feasible.",
+    "Acquire and review the exact D. P. Saxena Tajika translation before enabling the named applying/separating overlay."
   ],
-  "blockers": [
-    "tajika_source_admission: D. P. Saxena's 2001 Tajik Nilkanthi (LCCN 2001361798; OCLC 48507695) is the exact translation target, but licensed bytes are missing; bounded OCR candidates on PDF pages 45-47 remain quarantined and transcription, translation and specialist review are incomplete",
-    "compiled_profile: no production source-admitted Prashna profile exists"
-  ],
+  "blockers": [],
   "external_review_missing": true,
-  "available": false
+  "available": true
 }

@@ -584,13 +584,18 @@ class PrashnaFacade:
             ),
         )
 
-    def calculate(self, request: PrashnaRequest) -> PrashnaResult:
+    def calculate(
+        self,
+        request: PrashnaRequest,
+        *,
+        route_override: TopicRoute | None = None,
+    ) -> PrashnaResult:
         current_fingerprint = question_fingerprint(request.question)
         capture_identity: str | None = None
         cached_result: PrashnaCompletedResult | None = None
         try:
             profile = load_prashna_rule_profile()
-            route = route_prashna_topic(request.question, profile)
+            route = route_override or route_prashna_topic(request.question, profile)
         except PrashnaGovernanceError:
             return PrashnaUnavailableResult(
                 status="unavailable",
@@ -921,7 +926,7 @@ class PrashnaFacade:
                         status="pass",
                         severity="info",
                         inputs=(route.family or "",),
-                        outputs=(f"house_{rule_profile.primary_house}",),
+                        outputs=(f"house_{route.primary_house}",),
                     ),
                     evaluated_rule(
                         "prashna.geometry.applying_separating",

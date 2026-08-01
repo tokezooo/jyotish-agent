@@ -172,22 +172,33 @@ class PrashnaFullMcpInput(PrashnaRequest):
 class PrashnaFullReleaseResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
     surface: Literal["experimental_full"] = "experimental_full"
-    status: Literal["unavailable", "needs_input"]
+    status: Literal["completed", "unavailable", "needs_input", "incomplete"]
     request_mode: Literal["quick", "full", "deep", "inspection"] | None = None
     locale: Literal["ru", "en"] | None = None
-    admission_state: Literal["blocked_sources"] | None = None
+    profile: Literal[
+        "work_project_status",
+        "communication_contact",
+        "lost_object",
+        "general_low_risk_outcome",
+    ] | None = None
+    admission_state: Literal["blocked_sources", "experimental_full"] | None = None
     blockers: list[str] = Field(default_factory=list)
     external_review_missing: bool
     report: dict[str, Any] | None = None
-    error_code: Literal["INPUT_INVALID"] | None = None
+    error_code: str | None = None
 
     @model_validator(mode="after")
     def _status_contract(self) -> "PrashnaFullReleaseResult":
-        if self.status == "unavailable":
-            if self.admission_state != "blocked_sources" or self.error_code is not None:
-                raise ValueError("unavailable release requires blocked source audit")
-        elif self.error_code != "INPUT_INVALID" or self.admission_state is not None:
-            raise ValueError("needs_input release requires sanitized input error")
+        if self.status == "completed":
+            if (
+                self.admission_state != "experimental_full"
+                or self.profile is None
+                or self.report is None
+                or self.error_code is not None
+            ):
+                raise ValueError("successful private release requires profile and report")
+        elif self.report is not None or self.error_code is None:
+            raise ValueError("non-success release requires a sanitized error")
         return self
 
 

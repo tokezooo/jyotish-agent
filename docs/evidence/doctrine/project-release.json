@@ -29,25 +29,23 @@
     {
       "domain": "prashna",
       "release_id": "full_prashna_v1",
-      "evidence_sha256": "ca3fdd6b747360cf40b999bc031de9249fccc8a02ea3acd33f775664226ab9b3",
-      "admission_state": "blocked_sources",
-      "available": false,
+      "evidence_sha256": "c9490e7d98c6a18c4d544231abb7181d20942389bea2bf68995ca9748bd76958",
+      "admission_state": "experimental_full",
+      "available": true,
       "gate_statuses": {
         "source_manifest": "passed",
         "radicality_and_anchor_suite": "passed",
         "taxonomy_ru_en": "passed",
         "geometry_property_suite": "passed",
         "outcome_graph_and_privacy": "passed",
+        "baseline_geometry_admission": "passed",
         "tajika_source_admission": "failed",
         "published_outcome_cases": "passed",
         "held_out_questions": "passed",
         "concierge_future_outcomes": "missing",
         "specialist_review": "missing"
       },
-      "blockers": [
-        "tajika_source_admission: D. P. Saxena's 2001 Tajik Nilkanthi (LCCN 2001361798; OCLC 48507695) is the exact translation target, but licensed bytes are missing; bounded OCR candidates on PDF pages 45-47 remain quarantined and transcription, translation and specialist review are incomplete",
-        "compiled_profile: no production source-admitted Prashna profile exists"
-      ]
+      "blockers": []
     },
     {
       "domain": "muhurta",
@@ -98,9 +96,15 @@
     "full_python_suite": {
       "command": "uv run pytest -q",
       "status": "passed",
-      "passed": 933,
+      "passed": 939,
       "failed": 0,
       "skipped": 2
+    },
+    "prashna_private_release_suite": {
+      "command": "uv run pytest -q tests/doctrine/test_lea_532_prashna_radicality.py tests/doctrine/test_lea_533_prashna_taxonomy.py tests/doctrine/test_lea_534_prashna_geometry.py tests/doctrine/test_lea_535_prashna_outcome.py tests/doctrine/test_lea_536_prashna_renderer.py tests/doctrine/test_lea_537_prashna_release.py tests/doctrine/test_prashna_private_baseline_20260801.py tests/doctrine/test_project_release_audit.py",
+      "status": "passed",
+      "passed": 46,
+      "failed": 0
     },
     "jaimini_inventory_completion_suite": {
       "command": "uv run pytest -q tests/doctrine/test_lea_524_jaimini_inventory.py tests/doctrine/test_jaimini_baseline_reassessment_20260801.py tests/doctrine/test_jaimini_overlay_fragments_20260731.py tests/doctrine/test_lea_530_jaimini_release.py tests/doctrine/test_project_release_audit.py",
@@ -157,11 +161,9 @@
     "jaimini: compiled_profile: no source-admitted production profile exists",
     "jaimini: source_review: all sixteen baseline candidates are hash-bound to thirteen Nilakantha-mediated fragments, but seven conflicts remain quarantined and no baseline or overlay rule has specialist admission",
     "jaimini: specialist_review: no production rule/profile review",
-    "prashna: tajika_source_admission: D. P. Saxena's 2001 Tajik Nilkanthi (LCCN 2001361798; OCLC 48507695) is the exact translation target, but licensed bytes are missing; bounded OCR candidates on PDF pages 45-47 remain quarantined and transcription, translation and specialist review are incomplete",
-    "prashna: compiled_profile: no production source-admitted Prashna profile exists",
     "muhurta: specialist_review: external rule-pack review is missing",
     "muhurta: cross_domain_concierge_sessions: no opt-in sessions or value scores exist",
     "muhurta: modern_overlay_review: the acquired B. V. Raman 1969 fourth edition is identity-verified but not page-mapped, independently rights-confirmed, or specialist-reviewed; the overlay remains disabled"
   ],
-  "audit_sha256": "e01468ef1381e7be594eb50166ec6fe54284b9c83a819186e524918b6be3cb58"
+  "audit_sha256": "727ce52472677ee42571c3282759f9567ac561e995a3e32b4f4548baaa9f2153"
 }

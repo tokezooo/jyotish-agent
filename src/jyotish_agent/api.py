@@ -581,26 +581,11 @@ async def jaimini_full_release(
 async def prashna_full_release(
     req: PrashnaFullMcpInput,
 ) -> PrashnaFullReleaseResult:
-    """Fail closed until the packaged Full Prashna audit permits release."""
+    """Run the same source-verified private baseline exposed through MCP."""
 
-    from .doctrine.prashna_pack import PrashnaReleaseAudit
+    from .mcp_facade import JyotishMcpFacade
 
-    audit = PrashnaReleaseAudit.model_validate_json(
-        (Path(__file__).parent / "data/doctrine/prashna-release.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    if audit.available:  # pragma: no cover - future admitted production release
-        raise RuntimeError("Full Prashna runtime is not configured")
-    return PrashnaFullReleaseResult(
-        status="unavailable",
-        request_mode=req.mode,
-        locale=req.locale,
-        admission_state="blocked_sources",
-        blockers=list(audit.blockers),
-        external_review_missing=audit.external_review_missing,
-        report=None,
-    )
+    return JyotishMcpFacade(default_data_root(), None).prashna_full(req)
 
 
 @app.post(
