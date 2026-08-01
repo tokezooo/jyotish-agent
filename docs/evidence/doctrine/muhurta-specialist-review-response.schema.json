@@ -1,0 +1,152 @@
+{
+  "$defs": {
+    "MuhurtaReviewerRole": {
+      "enum": [
+        "electional_astrology_specialist",
+        "jyotish_practitioner",
+        "sanskrit_jyotish_specialist"
+      ],
+      "title": "MuhurtaReviewerRole",
+      "type": "string"
+    },
+    "MuhurtaSpecialistDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "subject_type": {
+          "enum": [
+            "rule",
+            "profile"
+          ],
+          "title": "Subject Type",
+          "type": "string"
+        },
+        "subject_id": {
+          "pattern": "^(?:muhurta\\.[A-Za-z0-9_.-]+|profile:[a-z][a-z0-9_]+)$",
+          "title": "Subject Id",
+          "type": "string"
+        },
+        "subject_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Subject Sha256",
+          "type": "string"
+        },
+        "decision": {
+          "enum": [
+            "approved",
+            "amended",
+            "rejected"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "note": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "minLength": 3,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Note"
+        },
+        "amendment_summary": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "minLength": 3,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Amendment Summary"
+        }
+      },
+      "required": [
+        "subject_type",
+        "subject_id",
+        "subject_sha256",
+        "decision"
+      ],
+      "title": "MuhurtaSpecialistDecision",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "review_id": {
+      "pattern": "^muhurta_review_[a-z0-9_]{3,80}$",
+      "title": "Review Id",
+      "type": "string"
+    },
+    "handoff_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Handoff Sha256",
+      "type": "string"
+    },
+    "reviewer_name": {
+      "maxLength": 120,
+      "minLength": 2,
+      "title": "Reviewer Name",
+      "type": "string"
+    },
+    "reviewer_role": {
+      "$ref": "#/$defs/MuhurtaReviewerRole"
+    },
+    "qualification_note": {
+      "maxLength": 500,
+      "minLength": 3,
+      "title": "Qualification Note",
+      "type": "string"
+    },
+    "independence_attested": {
+      "const": true,
+      "title": "Independence Attested",
+      "type": "boolean"
+    },
+    "source_access_attested": {
+      "const": true,
+      "title": "Source Access Attested",
+      "type": "boolean"
+    },
+    "contains_source_text": {
+      "const": false,
+      "title": "Contains Source Text",
+      "type": "boolean"
+    },
+    "decisions": {
+      "items": {
+        "$ref": "#/$defs/MuhurtaSpecialistDecision"
+      },
+      "maxItems": 8,
+      "minItems": 1,
+      "title": "Decisions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "review_id",
+    "handoff_sha256",
+    "reviewer_name",
+    "reviewer_role",
+    "qualification_note",
+    "independence_attested",
+    "source_access_attested",
+    "contains_source_text",
+    "decisions"
+  ],
+  "title": "MuhurtaSpecialistReviewResponse",
+  "type": "object"
+}
