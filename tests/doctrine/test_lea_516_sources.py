@@ -181,9 +181,23 @@ def test_tracked_examples_cover_required_domains_and_school_roles() -> None:
     )
 
 
-def test_private_source_root_is_ignored_and_no_pdf_is_packaged() -> None:
+def test_private_source_root_is_lfs_tracked_and_runtime_packages_remain_clean() -> None:
     gitignore = (ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
-    assert "private_sources/" in gitignore
+    attributes = (ROOT / ".gitattributes").read_text(encoding="utf-8")
+    assert "private_sources/" not in gitignore
+    assert "private_sources/**/*.pdf filter=lfs" in attributes
+    assert "private_sources/**/*.doc filter=lfs" in attributes
+    for protected_path in (
+        "private_sources/**/.env",
+        "private_sources/**/.venv/",
+        "private_sources/**/.git/",
+        "private_sources/**/profiles/",
+        "private_sources/**/*.sqlite",
+        "private_sources/**/*.log",
+        "private_sources/**/output/",
+        "private_sources/**/tmp/",
+    ):
+        assert protected_path in gitignore
     packaged = ROOT / "src/jyotish_agent"
     assert list(packaged.rglob("*.pdf")) == []
     assert list((ROOT / "tests").rglob("*.pdf")) == []

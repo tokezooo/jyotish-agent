@@ -1,0 +1,6 @@
+private_sources/**/*.docx filter=lfs diff=lfs merge=lfs -text
+private_sources/**/*.DOCX filter=lfs diff=lfs merge=lfs -text
+private_sources/**/*.pdf filter=lfs diff=lfs merge=lfs -text
+private_sources/**/*.PDF filter=lfs diff=lfs merge=lfs -text
+private_sources/**/*.doc filter=lfs diff=lfs merge=lfs -text
+private_sources/**/*.DOC filter=lfs diff=lfs merge=lfs -text

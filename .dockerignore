@@ -1,0 +1,35 @@
+# Never send local identities, private doctrine material, or generated artifacts
+# into the Railway build context. The Dockerfile also uses an allowlisted COPY set.
+.git/
+.venv/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+.DS_Store
+.env
+.env.*
+private_sources/
+private_evidence/
+profiles/
+artifacts/
+*.sqlite
+*.sqlite3
+*.db
+*.log
+output/
+tmp/
+node_modules/
+tests/
+eval/
+docs/
+examples/
+.agents/
+.expect/
+.gstack/
+.pi/
+.superpowers/
+.worktrees/
+computed_facts.json
+natal_chart_detailed.md
+server_response.json
+uvicorn_*.log

@@ -1,0 +1,84 @@
+{
+  "schema_version": "1.0",
+  "acquired_at": "2026-07-31",
+  "scope": "Private source acquisition only; no corpus admission or review approval implied.",
+  "files": [
+    {
+      "title": "Predicting through Jaimini's Chara Dasha: An Original Research",
+      "author": "K. N. Rao",
+      "match": "exact_title_isbn_search_result",
+      "edition_note": "Anna's Archive record lists Vani Publications, 2016, ISBN 9788189221072",
+      "local_file": "kn-rao-predicting-through-jaimini-chara-dasha-2016.pdf",
+      "source_url": "https://annas-archive.gl/md5/429c3217967ee3bbde25029c4ed7315d",
+      "provider": "annas-mcp",
+      "bytes": 18411299,
+      "pdf_pages": 135,
+      "sha256": "6e534cba2963209f3cb8898e357e9773d1dee27f6189a6b5b43ef2065739fb36",
+      "rights_note": "Copyrighted local research copy; public index availability does not establish reuse rights."
+    },
+    {
+      "title": "Predicting Through Jaimini Chara Dasha",
+      "author": "K. N. Rao",
+      "match": "alternate_scan",
+      "edition_note": "Anna's Archive alternate record; edition metadata incomplete",
+      "local_file": "kn-rao-predicting-through-jaimini-chara-dasha-alternate.pdf",
+      "source_url": "https://annas-archive.gl/md5/e701c3057e765b2b633c078fee8852bc",
+      "provider": "annas-mcp",
+      "bytes": 20487079,
+      "pdf_pages": 136,
+      "sha256": "5950aee477a95c60d4fb4b3b1e1b3bfecb327279cd7ff179631336cd03123259",
+      "rights_note": "Copyrighted local research copy; edition and reuse rights require review."
+    },
+    {
+      "title": "A Course on Jaimini Maharshi's Upadesa Sutra, Volume 1",
+      "author": "Sanjay Rath",
+      "match": "related_later_course_book_not_1997_edition",
+      "edition_note": "Sagittarius Publications, 2009, ISBN 9780976517726; Internet Archive-derived PDF",
+      "local_file": "sanjay-rath-a-course-on-jaimini-upadesa-sutra-2009.pdf",
+      "source_url": "https://annas-archive.gl/md5/6419d043d526aba45e37d0588d0f8160",
+      "provider": "annas-mcp",
+      "bytes": 32270100,
+      "pdf_pages": 520,
+      "sha256": "f05759d39fa8b19200a51544130fcc1a1f51ffee321e7c8b255fb97b14f4487d",
+      "rights_note": "Copyrighted local research copy; not interchangeable with the 1997 book."
+    },
+    {
+      "title": "Jaimini Maha Rishi's Upadesa Sutras: Complete with Four Chapters",
+      "author": "Maharishi Jaimini",
+      "translator_commentator": "Sanjay Rath",
+      "match": "exact_requested_1997_edition",
+      "edition_note": "Sagar Publications, first published 1997",
+      "local_file": "sanjay-rath-jaimini-maharishis-upadesa-sutras-1997.pdf",
+      "source_url": "https://j108.net/library/view/1454503370",
+      "download_url": "https://storage.yandexcloud.net/j108/library/znt9qlo0/Maharishi_Jaimini_-_Jaimini_Maharishi%27s_Upadesa_Sutras.pdf",
+      "provider": "J108 public library",
+      "bytes": 6129030,
+      "pdf_pages": 448,
+      "sha256": "5b9600dfd6a7c07664731f8bdb82643364df1e47fd1b9a29be15ddcf2fb79ed1",
+      "rights_note": "Copyrighted local research copy; public download availability does not establish reuse rights."
+    },
+    {
+      "title": "Narayana Dasa",
+      "author": "Sanjay Rath",
+      "match": "exact_requested_work_public_version_3",
+      "edition_note": "Sagittarius Publications, Version 3, 2004",
+      "local_file": "sanjay-rath-narayana-dasa.pdf",
+      "source_url": "https://storage.yandexcloud.net/j108/library/6fhh7uus/Sanjay_Rath_-_Narayana_Dasa.pdf",
+      "provider": "J108 public library storage",
+      "bytes": 1912330,
+      "pdf_pages": 97,
+      "sha256": "d5b576db6a37795a48a459e1ca4eb08195f44ef9134dbe012dc54aaaa752c21d",
+      "rights_note": "PDF header states: Free to reproduce so long as you quote the source. Preserve attribution and review exact permitted use before corpus publication."
+    }
+  ],
+  "missing": [
+    {
+      "title": "Neelakantha's Subodhini: Commentary on Jaimini Sutras",
+      "author": "K. Guru Rajesh Kotekal",
+      "isbn": "9788198388025",
+      "status": "not_found_as_downloadable_file",
+      "purchase_page": "https://bookkish.com/collections/k-guru-rajesh-books/products/neelakanthas-subodhini-commentary-on-jaimini-sutras",
+      "note": "Anna's Archive searches by title, author variants, transliteration, and ISBN returned no exact record. Purchase or user-supplied licensed bytes are required."
+    }
+  ]
+}

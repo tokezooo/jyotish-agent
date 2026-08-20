@@ -1,0 +1,66 @@
+{
+  "schema_version": "1.0",
+  "acquired_at": "2026-08-03",
+  "scope": "Private source acquisition only; no rights clearance, corpus admission, or specialist review implied.",
+  "files": [
+    {
+      "title": "Daivajna Vallabha",
+      "author": "Varaha Mihira",
+      "match": "exact_manifest_bytes",
+      "edition_note": "English electronic PDF created in 2003; Anna metadata labelled the payload as DOC, but file inspection identifies a 31-page PDF 1.2.",
+      "local_file": "daivajna-vallabha-2003-exact.pdf",
+      "canonical_private_path": "../daivajna-vallabha.pdf",
+      "source_url": "https://annas-archive.gl/md5/993009e4b95e71b27d3be65b3ded6101",
+      "provider": "annas-mcp",
+      "bytes": 72080,
+      "format": "PDF 1.2",
+      "pdf_pages": 31,
+      "md5": "993009e4b95e71b27d3be65b3ded6101",
+      "sha256": "3672d4ce627c1e27a2778c45b11795740bd2aebed6eb0835925603922fdd1ca1",
+      "expected_manifest_sha256": "3672d4ce627c1e27a2778c45b11795740bd2aebed6eb0835925603922fdd1ca1",
+      "rights_note": "Private research copy; catalog availability does not establish redistribution or commercial reuse rights."
+    },
+    {
+      "title": "Prasna Marga, Part I (Chapters I-XVI)",
+      "author": "Bangalore Venkata Raman",
+      "match": "textual_second_edition_1991_related_reprint_not_admitted_bytes",
+      "edition_note": "The PDF contains the preface to the second edition dated 29 April 1991; Anna metadata lists Motilal Banarsidass, 2010. It is a later digital/reprint artifact and is not byte-identical to the governed source.",
+      "local_file": "prasna-marga-bv-raman-part-1-1991-textual-match-anna-0464efcf.pdf",
+      "source_url": "https://annas-archive.gl/md5/0464efcf7b214b6e18a555627063ae2b",
+      "provider": "annas-mcp",
+      "bytes": 1194169,
+      "format": "PDF 1.4",
+      "pdf_pages": 276,
+      "md5": "0464efcf7b214b6e18a555627063ae2b",
+      "sha256": "92817c326813df375dfc399f5bdb3bcaf65f4676cf86d0046fd0fede4348421a",
+      "expected_manifest_sha256": "00a61cb4cf2639349558474a2a65f6dc743e2d5d34677a8f665d5c42185a325c",
+      "governed_page_replay": "failed: pages 33-35 and admitted fragment hashes do not match",
+      "rights_note": "Copyrighted private research copy; do not treat this related reprint as the admitted 1991 source or redistribute it."
+    },
+    {
+      "title": "Prasna Marga, Part I alternate",
+      "author": "Bangalore Venkata Raman (Anna metadata says Saunaka)",
+      "match": "related_editable_document_not_admitted_pdf",
+      "edition_note": "The content includes the second-edition preface dated 29 April 1991, but the payload is a Microsoft Compound Document rather than the required PDF source.",
+      "local_file": "prasna-marga-part-1-alternate-anna-60cb0537.doc",
+      "source_url": "https://annas-archive.gl/md5/60cb0537bece3eb8e75698649f10448b",
+      "provider": "annas-mcp",
+      "bytes": 1464832,
+      "format": "Microsoft Compound Document / Word",
+      "md5": "60cb0537bece3eb8e75698649f10448b",
+      "sha256": "a8ee75ec19775b4ac48fa81fcfafaf778a46a141cf5b7039dc5c4be890176e11",
+      "expected_manifest_sha256": "00a61cb4cf2639349558474a2a65f6dc743e2d5d34677a8f665d5c42185a325c",
+      "rights_note": "Copyrighted private research copy; metadata and format are incomplete and it is not eligible for corpus admission."
+    }
+  ],
+  "missing": [
+    {
+      "title": "Prasna Marga, Part I (Chapters I-XVI)",
+      "author": "Bangalore Venkata Raman",
+      "edition": "Second edition, 1991",
+      "required_sha256": "00a61cb4cf2639349558474a2a65f6dc743e2d5d34677a8f665d5c42185a325c",
+      "status": "exact_governed_bytes_not_found_in_annas_search",
+      "note": "Anna searches by exact title, author, year, page count, transliteration, and required SHA-256 returned only related reprint/document candidates."
+    }
+  ]
+}

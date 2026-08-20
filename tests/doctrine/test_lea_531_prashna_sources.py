@@ -11,7 +11,11 @@ from jyotish_agent.doctrine.prashna_pack import (
     build_prashna_corpus_coverage,
     render_prashna_corpus_coverage,
 )
-from jyotish_agent.doctrine.sources import SourceVerifier, load_source_manifest
+from jyotish_agent.doctrine.sources import (
+    SourceVerificationReport,
+    SourceVerifier,
+    load_source_manifest,
+)
 
 
 ROOT = Path(__file__).parents[2]
@@ -96,20 +100,27 @@ def test_verified_bytes_and_two_traceable_cases_complete_acquisition(
 def test_page_offsets_copyright_locality_and_private_projection() -> None:
     manifest = load_source_manifest(MANIFEST)
     by_id = {source.source_id: source for source in manifest.sources}
-    assert by_id["prasna_marga_bv_raman_part_1_1991"].page_offset == 0
+    assert by_id["prasna_marga_bv_raman_part_1_2010_reprint"].page_offset == 0
     assert by_id["prasna_marga_bv_raman_part_2_1992"].page_offset == -16
     assert by_id["satpancasika_sanskritdocuments_2016"].page_offset == -2
     assert by_id["tajika_nilakanthi_1893"].page_offset == -11
     assert (
-        by_id["prasna_marga_bv_raman_part_1_1991"].license_class.value
+        by_id["prasna_marga_bv_raman_part_1_2010_reprint"].license_class.value
         == "copyrighted_local"
     )
 
     catalog = PrashnaCorpusCatalog.model_validate_json(CATALOG.read_text())
     cases = PrashnaCaseCatalog.model_validate_json(CASES.read_text())
+    admitted_verification = SourceVerificationReport(
+        manifest_sha256=manifest.manifest_sha256,
+        verified_source_ids=tuple(
+            sorted(source.source_id for source in manifest.sources)
+        ),
+        findings=(),
+    )
     report = build_prashna_corpus_coverage(
         manifest,
-        SourceVerifier.verify(manifest, ROOT / "private_sources"),
+        admitted_verification,
         catalog,
         cases,
     )

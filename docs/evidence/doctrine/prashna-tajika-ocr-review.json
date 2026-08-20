@@ -3,7 +3,7 @@
   "audit_id": "prashna_tajika_ocr_review_v1",
   "source_id": "tajika_nilakanthi_1893",
   "source_file_sha256": "faeb2c49a41f8f4638e14645554515eb820e5ddfcfc08ab583ce8d2171941502",
-  "source_manifest_sha256": "7f320ba34fadc878ee028826a04d4b0b17b980614e4be212a262fdd552e5378b",
+  "source_manifest_sha256": "0d8c7d3a1319714069a7dbc4b0f5785f7cb425b9c64b709a7d66b0f6e94746b1",
   "review_scope": "Bounded candidate-page localization and technical OCR only; no translation, doctrine admission, or product activation.",
   "candidate_search": {
     "pdf_page_range": [7, 211],
