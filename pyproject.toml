@@ -38,6 +38,7 @@ dependencies = [
 [project.scripts]
 jyotish = "jyotish_agent.cli:entrypoint"
 jyotish-mcp = "jyotish_agent.mcp_server:main"
+jyotish-mcp-http = "jyotish_agent.mcp_http:main"
 
 [project.optional-dependencies]
 dev = [

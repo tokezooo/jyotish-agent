@@ -264,6 +264,6 @@ def test_tajika_bytes_are_not_required_by_baseline_runtime(monkeypatch) -> None:
     assert audit.available is True
     assert verified_ids == {
         "daivajna_vallabha_2003_scan",
-        "prasna_marga_bv_raman_part_1_1991",
+        "prasna_marga_bv_raman_part_1_2010_reprint",
     }
     assert "tajika_nilakanthi_1893" not in verified_ids

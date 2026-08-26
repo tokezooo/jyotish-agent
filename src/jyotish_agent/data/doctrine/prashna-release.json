@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0",
   "release_id": "full_prashna_v1",
-  "corpus_manifest_sha256": "7f320ba34fadc878ee028826a04d4b0b17b980614e4be212a262fdd552e5378b",
+  "corpus_manifest_sha256": "0d8c7d3a1319714069a7dbc4b0f5785f7cb425b9c64b709a7d66b0f6e94746b1",
   "compiled_profile_sha256": "0aac4fe74b9a529ce5f7a51db1ea3d24efa2f8a7dd9b2131e61c1c13eb138039",
   "admission_state": "experimental_full",
   "gates": [
@@ -48,7 +48,7 @@
     {
       "gate_id": "held_out_questions",
       "status": "passed",
-      "evidence": "LEA-537: eval/prashna/questions-held-out-v1.json (SHA-256 ea337e395aadd08f7e7498293e3e3e388c79aa33ca130250aa333ee29a744303) executed by evaluate_prashna_held_out_questions(allow_held_out=True): 12/12 passed; material-error rate 0.0; safe-supported no-answer rate 0.125; source mode synthetic_test_fixture_only"
+      "evidence": "LEA-537: eval/prashna/questions-held-out-v1.json (SHA-256 b84333c0b1c6df20f11da116e1d77f5f575da9a217b374f2f12a7bc7dd4bf8f5) executed by evaluate_prashna_held_out_questions(allow_held_out=True): 12/12 passed; material-error rate 0.0; safe-supported no-answer rate 0.125; source mode synthetic_test_fixture_only"
     },
     {
       "gate_id": "concierge_future_outcomes",

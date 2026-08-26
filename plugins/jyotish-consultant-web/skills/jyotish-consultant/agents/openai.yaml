@@ -1,0 +1,11 @@
+interface:
+  display_name: "Jyotish Consultant"
+  short_description: "Remote source-gated Jyotish guidance"
+  default_prompt: "Use the remote Jyotish calculate tool only when needed and answer my question naturally."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "jyotish"
+      description: "Remote read-only Jyotish calculate tool; personal requests require inline birth data."
+policy:
+  allow_implicit_invocation: true

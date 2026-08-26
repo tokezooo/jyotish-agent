@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "jyotish": {
+      "type": "http",
+      "url": "${JYOTISH_MCP_URL}"
+    }
+  }
+}

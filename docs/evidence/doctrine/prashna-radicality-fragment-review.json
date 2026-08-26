@@ -1,8 +1,8 @@
 {
   "schema_version": "1.0",
   "audit_id": "prashna_radicality_fragment_review_v1",
-  "source_manifest_sha256": "7f320ba34fadc878ee028826a04d4b0b17b980614e4be212a262fdd552e5378b",
-  "profile_sha256": "259221f4861fc31727e00772520d27f81a1d09816b538cb885d9ae84eb3b20ea",
+  "source_manifest_sha256": "0d8c7d3a1319714069a7dbc4b0f5785f7cb425b9c64b709a7d66b0f6e94746b1",
+  "profile_sha256": "286658cbcf9de45903f7ab45664f59e072423b458eed95bb4e50e280ab564ccf",
   "criterion_ids": [
     "anchor_exact",
     "question_not_test",
@@ -10,6 +10,16 @@
     "question_proper_form"
   ],
   "review_scope": "Four baseline radicality criteria only; safe low-risk private experimental use, with no Tajika overlay or public release claim.",
+  "source_readmission": {
+    "source_id": "prasna_marga_bv_raman_part_1_2010_reprint",
+    "edition_identity": "Motilal Banarsidass 2010 reprint containing B. V. Raman's second-edition preface dated 29 April 1991",
+    "source_sha256": "92817c326813df375dfc399f5bdb3bcaf65f4676cf86d0046fd0fede4348421a",
+    "page_count": 276,
+    "unchanged_fragment_hashes": ["anchor_exact", "question_not_test"],
+    "readmitted_fragment_hashes": ["question_proper_form"],
+    "review_status": "bounded_private_experimental_replay_passed",
+    "rights_status": "copyrighted_local_research_copy"
+  },
   "fragment_contract": {
     "coordinate_space": "PyPdfExtractor page text UTF-8 character offsets",
     "normalization": "whitespace_collapse_v1",
@@ -18,19 +28,19 @@
   },
   "source_pages": [
     {
-      "source_id": "prasna_marga_bv_raman_part_1_1991",
+      "source_id": "prasna_marga_bv_raman_part_1_2010_reprint",
       "pdf_page": 33,
       "printed_page": 33,
       "criteria": ["question_not_test"]
     },
     {
-      "source_id": "prasna_marga_bv_raman_part_1_1991",
+      "source_id": "prasna_marga_bv_raman_part_1_2010_reprint",
       "pdf_page": 34,
       "printed_page": 34,
       "criteria": ["anchor_exact"]
     },
     {
-      "source_id": "prasna_marga_bv_raman_part_1_1991",
+      "source_id": "prasna_marga_bv_raman_part_1_2010_reprint",
       "pdf_page": 35,
       "printed_page": 35,
       "criteria": ["question_proper_form"]
